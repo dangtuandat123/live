@@ -1,19 +1,23 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
+/*
+|--------------------------------------------------------------------------
+| Landing Page (Blade SSR - SEO tối ưu)
+|--------------------------------------------------------------------------
+*/
 Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
-});
+    return view('landing');
+})->name('home');
 
+/*
+|--------------------------------------------------------------------------
+| App Area (React Inertia CSR - sau khi đăng nhập)
+|--------------------------------------------------------------------------
+*/
 Route::get('/dashboard', function () {
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
