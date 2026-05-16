@@ -6,6 +6,17 @@ import './App.css'
 
 function App() {
   const [count, setCount] = useState(0)
+  const [backendMessage, setBackendMessage] = useState<string | null>(null)
+
+  const testConnection = async () => {
+    try {
+      const response = await fetch('/api/ping')
+      const data = await response.json()
+      setBackendMessage(data.message)
+    } catch (error) {
+      setBackendMessage('Failed to connect to backend!')
+    }
+  }
 
   return (
     <>
@@ -21,13 +32,27 @@ function App() {
             Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
           </p>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
+        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+          <button
+            type="button"
+            className="counter"
+            onClick={() => setCount((count) => count + 1)}
+          >
+            Count is {count}
+          </button>
+          <button
+            type="button"
+            className="counter"
+            onClick={testConnection}
+          >
+            Test Backend Connection
+          </button>
+        </div>
+        {backendMessage && (
+          <div style={{ marginTop: '20px', padding: '10px', background: '#242424', borderRadius: '8px', color: '#646cff' }}>
+            <p><strong>Response from Laravel:</strong> {backendMessage}</p>
+          </div>
+        )}
       </section>
 
       <div className="ticks"></div>
