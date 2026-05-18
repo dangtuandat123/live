@@ -1,55 +1,49 @@
-import InputError from '@/Components/InputError';
-import PrimaryButton from '@/Components/PrimaryButton';
-import TextInput from '@/Components/TextInput';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 
 export default function ForgotPassword({ status }: { status?: string }) {
-    const { data, setData, post, processing, errors } = useForm({
-        email: '',
-    });
+    const { data, setData, post, processing, errors } = useForm({ email: '' });
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-
         post(route('password.email'));
     };
 
     return (
         <GuestLayout>
-            <Head title="Forgot Password" />
-
-            <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-                Forgot your password? No problem. Just let us know your email
-                address and we will email you a password reset link that will
-                allow you to choose a new one.
-            </div>
-
-            {status && (
-                <div className="mb-4 text-sm font-medium text-green-600 dark:text-green-400">
-                    {status}
-                </div>
-            )}
-
-            <form onSubmit={submit}>
-                <TextInput
-                    id="email"
-                    type="email"
-                    name="email"
-                    value={data.email}
-                    className="mt-1 block w-full"
-                    isFocused={true}
-                    onChange={(e) => setData('email', e.target.value)}
-                />
-
-                <InputError message={errors.email} className="mt-2" />
-
-                <div className="mt-4 flex items-center justify-end">
-                    <PrimaryButton className="ms-4" disabled={processing}>
-                        Email Password Reset Link
-                    </PrimaryButton>
-                </div>
+            <Head title="Quên mật khẩu" />
+            <form onSubmit={submit} className="flex flex-col gap-6">
+                <FieldGroup>
+                    <div className="flex flex-col items-center gap-1 text-center">
+                        <h1 className="text-2xl font-bold">Quên mật khẩu</h1>
+                        <p className="text-sm text-balance text-muted-foreground mt-2">
+                            Nhập email của bạn và chúng tôi sẽ gửi liên kết đặt lại mật khẩu.
+                        </p>
+                    </div>
+                    {status && (
+                        <div className="text-sm font-medium text-green-600 text-center">{status}</div>
+                    )}
+                    <Field>
+                        <FieldLabel htmlFor="email">Email</FieldLabel>
+                        <Input
+                            id="email"
+                            type="email"
+                            placeholder="m@example.com"
+                            className="bg-background"
+                            autoFocus
+                            value={data.email}
+                            onChange={(e) => setData('email', e.target.value)}
+                        />
+                        {errors.email && <FieldDescription className="text-destructive font-medium">{errors.email}</FieldDescription>}
+                    </Field>
+                    <Button type="submit" disabled={processing} className="w-full mt-2">
+                        Gửi liên kết đặt lại mật khẩu
+                    </Button>
+                </FieldGroup>
             </form>
         </GuestLayout>
     );

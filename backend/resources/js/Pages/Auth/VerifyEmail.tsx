@@ -1,51 +1,45 @@
-import PrimaryButton from '@/Components/PrimaryButton';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
+import { Button } from '@/components/ui/button';
 
 export default function VerifyEmail({ status }: { status?: string }) {
     const { post, processing } = useForm({});
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-
         post(route('verification.send'));
     };
 
     return (
         <GuestLayout>
-            <Head title="Email Verification" />
-
-            <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-                Thanks for signing up! Before getting started, could you verify
-                your email address by clicking on the link we just emailed to
-                you? If you didn't receive the email, we will gladly send you
-                another.
-            </div>
-
-            {status === 'verification-link-sent' && (
-                <div className="mb-4 text-sm font-medium text-green-600 dark:text-green-400">
-                    A new verification link has been sent to the email address
-                    you provided during registration.
+            <Head title="Xác thực email" />
+            <div className="flex flex-col gap-6">
+                <div className="flex flex-col items-center gap-1 text-center">
+                    <h1 className="text-2xl font-bold">Xác thực email</h1>
+                    <p className="text-sm text-balance text-muted-foreground mt-2">
+                        Cảm ơn bạn đã đăng ký! Trước khi bắt đầu, vui lòng xác thực địa chỉ email của bạn bằng cách nhấp vào liên kết chúng tôi vừa gửi qua email.
+                    </p>
                 </div>
-            )}
-
-            <form onSubmit={submit}>
-                <div className="mt-4 flex items-center justify-between">
-                    <PrimaryButton disabled={processing}>
-                        Resend Verification Email
-                    </PrimaryButton>
-
+                {status === 'verification-link-sent' && (
+                    <div className="text-sm font-medium text-green-600 text-center">
+                        Liên kết xác thực mới đã được gửi đến email bạn đã cung cấp khi đăng ký.
+                    </div>
+                )}
+                <form onSubmit={submit} className="flex flex-col gap-4">
+                    <Button type="submit" disabled={processing} className="w-full">
+                        Gửi lại email xác thực
+                    </Button>
                     <Link
                         href={route('logout')}
                         method="post"
                         as="button"
-                        className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:text-gray-400 dark:hover:text-gray-100 dark:focus:ring-offset-gray-800"
+                        className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground text-center"
                     >
-                        Log Out
+                        Đăng xuất
                     </Link>
-                </div>
-            </form>
+                </form>
+            </div>
         </GuestLayout>
     );
 }

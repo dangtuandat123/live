@@ -1,39 +1,25 @@
-import DangerButton from '@/Components/DangerButton';
-import InputError from '@/Components/InputError';
-import InputLabel from '@/Components/InputLabel';
-import Modal from '@/Components/Modal';
-import SecondaryButton from '@/Components/SecondaryButton';
-import TextInput from '@/Components/TextInput';
 import { useForm } from '@inertiajs/react';
 import { FormEventHandler, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 
-export default function DeleteUserForm({
-    className = '',
-}: {
-    className?: string;
-}) {
-    const [confirmingUserDeletion, setConfirmingUserDeletion] = useState(false);
+export default function DeleteUserForm() {
+    const [confirming, setConfirming] = useState(false);
     const passwordInput = useRef<HTMLInputElement>(null);
 
-    const {
-        data,
-        setData,
-        delete: destroy,
-        processing,
-        reset,
-        errors,
-        clearErrors,
-    } = useForm({
-        password: '',
-    });
+    const { data, setData, delete: destroy, processing, reset, errors, clearErrors } = useForm({ password: '' });
 
-    const confirmUserDeletion = () => {
-        setConfirmingUserDeletion(true);
+    const confirmDelete = () => setConfirming(true);
+
+    const closeModal = () => {
+        setConfirming(false);
+        clearErrors();
+        reset();
     };
 
-    const deleteUser: FormEventHandler = (e) => {
+    const submit: FormEventHandler = (e) => {
         e.preventDefault();
-
         destroy(route('profile.destroy'), {
             preserveScroll: true,
             onSuccess: () => closeModal(),
@@ -42,83 +28,51 @@ export default function DeleteUserForm({
         });
     };
 
-    const closeModal = () => {
-        setConfirmingUserDeletion(false);
-
-        clearErrors();
-        reset();
-    };
-
     return (
-        <section className={`space-y-6 ${className}`}>
-            <header>
-                <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                    Delete Account
-                </h2>
-
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Once your account is deleted, all of its resources and data
-                    will be permanently deleted. Before deleting your account,
-                    please download any data or information that you wish to
-                    retain.
+        <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-0.5">
+                <h2 className="text-lg font-semibold text-destructive">Xóa tài khoản</h2>
+                <p className="text-sm text-muted-foreground">
+                    Khi tài khoản của bạn bị xóa, tất cả dữ liệu sẽ bị xóa vĩnh viễn. Vui lòng tải xuống mọi dữ liệu bạn muốn giữ lại trước khi xóa tài khoản.
                 </p>
-            </header>
+            </div>
+            <div>
+                <Button variant="destructive" onClick={confirmDelete}>Xóa tài khoản</Button>
+            </div>
 
-            <DangerButton onClick={confirmUserDeletion}>
-                Delete Account
-            </DangerButton>
-
-            <Modal show={confirmingUserDeletion} onClose={closeModal}>
-                <form onSubmit={deleteUser} className="p-6">
-                    <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                        Are you sure you want to delete your account?
-                    </h2>
-
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        Once your account is deleted, all of its resources and
-                        data will be permanently deleted. Please enter your
-                        password to confirm you would like to permanently delete
-                        your account.
-                    </p>
-
-                    <div className="mt-6">
-                        <InputLabel
-                            htmlFor="password"
-                            value="Password"
-                            className="sr-only"
-                        />
-
-                        <TextInput
-                            id="password"
-                            type="password"
-                            name="password"
-                            ref={passwordInput}
-                            value={data.password}
-                            onChange={(e) =>
-                                setData('password', e.target.value)
-                            }
-                            className="mt-1 block w-3/4"
-                            isFocused
-                            placeholder="Password"
-                        />
-
-                        <InputError
-                            message={errors.password}
-                            className="mt-2"
-                        />
+            {confirming && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div className="fixed inset-0 bg-black/50" onClick={closeModal} />
+                    <div className="relative z-50 w-full max-w-md rounded-lg border bg-background p-6 shadow-lg mx-4">
+                        <form onSubmit={submit} className="flex flex-col gap-6">
+                            <div className="flex flex-col gap-0.5">
+                                <h2 className="text-lg font-semibold">Bạn có chắc chắn muốn xóa tài khoản?</h2>
+                                <p className="text-sm text-muted-foreground">
+                                    Tất cả dữ liệu của bạn sẽ bị xóa vĩnh viễn. Vui lòng nhập mật khẩu để xác nhận.
+                                </p>
+                            </div>
+                            <Field>
+                                <FieldLabel htmlFor="delete-password" className="sr-only">Mật khẩu</FieldLabel>
+                                <Input
+                                    id="delete-password"
+                                    type="password"
+                                    ref={passwordInput}
+                                    className="bg-background"
+                                    autoFocus
+                                    placeholder="Mật khẩu"
+                                    value={data.password}
+                                    onChange={(e) => setData('password', e.target.value)}
+                                />
+                                {errors.password && <FieldDescription className="text-destructive font-medium">{errors.password}</FieldDescription>}
+                            </Field>
+                            <div className="flex justify-end gap-3">
+                                <Button variant="outline" type="button" onClick={closeModal}>Hủy</Button>
+                                <Button variant="destructive" type="submit" disabled={processing}>Xóa tài khoản</Button>
+                            </div>
+                        </form>
                     </div>
-
-                    <div className="mt-6 flex justify-end">
-                        <SecondaryButton onClick={closeModal}>
-                            Cancel
-                        </SecondaryButton>
-
-                        <DangerButton className="ms-3" disabled={processing}>
-                            Delete Account
-                        </DangerButton>
-                    </div>
-                </form>
-            </Modal>
-        </section>
+                </div>
+            )}
+        </div>
     );
 }
