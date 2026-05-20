@@ -1,12 +1,5 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,40 +8,39 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Progress } from "@/components/ui/progress"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  EyeIcon,
-  MessageSquareIcon,
-  SmileIcon,
-  PhoneIcon,
-  TrendingUpIcon,
-  ClockIcon,
-  CircleStopIcon,
-  UsersIcon,
-  HelpCircleIcon,
-  PackageIcon,
-  SparklesIcon,
+  EyeIcon, MessageSquareIcon, SmileIcon, PhoneIcon, TrendingUpIcon,
+  ClockIcon, CircleStopIcon, UsersIcon, HelpCircleIcon, PackageIcon,
+  SparklesIcon, SearchIcon, ChevronDownIcon, ArrowDownIcon,
 } from "lucide-react"
+import * as React from "react"
 
-const mockComments = [
-  { id: 1, user: "Nguyễn Thị Lan", text: "Áo thun này bao nhiêu tiền chị ơi?", time: "2 giây trước", sentiment: "positive", hasPhone: false },
-  { id: 2, user: "Trần Văn Minh", text: "Mình muốn mua quần jean size 30, ship về HCM. SĐT 0901234567", time: "5 giây trước", sentiment: "positive", hasPhone: true },
-  { id: 3, user: "Lê Hồng Phúc", text: "Chất lượng vải thế nào ạ? Có bị xù lông không?", time: "12 giây trước", sentiment: "neutral", hasPhone: false },
-  { id: 4, user: "Phạm Thị Mai", text: "Váy hoa đẹp quá! Cho mình 1 cái size M nhé. Mình ở 123 Lê Lợi Q1", time: "18 giây trước", sentiment: "positive", hasPhone: false },
-  { id: 5, user: "Hoàng Đức Long", text: "Giá đắt quá, shop khác bán rẻ hơn", time: "25 giây trước", sentiment: "negative", hasPhone: false },
-  { id: 6, user: "Vũ Thị Hà", text: "Mua 2 cái được giảm giá không shop?", time: "30 giây trước", sentiment: "positive", hasPhone: false },
-  { id: 7, user: "Đỗ Minh Tuấn", text: "Túi xách có mấy màu vậy chị? 0987654321", time: "35 giây trước", sentiment: "positive", hasPhone: true },
-  { id: 8, user: "Ngô Thanh Huyền", text: "Kính mát có chống UV không ạ?", time: "42 giây trước", sentiment: "neutral", hasPhone: false },
-  { id: 9, user: "Bùi Văn Sơn", text: "Ship tỉnh mất mấy ngày shop ơi?", time: "50 giây trước", sentiment: "neutral", hasPhone: false },
-  { id: 10, user: "Trịnh Thị Ngọc", text: "Chốt đơn áo thun trắng size L! Mình ở Đà Nẵng", time: "55 giây trước", sentiment: "positive", hasPhone: false },
-]
+// --- Mock Data ---
+function generateComments(count: number) {
+  const names = ["Nguyễn Thị Lan","Trần Văn Minh","Lê Hồng Phúc","Phạm Thị Mai","Hoàng Đức Long","Vũ Thị Hà","Đỗ Minh Tuấn","Ngô Thanh Huyền","Bùi Văn Sơn","Trịnh Thị Ngọc","Lý Quốc Bảo","Đặng Thu Hương","Cao Minh Đức","Tô Thanh Tâm","Hồ Ngọc Anh"]
+  const texts = [
+    "Áo thun này bao nhiêu tiền chị ơi?","Mình muốn mua quần jean size 30, ship về HCM. SĐT 0901234567",
+    "Chất lượng vải thế nào ạ?","Váy hoa đẹp quá! Cho mình 1 cái size M nhé","Giá đắt quá, shop khác rẻ hơn",
+    "Mua 2 cái được giảm giá không?","Túi xách có mấy màu? 0987654321","Kính mát chống UV không ạ?",
+    "Ship tỉnh mất mấy ngày?","Chốt đơn áo thun trắng size L! Đà Nẵng","Có size XXL không shop?",
+    "Hàng có sẵn không hay phải đợi?","Màu đen còn không ạ?","Đẹp quá, cho mình 2 cái nhé",
+    "Chất liệu cotton 100% hả shop?","Giày size 42 còn không?","Mình ở Hà Nội ship mấy ngày?",
+  ]
+  const sentiments: ("positive"|"neutral"|"negative")[] = ["positive","positive","positive","neutral","negative","positive","neutral"]
+  return Array.from({length: count}, (_, i) => ({
+    id: i + 1,
+    user: names[i % names.length],
+    text: texts[i % texts.length],
+    time: `${Math.max(1, i * 3)} giây trước`,
+    sentiment: sentiments[i % sentiments.length],
+    hasPhone: i % 7 === 1 || i % 11 === 6,
+  }))
+}
+
+const allComments = generateComments(200)
 
 const topProducts = [
   { name: "Áo thun basic cotton", mentions: 342, sentiment: 85, questions: 45 },
@@ -72,10 +64,13 @@ const potentialCustomers = [
   { name: "Đỗ Minh Tuấn", phone: "0987654321", address: "", product: "Túi xách da PU", comment: "Hỏi mấy màu" },
   { name: "Phạm Thị Mai", phone: "", address: "123 Lê Lợi Q1", product: "Váy hoa mùa hè", comment: "Mua size M" },
   { name: "Trịnh Thị Ngọc", phone: "", address: "Đà Nẵng", product: "Áo thun basic cotton", comment: "Chốt đơn size L" },
+  { name: "Lý Quốc Bảo", phone: "0912345678", address: "Bình Dương", product: "Giày sneaker trắng", comment: "Mua size 42" },
+  { name: "Đặng Thu Hương", phone: "", address: "Cần Thơ", product: "Váy hoa mùa hè", comment: "Mua 2 cái size S" },
+  { name: "Cao Minh Đức", phone: "0978123456", address: "Hà Nội", product: "Áo thun basic cotton", comment: "Chốt 3 cái size L" },
 ]
 
 function SentimentBadge({ sentiment }: { sentiment: string }) {
-  const config: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
+  const config: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
     positive: { label: "Tích cực", variant: "default" },
     neutral: { label: "Trung lập", variant: "secondary" },
     negative: { label: "Tiêu cực", variant: "destructive" },
@@ -84,6 +79,252 @@ function SentimentBadge({ sentiment }: { sentiment: string }) {
   return <Badge variant={c.variant} className="text-xs">{c.label}</Badge>
 }
 
+// --- Sub-components for each tab ---
+
+function CommentsPanel() {
+  const BATCH = 50
+  const [filter, setFilter] = React.useState("all")
+  const [search, setSearch] = React.useState("")
+  const [visibleCount, setVisibleCount] = React.useState(BATCH)
+
+  const filtered = allComments.filter((c) => {
+    if (filter !== "all" && c.sentiment !== filter) return false
+    if (search && !c.text.toLowerCase().includes(search.toLowerCase()) && !c.user.toLowerCase().includes(search.toLowerCase())) return false
+    return true
+  })
+
+  const visible = filtered.slice(0, visibleCount)
+  const hasMore = visibleCount < filtered.length
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Bình luận Realtime</CardTitle>
+            <CardDescription>
+              Hiển thị {visible.length} / {filtered.length} bình luận (tổng: {allComments.length})
+            </CardDescription>
+          </div>
+          <Badge variant="destructive" className="gap-1">
+            <span className="relative flex size-2">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-75" />
+              <span className="relative inline-flex size-2 rounded-full bg-current" />
+            </span>
+            Live
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2 pt-2">
+          <div className="relative flex-1">
+            <SearchIcon className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input placeholder="Tìm trong bình luận..." value={search} onChange={(e) => { setSearch(e.target.value); setVisibleCount(BATCH) }} className="pl-9 h-8 text-sm" />
+          </div>
+          <Select value={filter} onValueChange={(v) => { setFilter(v); setVisibleCount(BATCH) }}>
+            <SelectTrigger className="w-[130px] h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tất cả</SelectItem>
+              <SelectItem value="positive">Tích cực</SelectItem>
+              <SelectItem value="neutral">Trung lập</SelectItem>
+              <SelectItem value="negative">Tiêu cực</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <ScrollArea className="h-[480px] pr-3">
+          <div className="space-y-2">
+            {visible.map((comment) => (
+              <div key={comment.id} className="flex items-start gap-2.5 rounded-lg border p-2.5">
+                <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                  {comment.user.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0 space-y-0.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-sm font-medium">{comment.user}</span>
+                    <SentimentBadge sentiment={comment.sentiment} />
+                    {comment.hasPhone && (
+                      <Badge variant="outline" className="gap-1 text-xs"><PhoneIcon className="size-3" />SĐT</Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground break-words">{comment.text}</p>
+                  <p className="text-xs text-muted-foreground/60">{comment.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          {hasMore && (
+            <div className="pt-3 text-center">
+              <Button variant="outline" size="sm" onClick={() => setVisibleCount((p) => p + BATCH)}>
+                <ChevronDownIcon className="mr-1.5 size-3.5" />
+                Tải thêm {Math.min(BATCH, filtered.length - visibleCount)} bình luận
+              </Button>
+            </div>
+          )}
+        </ScrollArea>
+      </CardContent>
+    </Card>
+  )
+}
+
+function ProductsPanel() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Sản phẩm được nhắc đến</CardTitle>
+        <CardDescription>Xếp hạng theo số lượt nhắc trong bình luận (cập nhật realtime)</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-10">#</TableHead>
+              <TableHead>Sản phẩm</TableHead>
+              <TableHead className="text-right">Lượt nhắc</TableHead>
+              <TableHead>Sentiment</TableHead>
+              <TableHead className="text-right">Câu hỏi</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {topProducts.map((product, i) => (
+              <TableRow key={product.name}>
+                <TableCell className="font-bold text-muted-foreground">{i + 1}</TableCell>
+                <TableCell className="font-medium">{product.name}</TableCell>
+                <TableCell className="text-right">{product.mentions}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Progress value={product.sentiment} className="h-2 w-20" />
+                    <span className="text-xs text-muted-foreground">{product.sentiment}%</span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">{product.questions}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  )
+}
+
+function QuestionsPanel() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Câu hỏi thường gặp</CardTitle>
+        <CardDescription>Phân loại và gom nhóm câu hỏi bởi AI</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-10">#</TableHead>
+              <TableHead>Câu hỏi</TableHead>
+              <TableHead className="text-right">Số lần</TableHead>
+              <TableHead>SP liên quan</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {topQuestions.map((q, i) => (
+              <TableRow key={q.question}>
+                <TableCell className="font-bold text-muted-foreground">{i + 1}</TableCell>
+                <TableCell className="font-medium">{q.question}</TableCell>
+                <TableCell className="text-right"><Badge variant="secondary">{q.count}</Badge></TableCell>
+                <TableCell className="text-muted-foreground text-sm">{q.product}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  )
+}
+
+function CustomersPanel() {
+  const [search, setSearch] = React.useState("")
+  const filtered = potentialCustomers.filter((c) =>
+    !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search) || c.product.toLowerCase().includes(search.toLowerCase())
+  )
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Khách hàng tiềm năng</CardTitle>
+            <CardDescription>Trích xuất SĐT/địa chỉ từ bình luận · {filtered.length} khách</CardDescription>
+          </div>
+        </div>
+        <div className="relative max-w-xs pt-2">
+          <SearchIcon className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground mt-1" />
+          <Input placeholder="Tìm theo tên, SĐT, SP..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-8 text-sm" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Tên</TableHead>
+              <TableHead>SĐT</TableHead>
+              <TableHead>Địa chỉ</TableHead>
+              <TableHead>SP quan tâm</TableHead>
+              <TableHead>Nội dung</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.map((c, i) => (
+              <TableRow key={i}>
+                <TableCell className="font-medium">{c.name}</TableCell>
+                <TableCell>
+                  {c.phone ? <Badge variant="outline" className="gap-1"><PhoneIcon className="size-3" />{c.phone}</Badge> : <span className="text-muted-foreground">—</span>}
+                </TableCell>
+                <TableCell>{c.address || <span className="text-muted-foreground">—</span>}</TableCell>
+                <TableCell><Badge variant="secondary">{c.product}</Badge></TableCell>
+                <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">{c.comment}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  )
+}
+
+function AIInsightsPanel() {
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><SparklesIcon className="size-5" />Tóm tắt AI</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <p><strong className="text-foreground">Phiên live đang diễn ra tốt</strong> với tỷ lệ tương tác cao. Sản phẩm "Áo thun basic cotton" được quan tâm nhiều nhất với 342 lượt nhắc.</p>
+          <p><strong className="text-foreground">Cảm xúc tích cực chiếm 78%</strong>, chủ yếu liên quan đến chất lượng sản phẩm và giá cả hợp lý.</p>
+          <p><strong className="text-foreground">Gợi ý:</strong> Nên trả lời câu hỏi về "size" và "ship". Có thể đưa ra combo giảm giá vì nhiều khách hỏi về mua nhiều.</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader><CardTitle>Cảnh báo AI</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3">
+            <p className="text-sm font-medium text-yellow-600">⚠️ Câu hỏi chưa trả lời</p>
+            <p className="text-xs text-muted-foreground mt-1">28 câu hỏi về "chất liệu" chưa được trả lời trong 5 phút qua.</p>
+          </div>
+          <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3">
+            <p className="text-sm font-medium text-green-600">✅ Sản phẩm hot</p>
+            <p className="text-xs text-muted-foreground mt-1">"Váy hoa mùa hè" có sentiment 92% — bán chạy nhất phiên này.</p>
+          </div>
+          <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
+            <p className="text-sm font-medium text-blue-600">💡 Cơ hội upsell</p>
+            <p className="text-xs text-muted-foreground mt-1">31 khách hỏi "mua 2 giảm giá không" — nên tạo combo giảm giá ngay.</p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// --- Main Page ---
 export default function LivesShow() {
   return (
     <AuthenticatedLayout>
@@ -112,317 +353,150 @@ export default function LivesShow() {
       <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
         {/* Session Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Flash Sale Mùa Hè</h1>
-              <div className="flex items-center gap-2 mt-1">
-                <Badge variant="default">Facebook</Badge>
-                <Badge variant="destructive" className="gap-1">
-                  <span className="relative flex size-2">
-                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-75" />
-                    <span className="relative inline-flex size-2 rounded-full bg-current" />
-                  </span>
-                  Đang Live
-                </Badge>
-                <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <ClockIcon className="size-3.5" />
-                  1h 23m
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Flash Sale Mùa Hè</h1>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant="default">Facebook</Badge>
+              <Badge variant="destructive" className="gap-1">
+                <span className="relative flex size-2">
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-75" />
+                  <span className="relative inline-flex size-2 rounded-full bg-current" />
                 </span>
-              </div>
+                Đang Live
+              </Badge>
+              <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                <ClockIcon className="size-3.5" />1h 23m
+              </span>
             </div>
           </div>
-          <Button variant="destructive">
-            <CircleStopIcon className="mr-2 size-4" />
-            Kết thúc phiên
-          </Button>
+          <Button variant="destructive"><CircleStopIcon className="mr-2 size-4" />Kết thúc phiên</Button>
         </div>
 
-        {/* Realtime KPIs */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Lượt xem</CardTitle>
-              <EyeIcon className="size-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">3,247</div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <TrendingUpIcon className="size-3 text-green-500" />
-                +127 trong 5 phút qua
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Bình luận</CardTitle>
-              <MessageSquareIcon className="size-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">523</div>
-              <p className="text-xs text-muted-foreground">~8.2 comment/phút</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Sentiment</CardTitle>
-              <SmileIcon className="size-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">78%</div>
-              <p className="text-xs text-muted-foreground">tích cực</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">KH tiềm năng</CardTitle>
-              <PhoneIcon className="size-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">12</div>
-              <p className="text-xs text-muted-foreground">đã để lại SĐT/địa chỉ</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Content Tabs */}
-        <Tabs defaultValue="comments" className="flex-1">
-          <TabsList>
-            <TabsTrigger value="comments" className="gap-1.5">
-              <MessageSquareIcon className="size-4" />
-              Bình luận
-            </TabsTrigger>
-            <TabsTrigger value="products" className="gap-1.5">
-              <PackageIcon className="size-4" />
-              Sản phẩm
-            </TabsTrigger>
-            <TabsTrigger value="questions" className="gap-1.5">
-              <HelpCircleIcon className="size-4" />
-              Câu hỏi
-            </TabsTrigger>
-            <TabsTrigger value="customers" className="gap-1.5">
-              <UsersIcon className="size-4" />
-              KH tiềm năng
-            </TabsTrigger>
-            <TabsTrigger value="ai" className="gap-1.5">
-              <SparklesIcon className="size-4" />
-              AI Insights
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Comments Tab */}
-          <TabsContent value="comments">
+        {/* 2-Column Layout: Video + KPI (left) | Tabs (right) — stacks on mobile */}
+        <div className="grid gap-4 xl:grid-cols-[380px_1fr]">
+          {/* Left Column: Video + KPIs */}
+          <div className="flex flex-col gap-4">
+            {/* Video Embed */}
             <Card>
-              <CardHeader>
-                <CardTitle>Bình luận Realtime</CardTitle>
-                <CardDescription>Feed bình luận với phân tích cảm xúc tự động bởi AI</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[500px] pr-4">
-                  <div className="space-y-3">
-                    {mockComments.map((comment) => (
-                      <div
-                        key={comment.id}
-                        className="flex items-start gap-3 rounded-lg border p-3"
-                      >
-                        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                          {comment.user.charAt(0)}
-                        </div>
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{comment.user}</span>
-                            <SentimentBadge sentiment={comment.sentiment} />
-                            {comment.hasPhone && (
-                              <Badge variant="outline" className="gap-1 text-xs">
-                                <PhoneIcon className="size-3" />
-                                SĐT
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground">{comment.text}</p>
-                          <p className="text-xs text-muted-foreground">{comment.time}</p>
-                        </div>
-                      </div>
-                    ))}
+              <CardContent className="p-0">
+                <div className="aspect-video w-full rounded-t-lg bg-muted/50 flex items-center justify-center relative overflow-hidden">
+                  {/* Placeholder for video embed iframe */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/10" />
+                  <div className="text-center z-10 space-y-2">
+                    <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/10">
+                      <EyeIcon className="size-6 text-primary" />
+                    </div>
+                    <p className="text-sm font-medium">Đang phát trực tiếp</p>
+                    <p className="text-xs text-muted-foreground">Video embed từ Facebook Live</p>
+                    <Badge variant="destructive" className="gap-1">
+                      <span className="relative flex size-1.5">
+                        <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-75" />
+                        <span className="relative inline-flex size-1.5 rounded-full bg-current" />
+                      </span>
+                      3,247 đang xem
+                    </Badge>
                   </div>
-                </ScrollArea>
+                </div>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          {/* Products Tab */}
-          <TabsContent value="products">
-            <Card>
-              <CardHeader>
-                <CardTitle>Sản phẩm được nhắc đến</CardTitle>
-                <CardDescription>Xếp hạng sản phẩm theo số lượt nhắc đến trong bình luận</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>#</TableHead>
-                      <TableHead>Sản phẩm</TableHead>
-                      <TableHead className="text-right">Lượt nhắc</TableHead>
-                      <TableHead>Sentiment</TableHead>
-                      <TableHead className="text-right">Câu hỏi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {topProducts.map((product, i) => (
-                      <TableRow key={product.name}>
-                        <TableCell className="font-bold text-muted-foreground">{i + 1}</TableCell>
-                        <TableCell className="font-medium">{product.name}</TableCell>
-                        <TableCell className="text-right">{product.mentions}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Progress value={product.sentiment} className="h-2 w-20" />
-                            <span className="text-xs text-muted-foreground">{product.sentiment}%</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">{product.questions}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Questions Tab */}
-          <TabsContent value="questions">
-            <Card>
-              <CardHeader>
-                <CardTitle>Câu hỏi thường gặp</CardTitle>
-                <CardDescription>Câu hỏi được hỏi nhiều nhất trong bình luận, phân loại bởi AI</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>#</TableHead>
-                      <TableHead>Câu hỏi</TableHead>
-                      <TableHead className="text-right">Số lần hỏi</TableHead>
-                      <TableHead>Sản phẩm liên quan</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {topQuestions.map((q, i) => (
-                      <TableRow key={q.question}>
-                        <TableCell className="font-bold text-muted-foreground">{i + 1}</TableCell>
-                        <TableCell className="font-medium">{q.question}</TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant="secondary">{q.count}</Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{q.product}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Customers Tab */}
-          <TabsContent value="customers">
-            <Card>
-              <CardHeader>
-                <CardTitle>Khách hàng tiềm năng</CardTitle>
-                <CardDescription>Khách hàng đã để lại thông tin liên hệ (SĐT, địa chỉ) trong bình luận</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tên</TableHead>
-                      <TableHead>SĐT</TableHead>
-                      <TableHead>Địa chỉ</TableHead>
-                      <TableHead>Sản phẩm quan tâm</TableHead>
-                      <TableHead>Nội dung</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {potentialCustomers.map((customer, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="font-medium">{customer.name}</TableCell>
-                        <TableCell>
-                          {customer.phone ? (
-                            <Badge variant="outline" className="gap-1">
-                              <PhoneIcon className="size-3" />
-                              {customer.phone}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell>{customer.address || <span className="text-muted-foreground">—</span>}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{customer.product}</Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-                          {customer.comment}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* AI Insights Tab */}
-          <TabsContent value="ai">
-            <div className="grid gap-4 md:grid-cols-2">
+            {/* KPI Cards — 3 columns */}
+            <div className="grid grid-cols-3 gap-3">
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <SparklesIcon className="size-5" />
-                    Tóm tắt AI
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm text-muted-foreground">
-                  <p>
-                    <strong className="text-foreground">Phiên live đang diễn ra tốt</strong> với tỷ lệ tương tác cao.
-                    Sản phẩm "Áo thun basic cotton" được quan tâm nhiều nhất với 342 lượt nhắc.
-                  </p>
-                  <p>
-                    <strong className="text-foreground">Cảm xúc tích cực chiếm 78%</strong>, chủ yếu liên quan đến chất lượng
-                    sản phẩm và giá cả hợp lý. Một số phản hồi tiêu cực về giá cao hơn so với shop khác.
-                  </p>
-                  <p>
-                    <strong className="text-foreground">Gợi ý:</strong> Nên trả lời câu hỏi về "size" và "ship" vì đây là
-                    2 câu hỏi nhiều nhất. Có thể đưa ra combo giảm giá vì nhiều khách hỏi về mua nhiều.
+                <CardContent className="p-3 text-center">
+                  <div className="text-2xl font-bold">3,247</div>
+                  <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                    <EyeIcon className="size-3" />Xem
                   </p>
                 </CardContent>
               </Card>
-
               <Card>
-                <CardHeader>
-                  <CardTitle>Cảnh báo AI</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3">
-                    <p className="text-sm font-medium text-yellow-600">⚠️ Câu hỏi chưa trả lời</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      28 câu hỏi về "chất liệu" chưa được trả lời trong 5 phút qua.
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3">
-                    <p className="text-sm font-medium text-green-600">✅ Sản phẩm hot</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      "Váy hoa mùa hè" có sentiment 92% — sản phẩm bán chạy nhất phiên này.
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
-                    <p className="text-sm font-medium text-blue-600">💡 Cơ hội upsell</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      31 khách hỏi "mua 2 giảm giá không" — nên tạo combo giảm giá ngay.
-                    </p>
-                  </div>
+                <CardContent className="p-3 text-center">
+                  <div className="text-2xl font-bold">523</div>
+                  <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                    <MessageSquareIcon className="size-3" />BL
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <div className="text-2xl font-bold">12</div>
+                  <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                    <PhoneIcon className="size-3" />Leads
+                  </p>
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-        </Tabs>
+
+            {/* Sentiment AI Card */}
+            <Card>
+              <CardHeader className="p-4 pb-3">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <SmileIcon className="size-4" />
+                  Cảm xúc AI
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="flex items-start gap-4">
+                  {/* Left: big percentage */}
+                  <div>
+                    <div className="text-3xl font-bold text-green-500">78%</div>
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <TrendingUpIcon className="size-3 text-green-500" />
+                      +12.5%
+                    </p>
+                  </div>
+                  {/* Right: legend */}
+                  <div className="flex-1 space-y-1.5 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <span className="size-2 rounded-full bg-green-500" />
+                        Tích cực
+                      </span>
+                      <span className="font-medium">78%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <span className="size-2 rounded-full bg-amber-500" />
+                        Trung lập
+                      </span>
+                      <span className="font-medium">15%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <span className="size-2 rounded-full bg-red-500" />
+                        Tiêu cực
+                      </span>
+                      <span className="font-medium">7%</span>
+                    </div>
+                  </div>
+                </div>
+                {/* Stacked bar */}
+                <div className="mt-3 flex h-2.5 w-full overflow-hidden rounded-full">
+                  <div className="bg-green-500" style={{ width: "78%" }} />
+                  <div className="bg-amber-500" style={{ width: "15%" }} />
+                  <div className="bg-red-500" style={{ width: "7%" }} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right Column: Tabs */}
+          <Tabs defaultValue="comments" className="min-w-0">
+            <TabsList className="flex-wrap">
+              <TabsTrigger value="comments" className="gap-1.5"><MessageSquareIcon className="size-3.5" />Bình luận</TabsTrigger>
+              <TabsTrigger value="products" className="gap-1.5"><PackageIcon className="size-3.5" />Sản phẩm</TabsTrigger>
+              <TabsTrigger value="questions" className="gap-1.5"><HelpCircleIcon className="size-3.5" />Câu hỏi</TabsTrigger>
+              <TabsTrigger value="customers" className="gap-1.5"><UsersIcon className="size-3.5" />KH tiềm năng</TabsTrigger>
+              <TabsTrigger value="ai" className="gap-1.5"><SparklesIcon className="size-3.5" />AI</TabsTrigger>
+            </TabsList>
+            <TabsContent value="comments"><CommentsPanel /></TabsContent>
+            <TabsContent value="products"><ProductsPanel /></TabsContent>
+            <TabsContent value="questions"><QuestionsPanel /></TabsContent>
+            <TabsContent value="customers"><CustomersPanel /></TabsContent>
+            <TabsContent value="ai"><AIInsightsPanel /></TabsContent>
+          </Tabs>
+        </div>
       </div>
     </AuthenticatedLayout>
   )
