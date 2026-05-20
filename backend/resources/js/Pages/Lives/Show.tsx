@@ -697,8 +697,8 @@ function StatsPanel() {
           <CardDescription>Bình luận và lượt xem realtime mỗi 5 phút</CardDescription>
         </CardHeader>
         <CardContent>
-          <ChartContainer config={activityConfig} className="min-h-[200px] w-full">
-            <AreaChart accessibilityLayer data={activityData}>
+          <ChartContainer config={activityConfig} className="aspect-auto h-[250px] w-full">
+            <AreaChart accessibilityLayer data={activityData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="time" tickLine={false} axisLine={false} tickMargin={8} />
               <YAxis tickLine={false} axisLine={false} tickMargin={8} width={35} />
@@ -728,7 +728,7 @@ function StatsPanel() {
           <CardDescription>Tỷ lệ tích cực / trung lập / tiêu cực</CardDescription>
         </CardHeader>
         <CardContent>
-          <ChartContainer config={sentimentConfig} className="min-h-[220px] w-full">
+          <ChartContainer config={sentimentConfig} className="aspect-auto h-[250px] w-full">
             <PieChart accessibilityLayer>
               <ChartTooltip content={<ChartTooltipContent hideLabel />} />
               <Pie data={sentimentData} dataKey="value" nameKey="name" innerRadius={50} strokeWidth={2}>
@@ -757,8 +757,8 @@ function StatsPanel() {
           <CardDescription>Lượt nhắc và câu hỏi theo sản phẩm</CardDescription>
         </CardHeader>
         <CardContent>
-          <ChartContainer config={productConfig} className="min-h-[220px] w-full">
-            <BarChart accessibilityLayer data={productData}>
+          <ChartContainer config={productConfig} className="aspect-auto h-[250px] w-full">
+            <BarChart accessibilityLayer data={productData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
               <YAxis tickLine={false} axisLine={false} tickMargin={8} width={35} />
