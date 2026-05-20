@@ -548,7 +548,7 @@ function ProductsPanel() {
               <th className="h-10 px-2 text-left font-medium text-foreground">#</th>
               <th className="h-10 px-2 text-left font-medium text-foreground">Sản phẩm</th>
               <th className="h-10 px-2 text-right font-medium text-foreground">Lượt nhắc</th>
-              <th className="h-10 px-2 text-left font-medium text-foreground">Sentiment</th>
+              <th className="h-10 px-2 text-left font-medium text-foreground">Cảm xúc</th>
               <th className="h-10 px-2 text-right font-medium text-foreground">Câu hỏi</th>
             </tr>
           </thead>
@@ -875,7 +875,7 @@ function AIInsightsPanel() {
             <p><strong className="text-foreground">Cảm xúc tích cực chiếm 78%</strong>, chủ yếu liên quan đến chất lượng sản phẩm và giá cả hợp lý.</p>
             <p><strong className="text-foreground">Gợi ý:</strong> Nên trả lời câu hỏi về "size" và "ship". Có thể đưa ra combo giảm giá vì nhiều khách hỏi về mua nhiều.</p>
             <p><strong className="text-foreground">Sản phẩm nổi bật:</strong> "Váy hoa mùa hè" có sentiment 92%, "Áo thun basic cotton" dẫn đầu lượt nhắc. Nên push thêm combo 2 sản phẩm này.</p>
-            <p><strong className="text-foreground">Khách hàng:</strong> 45 khách để lại SĐT/ĐC, tỷ lệ chuyển đổi 8.6% từ bình luận. Top lead: Nguyễn Thị Lan (SĐT + địa chỉ đầy đủ).</p>
+            <p><strong className="text-foreground">Khách hàng:</strong> 45 khách để lại SĐT/ĐC, tỷ lệ chuyển đổi 8.6% từ bình luận. Top lead: Trần Văn Minh (SĐT + địa chỉ đầy đủ).</p>
             <p><strong className="text-foreground">So sánh:</strong> Phiên này tốt hơn 23% so với phiên trước về lượt tương tác, nhưng tỷ lệ chốt đơn giảm 5% — cần push mạnh hơn CTA.</p>
           </div>
         </FadeScrollArea>
@@ -1269,7 +1269,7 @@ export default function LivesShow() {
                     </p>
                   </div>
                   <div className="p-2.5 text-center">
-                    <div className="text-lg font-bold">12</div>
+                    <div className="text-lg font-bold">15</div>
                     <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
                       <PhoneIcon className="size-3" />KH tiềm năng
                     </p>
@@ -1334,7 +1334,7 @@ export default function LivesShow() {
                     { keyword: "so sánh", count: 109 },
                     { keyword: "chất liệu", count: 99 },
                     { keyword: "tư vấn", count: 95 },
-                    { keyword: "giao hỏa tốc", count: 92 },
+                    { keyword: "giao hoả tốc", count: 92 },
                   ].map((item) => (
                     <div key={item.keyword} className="flex items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-xs">
                       <span>{item.keyword}</span>
