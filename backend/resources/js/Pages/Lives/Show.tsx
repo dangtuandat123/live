@@ -9,10 +9,12 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from "@/components/ui/chart"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, Pie, PieChart, Label } from "recharts"
 import {
-  EyeIcon, MessageSquareIcon, SmileIcon, PhoneIcon, TrendingUpIcon, ArrowUpIcon, ShoppingCartIcon,
-  ClockIcon, CircleStopIcon, UsersIcon, HelpCircleIcon, PackageIcon,
-  SparklesIcon, SearchIcon, LoaderIcon,
+  EyeIcon, MessageSquareIcon, SmileIcon, PhoneIcon, TrendingUpIcon, TrendingDownIcon, ArrowUpIcon, ShoppingCartIcon,
+  ClockIcon, CircleStopIcon, UsersIcon, HelpCircleIcon, PackageIcon, BarChart3Icon,
+  SparklesIcon, SearchIcon, LoaderIcon, MinusIcon, CopyIcon, CheckIcon,
 } from "lucide-react"
 import * as React from "react"
 
@@ -69,39 +71,39 @@ function generateComments(count: number) {
 const allComments = generateComments(200)
 
 const topProducts = [
-  { name: "Áo thun basic cotton", image: "https://picsum.photos/seed/tshirt/80/80", mentions: 342, sentiment: 85, questions: 45 },
-  { name: "Váy hoa mùa hè", image: "https://picsum.photos/seed/dress/80/80", mentions: 287, sentiment: 92, questions: 32 },
-  { name: "Quần jean slim fit", image: "https://picsum.photos/seed/jeans/80/80", mentions: 198, sentiment: 78, questions: 28 },
-  { name: "Túi xách da PU", image: "https://picsum.photos/seed/bag/80/80", mentions: 156, sentiment: 88, questions: 19 },
-  { name: "Giày sneaker trắng", image: "https://picsum.photos/seed/sneaker/80/80", mentions: 124, sentiment: 71, questions: 22 },
-  { name: "Kính mát thời trang", image: "https://picsum.photos/seed/glasses/80/80", mentions: 112, sentiment: 80, questions: 15 },
-  { name: "Nón bucket unisex", image: "https://picsum.photos/seed/hat/80/80", mentions: 98, sentiment: 75, questions: 12 },
-  { name: "Dây chuyền bạc", image: "https://picsum.photos/seed/necklace/80/80", mentions: 87, sentiment: 90, questions: 10 },
-  { name: "Balo du lịch", image: "https://picsum.photos/seed/backpack/80/80", mentions: 76, sentiment: 82, questions: 8 },
-  { name: "Đồng hồ thông minh", image: "https://picsum.photos/seed/watch/80/80", mentions: 65, sentiment: 88, questions: 14 },
-  { name: "Áo khoác dù", image: "https://picsum.photos/seed/jacket/80/80", mentions: 54, sentiment: 73, questions: 9 },
-  { name: "Sandal quai hậu", image: "https://picsum.photos/seed/sandal/80/80", mentions: 48, sentiment: 79, questions: 7 },
-  { name: "Ví cầm tay nam", image: "https://picsum.photos/seed/wallet/80/80", mentions: 42, sentiment: 85, questions: 5 },
-  { name: "Thắt lưng da bò", image: "https://picsum.photos/seed/belt/80/80", mentions: 38, sentiment: 77, questions: 6 },
-  { name: "Mũ lưỡi trai", image: "https://picsum.photos/seed/cap/80/80", mentions: 31, sentiment: 81, questions: 4 },
+  { name: "Áo thun basic cotton", image: "https://picsum.photos/seed/tshirt/80/80", mentions: 342, sentiment: 85, questions: 45, trend: "up" as const },
+  { name: "Váy hoa mùa hè", image: "https://picsum.photos/seed/dress/80/80", mentions: 287, sentiment: 92, questions: 32, trend: "up" as const },
+  { name: "Quần jean slim fit", image: "https://picsum.photos/seed/jeans/80/80", mentions: 198, sentiment: 78, questions: 28, trend: "stable" as const },
+  { name: "Túi xách da PU", image: "https://picsum.photos/seed/bag/80/80", mentions: 156, sentiment: 88, questions: 19, trend: "down" as const },
+  { name: "Giày sneaker trắng", image: "https://picsum.photos/seed/sneaker/80/80", mentions: 124, sentiment: 71, questions: 22, trend: "up" as const },
+  { name: "Kính mát thời trang", image: "https://picsum.photos/seed/glasses/80/80", mentions: 112, sentiment: 80, questions: 15, trend: "stable" as const },
+  { name: "Nón bucket unisex", image: "https://picsum.photos/seed/hat/80/80", mentions: 98, sentiment: 75, questions: 12, trend: "down" as const },
+  { name: "Dây chuyền bạc", image: "https://picsum.photos/seed/necklace/80/80", mentions: 87, sentiment: 90, questions: 10, trend: "up" as const },
+  { name: "Balo du lịch", image: "https://picsum.photos/seed/backpack/80/80", mentions: 76, sentiment: 82, questions: 8, trend: "stable" as const },
+  { name: "Đồng hồ thông minh", image: "https://picsum.photos/seed/watch/80/80", mentions: 65, sentiment: 88, questions: 14, trend: "up" as const },
+  { name: "Áo khoác dù", image: "https://picsum.photos/seed/jacket/80/80", mentions: 54, sentiment: 73, questions: 9, trend: "down" as const },
+  { name: "Sandal quai hậu", image: "https://picsum.photos/seed/sandal/80/80", mentions: 48, sentiment: 79, questions: 7, trend: "stable" as const },
+  { name: "Ví cầm tay nam", image: "https://picsum.photos/seed/wallet/80/80", mentions: 42, sentiment: 85, questions: 5, trend: "down" as const },
+  { name: "Thắt lưng da bò", image: "https://picsum.photos/seed/belt/80/80", mentions: 38, sentiment: 77, questions: 6, trend: "stable" as const },
+  { name: "Mũ lưỡi trai", image: "https://picsum.photos/seed/cap/80/80", mentions: 31, sentiment: 81, questions: 4, trend: "up" as const },
 ]
 
 const topQuestions = [
-  { question: "Giá bao nhiêu?", count: 89, product: "Chung" },
-  { question: "Có size nào?", count: 67, product: "Áo thun, Quần jean" },
-  { question: "Ship mất mấy ngày?", count: 54, product: "Chung" },
-  { question: "Có bảo hành không?", count: 38, product: "Giày sneaker" },
-  { question: "Mua 2 giảm giá không?", count: 31, product: "Chung" },
-  { question: "Chất liệu gì?", count: 28, product: "Áo thun, Váy hoa" },
-  { question: "Có màu khác không?", count: 25, product: "Túi xách da PU" },
-  { question: "Mặc có nóng không?", count: 22, product: "Áo thun basic cotton" },
-  { question: "Đổi trả được không?", count: 20, product: "Chung" },
-  { question: "Có COD không?", count: 18, product: "Chung" },
-  { question: "Size chart ở đâu?", count: 16, product: "Quần jean, Váy hoa" },
-  { question: "Hàng Việt Nam hay TQ?", count: 14, product: "Áo thun basic cotton" },
-  { question: "Giặt máy được không?", count: 12, product: "Váy hoa mùa hè" },
-  { question: "Có hộp đựng không?", count: 10, product: "Giày sneaker" },
-  { question: "Combo mua 3 giá sao?", count: 9, product: "Chung" },
+  { question: "Giá bao nhiêu?", count: 89, product: "Chung", answer: "Giá hiện trên màn hình ạ, inbox shop để nhận giá sỉ" },
+  { question: "Có size nào?", count: 67, product: "Áo thun, Quần jean", answer: "Có đủ S/M/L/XL, inbox shop để tư vấn size" },
+  { question: "Ship mất mấy ngày?", count: 54, product: "Chung", answer: "Nội thành 1-2 ngày, tỉnh 3-5 ngày ạ" },
+  { question: "Có bảo hành không?", count: 38, product: "Giày sneaker", answer: "Bảo hành 6 tháng lỗi do nhà sản xuất" },
+  { question: "Mua 2 giảm giá không?", count: 31, product: "Chung", answer: "Mua 2 giảm 10%, mua 3 giảm 15% ạ" },
+  { question: "Chất liệu gì?", count: 28, product: "Áo thun, Váy hoa", answer: "Cotton 100% co giãn 4 chiều" },
+  { question: "Có màu khác không?", count: 25, product: "Túi xách da PU", answer: "Có đen, nâu, be, hồng pastel ạ" },
+  { question: "Mặc có nóng không?", count: 22, product: "Áo thun basic cotton", answer: "Cotton thoáng mát, thấm hút mồ hôi tốt" },
+  { question: "Đổi trả được không?", count: 20, product: "Chung", answer: "Đổi trả miễn phí trong 7 ngày" },
+  { question: "Có COD không?", count: 18, product: "Chung", answer: "Có COD toàn quốc, nhận hàng mới thanh toán" },
+  { question: "Size chart ở đâu?", count: 16, product: "Quần jean, Váy hoa", answer: "Inbox shop gửi bảng size chi tiết ạ" },
+  { question: "Hàng Việt Nam hay TQ?", count: 14, product: "Áo thun basic cotton", answer: "Hàng Việt Nam, sản xuất tại Bình Dương" },
+  { question: "Giặt máy được không?", count: 12, product: "Váy hoa mùa hè", answer: "Giặt máy bình thường, không xổ vải" },
+  { question: "Có hộp đựng không?", count: 10, product: "Giày sneaker", answer: "Có fullbox + túi đựng kèm ạ" },
+  { question: "Combo mua 3 giá sao?", count: 9, product: "Chung", answer: "Combo 3 giảm 15%, inbox shop báo giá" },
 ]
 
 const potentialCustomers = [
@@ -378,7 +380,14 @@ function ProductsPanel() {
                       <span className="font-medium truncate">{product.name}</span>
                     </div>
                   </td>
-                  <td className="p-2 text-right">{product.mentions}</td>
+                  <td className="p-2 text-right">
+                    <div className="inline-flex items-center gap-1">
+                      {product.trend === "up" && <TrendingUpIcon className="size-3.5 text-emerald-500" />}
+                      {product.trend === "down" && <TrendingDownIcon className="size-3.5 text-red-500" />}
+                      {product.trend === "stable" && <MinusIcon className="size-3.5 text-muted-foreground/50" />}
+                      {product.mentions}
+                    </div>
+                  </td>
                   <td className="p-2">
                     <div className="flex items-center gap-2">
                       <Progress value={product.sentiment} className="h-2 w-20" />
@@ -397,6 +406,12 @@ function ProductsPanel() {
 }
 
 function QuestionsPanel() {
+  const [copiedIdx, setCopiedIdx] = React.useState<number | null>(null)
+  const copyAnswer = (text: string, idx: number) => {
+    navigator.clipboard.writeText(text)
+    setCopiedIdx(idx)
+    setTimeout(() => setCopiedIdx(null), 1500)
+  }
   return (
     <Card className="h-full flex flex-col">
       <CardHeader>
@@ -406,17 +421,19 @@ function QuestionsPanel() {
       <div className="px-4">
         <table className="w-full table-fixed text-sm">
           <colgroup>
-            <col className="w-[8%]" />
-            <col className="w-[46%]" />
-            <col className="w-[16%]" />
-            <col className="w-[30%]" />
+            <col className="w-[6%]" />
+            <col className="w-[28%]" />
+            <col className="w-[10%]" />
+            <col className="w-[20%]" />
+            <col className="w-[36%]" />
           </colgroup>
           <thead className="[&_tr]:border-b">
             <tr className="border-b">
               <th className="h-10 px-2 text-left font-medium text-foreground">#</th>
               <th className="h-10 px-2 text-left font-medium text-foreground">Câu hỏi</th>
               <th className="h-10 px-2 text-right font-medium text-foreground">Số lần</th>
-              <th className="h-10 px-2 text-left font-medium text-foreground">SP liên quan</th>
+              <th className="h-10 px-2 text-left font-medium text-foreground">SP</th>
+              <th className="h-10 px-2 text-left font-medium text-foreground">Gợi ý trả lời</th>
             </tr>
           </thead>
         </table>
@@ -425,10 +442,11 @@ function QuestionsPanel() {
         <div className="px-4">
           <table className="w-full table-fixed text-sm">
             <colgroup>
-              <col className="w-[8%]" />
-              <col className="w-[46%]" />
-              <col className="w-[16%]" />
-              <col className="w-[30%]" />
+              <col className="w-[6%]" />
+              <col className="w-[28%]" />
+              <col className="w-[10%]" />
+              <col className="w-[20%]" />
+              <col className="w-[36%]" />
             </colgroup>
             <tbody className="[&_tr:last-child]:border-0">
               {topQuestions.map((q, i) => (
@@ -437,6 +455,18 @@ function QuestionsPanel() {
                   <td className="p-2 font-medium truncate">{q.question}</td>
                   <td className="p-2 text-right"><Badge variant="secondary">{q.count}</Badge></td>
                   <td className="p-2 text-muted-foreground text-sm truncate">{q.product}</td>
+                  <td className="p-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground truncate flex-1">{q.answer}</span>
+                      <button
+                        onClick={() => copyAnswer(q.answer, i)}
+                        className="shrink-0 rounded p-1 hover:bg-muted transition-colors"
+                        title="Copy câu trả lời"
+                      >
+                        {copiedIdx === i ? <CheckIcon className="size-3 text-emerald-500" /> : <CopyIcon className="size-3 text-muted-foreground" />}
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -449,9 +479,15 @@ function QuestionsPanel() {
 
 function CustomersPanel() {
   const [search, setSearch] = React.useState("")
+  const [copiedPhone, setCopiedPhone] = React.useState<number | null>(null)
   const filtered = potentialCustomers.filter((c) =>
     !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search) || c.product.toLowerCase().includes(search.toLowerCase())
   )
+  const copyPhone = (phone: string, idx: number) => {
+    navigator.clipboard.writeText(phone)
+    setCopiedPhone(idx)
+    setTimeout(() => setCopiedPhone(null), 1500)
+  }
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="pb-3">
@@ -501,7 +537,18 @@ function CustomersPanel() {
                 <tr key={i} className="border-b transition-colors hover:bg-muted/50">
                   <td className="p-2 font-medium truncate">{c.name}</td>
                   <td className="p-2">
-                    {c.phone ? <Badge variant="outline" className="gap-1"><PhoneIcon className="size-3" />{c.phone}</Badge> : <span className="text-muted-foreground">—</span>}
+                    {c.phone ? (
+                      <div className="flex items-center gap-1">
+                        <Badge variant="outline" className="gap-1"><PhoneIcon className="size-3" />{c.phone}</Badge>
+                        <button
+                          onClick={() => copyPhone(c.phone, i)}
+                          className="shrink-0 rounded p-1 hover:bg-muted transition-colors"
+                          title="Copy SĐT"
+                        >
+                          {copiedPhone === i ? <CheckIcon className="size-3 text-emerald-500" /> : <CopyIcon className="size-3 text-muted-foreground" />}
+                        </button>
+                      </div>
+                    ) : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="p-2 truncate">{c.address || <span className="text-muted-foreground">—</span>}</td>
                   <td className="p-2"><Badge variant="secondary" className="truncate max-w-full">{c.product}</Badge></td>
@@ -518,7 +565,7 @@ function CustomersPanel() {
 
 function AIInsightsPanel() {
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid gap-4 md:grid-cols-2 h-full overflow-y-auto px-1 pb-1">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><SparklesIcon className="size-5" />Tóm tắt AI</CardTitle>
@@ -543,6 +590,174 @@ function AIInsightsPanel() {
           <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
             <p className="text-sm font-medium text-blue-600">💡 Cơ hội upsell</p>
             <p className="text-xs text-muted-foreground mt-1">31 khách hỏi "mua 2 giảm giá không" — nên tạo combo giảm giá ngay.</p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function StatsPanel() {
+  const activityData = [
+    { time: "0:00", comments: 12, viewers: 820 },
+    { time: "0:05", comments: 28, viewers: 1050 },
+    { time: "0:10", comments: 45, viewers: 1320 },
+    { time: "0:15", comments: 38, viewers: 1480 },
+    { time: "0:20", comments: 62, viewers: 1720 },
+    { time: "0:25", comments: 71, viewers: 2100 },
+    { time: "0:30", comments: 55, viewers: 2340 },
+    { time: "0:35", comments: 48, viewers: 2180 },
+    { time: "0:40", comments: 82, viewers: 2560 },
+    { time: "0:45", comments: 95, viewers: 2890 },
+    { time: "0:50", comments: 78, viewers: 3100 },
+    { time: "0:55", comments: 64, viewers: 3200 },
+  ]
+
+  const sentimentData = [
+    { name: "positive", value: 115, fill: "var(--color-positive)" },
+    { name: "neutral", value: 57, fill: "var(--color-neutral)" },
+    { name: "negative", value: 28, fill: "var(--color-negative)" },
+  ]
+
+  const productData = topProducts.slice(0, 6).map((p) => ({
+    name: p.name.length > 12 ? p.name.slice(0, 12) + "…" : p.name,
+    mentions: p.mentions,
+    questions: p.questions,
+  }))
+
+  const funnelData = [
+    { stage: "Người xem", value: 3247 },
+    { stage: "Bình luận", value: 523 },
+    { stage: "Có SĐT/ĐC", value: 45 },
+    { stage: "Chốt đơn", value: 18 },
+  ]
+
+  const activityConfig = {
+    comments: { label: "Bình luận", color: "var(--chart-1)" },
+    viewers: { label: "Người xem", color: "var(--chart-2)" },
+  } satisfies ChartConfig
+
+  const sentimentConfig = {
+    positive: { label: "Tích cực", color: "#22c55e" },
+    neutral: { label: "Trung lập", color: "#6b7280" },
+    negative: { label: "Tiêu cực", color: "#ef4444" },
+  } satisfies ChartConfig
+
+  const productConfig = {
+    mentions: { label: "Lượt nhắc", color: "var(--chart-1)" },
+    questions: { label: "Câu hỏi", color: "var(--chart-4)" },
+  } satisfies ChartConfig
+
+  const funnelConfig = {
+    value: { label: "Số lượng", color: "var(--chart-1)" },
+  } satisfies ChartConfig
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2 h-full overflow-y-auto px-1 pb-1">
+      {/* Activity Timeline */}
+      <Card className="md:col-span-2">
+        <CardHeader>
+          <CardTitle>Hoạt động theo thời gian</CardTitle>
+          <CardDescription>Bình luận và lượt xem realtime mỗi 5 phút</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={activityConfig} className="min-h-[200px] w-full">
+            <AreaChart accessibilityLayer data={activityData}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="time" tickLine={false} axisLine={false} tickMargin={8} />
+              <YAxis tickLine={false} axisLine={false} tickMargin={8} width={35} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <ChartLegend content={<ChartLegendContent />} />
+              <defs>
+                <linearGradient id="fillComments" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--color-comments)" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="var(--color-comments)" stopOpacity={0.1} />
+                </linearGradient>
+                <linearGradient id="fillViewers" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--color-viewers)" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="var(--color-viewers)" stopOpacity={0.1} />
+                </linearGradient>
+              </defs>
+              <Area dataKey="viewers" type="natural" fill="url(#fillViewers)" stroke="var(--color-viewers)" strokeWidth={2} />
+              <Area dataKey="comments" type="natural" fill="url(#fillComments)" stroke="var(--color-comments)" strokeWidth={2} />
+            </AreaChart>
+          </ChartContainer>
+        </CardContent>
+      </Card>
+
+      {/* Sentiment Donut */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Phân bổ cảm xúc</CardTitle>
+          <CardDescription>Tỷ lệ tích cực / trung lập / tiêu cực</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={sentimentConfig} className="min-h-[220px] w-full">
+            <PieChart accessibilityLayer>
+              <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+              <Pie data={sentimentData} dataKey="value" nameKey="name" innerRadius={50} strokeWidth={2}>
+                <Label content={({ viewBox }) => {
+                  if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                    const total = sentimentData.reduce((s, d) => s + d.value, 0)
+                    return (
+                      <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
+                        <tspan x={viewBox.cx} y={viewBox.cy} className="fill-foreground text-2xl font-bold">{total}</tspan>
+                        <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 20} className="fill-muted-foreground text-xs">bình luận</tspan>
+                      </text>
+                    )
+                  }
+                }} />
+              </Pie>
+              <ChartLegend content={<ChartLegendContent nameKey="name" />} />
+            </PieChart>
+          </ChartContainer>
+        </CardContent>
+      </Card>
+
+      {/* Top Products Bar */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Top sản phẩm</CardTitle>
+          <CardDescription>Lượt nhắc và câu hỏi theo sản phẩm</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={productConfig} className="min-h-[220px] w-full">
+            <BarChart accessibilityLayer data={productData}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
+              <YAxis tickLine={false} axisLine={false} tickMargin={8} width={35} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <ChartLegend content={<ChartLegendContent />} />
+              <Bar dataKey="mentions" fill="var(--color-mentions)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="questions" fill="var(--color-questions)" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ChartContainer>
+        </CardContent>
+      </Card>
+
+      {/* Conversion Funnel */}
+      <Card className="md:col-span-2">
+        <CardHeader>
+          <CardTitle>Phễu chuyển đổi</CardTitle>
+          <CardDescription>Từ người xem → bình luận → để lại thông tin → chốt đơn</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-end justify-around gap-2 min-h-[120px]">
+            {funnelData.map((item, i) => {
+              const maxVal = funnelData[0].value
+              const heightPct = Math.max(15, (item.value / maxVal) * 100)
+              const conversionRate = i > 0 ? ((item.value / funnelData[i - 1].value) * 100).toFixed(1) : null
+              return (
+                <div key={item.stage} className="flex flex-col items-center gap-1.5 flex-1">
+                  {conversionRate && (
+                    <span className="text-[10px] font-medium text-muted-foreground">↓ {conversionRate}%</span>
+                  )}
+                  <div className="w-full max-w-[80px] rounded-t-md bg-primary/80 transition-all" style={{ height: `${heightPct}px` }} />
+                  <span className="text-lg font-bold tabular-nums">{item.value.toLocaleString()}</span>
+                  <span className="text-xs text-muted-foreground text-center">{item.stage}</span>
+                </div>
+              )
+            })}
           </div>
         </CardContent>
       </Card>
@@ -725,12 +940,14 @@ export default function LivesShow() {
               <TabsTrigger value="products" className="gap-1.5"><PackageIcon className="size-3.5" />Sản phẩm</TabsTrigger>
               <TabsTrigger value="questions" className="gap-1.5"><HelpCircleIcon className="size-3.5" />Câu hỏi</TabsTrigger>
               <TabsTrigger value="customers" className="gap-1.5"><UsersIcon className="size-3.5" />KH tiềm năng</TabsTrigger>
+              <TabsTrigger value="stats" className="gap-1.5"><BarChart3Icon className="size-3.5" />Thống kê</TabsTrigger>
               <TabsTrigger value="ai" className="gap-1.5"><SparklesIcon className="size-3.5" />AI</TabsTrigger>
             </TabsList>
             <TabsContent value="comments" className="flex-1 min-h-0 overflow-y-auto"><CommentsPanel /></TabsContent>
             <TabsContent value="products" className="flex-1 min-h-0 overflow-y-auto"><ProductsPanel /></TabsContent>
             <TabsContent value="questions" className="flex-1 min-h-0 overflow-y-auto"><QuestionsPanel /></TabsContent>
             <TabsContent value="customers" className="flex-1 min-h-0 overflow-y-auto"><CustomersPanel /></TabsContent>
+            <TabsContent value="stats" className="flex-1 min-h-0 overflow-y-auto"><StatsPanel /></TabsContent>
             <TabsContent value="ai" className="flex-1 min-h-0 overflow-y-auto"><AIInsightsPanel /></TabsContent>
           </Tabs>
         </div>
