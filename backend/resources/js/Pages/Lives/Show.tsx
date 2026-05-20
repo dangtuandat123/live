@@ -874,7 +874,7 @@ function AIInsightsPanel() {
             <p><strong className="text-foreground">Phiên live đang diễn ra tốt</strong> với tỷ lệ tương tác cao. Sản phẩm "Áo thun basic cotton" được quan tâm nhiều nhất với 342 lượt nhắc.</p>
             <p><strong className="text-foreground">Cảm xúc tích cực chiếm 78%</strong>, chủ yếu liên quan đến chất lượng sản phẩm và giá cả hợp lý.</p>
             <p><strong className="text-foreground">Gợi ý:</strong> Nên trả lời câu hỏi về "size" và "ship". Có thể đưa ra combo giảm giá vì nhiều khách hỏi về mua nhiều.</p>
-            <p><strong className="text-foreground">Sản phẩm nổi bật:</strong> "Váy hoa mùa hè" có sentiment 92%, "Áo thun basic cotton" dẫn đầu lượt nhắc. Nên push thêm combo 2 sản phẩm này.</p>
+            <p><strong className="text-foreground">Sản phẩm nổi bật:</strong> "Váy hoa mùa hè" có cảm xúc tích cực 92%, "Áo thun basic cotton" dẫn đầu lượt nhắc. Nên push thêm combo 2 sản phẩm này.</p>
             <p><strong className="text-foreground">Khách hàng:</strong> 45 khách để lại SĐT/ĐC, tỷ lệ chuyển đổi 8.6% từ bình luận. Top lead: Trần Văn Minh (SĐT + địa chỉ đầy đủ).</p>
             <p><strong className="text-foreground">So sánh:</strong> Phiên này tốt hơn 23% so với phiên trước về lượt tương tác, nhưng tỷ lệ chốt đơn giảm 5% — cần push mạnh hơn CTA.</p>
           </div>
@@ -898,7 +898,7 @@ function AIInsightsPanel() {
               {
                 icon: FlameIcon,
                 title: "Sản phẩm đang hot",
-                desc: '"Váy hoa mùa hè" có sentiment 92% — bán chạy nhất phiên này.',
+                desc: '"Váy hoa mùa hè" có cảm xúc tích cực 92% — bán chạy nhất phiên này.',
                 color: "emerald",
                 severity: "Thông tin",
                 time: "5 phút trước",
@@ -913,7 +913,7 @@ function AIInsightsPanel() {
               },
               {
                 icon: HeartCrackIcon,
-                title: "Sentiment giảm",
+                title: "Cảm xúc giảm",
                 desc: 'Tỷ lệ tiêu cực tăng từ 5% lên 12% trong 10 phút qua. Chủ đề: "giá đắt", "ship chậm".',
                 color: "red",
                 severity: "Cao",
@@ -946,7 +946,7 @@ function AIInsightsPanel() {
               {
                 icon: ZapIcon,
                 title: "Đỉnh tương tác",
-                desc: 'Peak engagement ở phút 40-45, nên giới thiệu SP mới ngay bây giờ.',
+                desc: 'Đỉnh tương tác ở phút 40-45, nên giới thiệu SP mới ngay bây giờ.',
                 color: "yellow",
                 severity: "Trung bình",
                 time: "4 phút trước",
