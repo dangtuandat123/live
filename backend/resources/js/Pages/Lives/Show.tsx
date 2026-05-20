@@ -872,7 +872,7 @@ function AIInsightsPanel() {
         <FadeScrollArea>
           <div className="space-y-3 px-4 text-sm text-muted-foreground">
             <p><strong className="text-foreground">Phiên live đang diễn ra tốt</strong> với tỷ lệ tương tác cao. Sản phẩm "Áo thun basic cotton" được quan tâm nhiều nhất với 342 lượt nhắc.</p>
-            <p><strong className="text-foreground">Cảm xúc tích cực chiếm 78%</strong>, chủ yếu liên quan đến chất lượng sản phẩm và giá cả hợp lý.</p>
+            <p><strong className="text-foreground">Cảm xúc tích cực chiếm 58%</strong>, chủ yếu liên quan đến chất lượng sản phẩm và giá cả hợp lý.</p>
             <p><strong className="text-foreground">Gợi ý:</strong> Nên trả lời câu hỏi về "size" và "ship". Có thể đưa ra combo giảm giá vì nhiều khách hỏi về mua nhiều.</p>
             <p><strong className="text-foreground">Sản phẩm nổi bật:</strong> "Váy hoa mùa hè" có cảm xúc tích cực 92%, "Áo thun basic cotton" dẫn đầu lượt nhắc. Nên push thêm combo 2 sản phẩm này.</p>
             <p><strong className="text-foreground">Khách hàng:</strong> 45 khách để lại SĐT/ĐC, tỷ lệ chuyển đổi 8.6% từ bình luận. Top lead: Trần Văn Minh (SĐT + địa chỉ đầy đủ).</p>
@@ -1262,7 +1262,7 @@ export default function LivesShow() {
                       <EyeIcon className="size-6 text-primary" />
                     </div>
                     <p className="text-sm font-medium">Đang phát trực tiếp</p>
-                    <p className="text-xs text-muted-foreground">Video embed từ Facebook Live</p>
+                    <p className="text-xs text-muted-foreground">Nhúng video từ Facebook Live</p>
                     <Badge variant="destructive" className="gap-1">
                       <span className="relative flex size-1.5">
                         <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-75" />
@@ -1296,7 +1296,7 @@ export default function LivesShow() {
               </CardContent>
             </Card>
 
-            {/* Sentiment AI Card */}
+            {/* Phân tích cảm xúc */}
             <Card>
               <CardHeader className="px-3 pt-0">
                 <CardTitle className="flex items-center gap-2 text-xs">
@@ -1307,7 +1307,7 @@ export default function LivesShow() {
               <CardContent className="px-3">
                 <div className="flex items-start gap-3">
                   <div>
-                    <div className="text-2xl font-bold text-green-500">78%</div>
+                    <div className="text-2xl font-bold text-green-500">58%</div>
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
                       <TrendingUpIcon className="size-3 text-green-500" />+12.5%
                     </p>
@@ -1315,22 +1315,22 @@ export default function LivesShow() {
                   <div className="flex-1 space-y-1 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-green-500" />Tích cực</span>
-                      <span className="font-medium">78%</span>
+                      <span className="font-medium">58%</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-amber-500" />Trung lập</span>
-                      <span className="font-medium">15%</span>
+                      <span className="font-medium">28%</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-red-500" />Tiêu cực</span>
-                      <span className="font-medium">7%</span>
+                      <span className="font-medium">14%</span>
                     </div>
                   </div>
                 </div>
                 <div className="mt-2 flex h-2 w-full overflow-hidden rounded-full">
-                  <div className="bg-green-500" style={{ width: "78%" }} />
-                  <div className="bg-amber-500" style={{ width: "15%" }} />
-                  <div className="bg-red-500" style={{ width: "7%" }} />
+                  <div className="bg-green-500" style={{ width: "58%" }} />
+                  <div className="bg-amber-500" style={{ width: "28%" }} />
+                  <div className="bg-red-500" style={{ width: "14%" }} />
                 </div>
               </CardContent>
             </Card>
