@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import {
-  EyeIcon, MessageSquareIcon, SmileIcon, PhoneIcon, TrendingUpIcon, ArrowUpIcon,
+  EyeIcon, MessageSquareIcon, SmileIcon, PhoneIcon, TrendingUpIcon, ArrowUpIcon, ShoppingCartIcon,
   ClockIcon, CircleStopIcon, UsersIcon, HelpCircleIcon, PackageIcon,
   SparklesIcon, SearchIcon, LoaderIcon,
 } from "lucide-react"
@@ -27,6 +27,31 @@ function generateComments(count: number) {
     "Hàng có sẵn không hay phải đợi?","Màu đen còn không ạ?","Đẹp quá, cho mình 2 cái nhé",
     "Chất liệu cotton 100% hả shop?","Giày size 42 còn không?","Mình ở Hà Nội ship mấy ngày?",
   ]
+  // AI-generated tags (mock) — in production, these come from AI classification
+  const questionTags: (string | null)[] = [
+    "Hỏi giá", null,
+    "Hỏi chất liệu", null, null,
+    "Hỏi giảm giá", "Hỏi màu", "Hỏi tính năng",
+    "Hỏi ship", null, "Hỏi size",
+    "Hỏi tồn kho", "Hỏi màu", null,
+    "Hỏi chất liệu", "Hỏi size", "Hỏi ship",
+  ]
+  const productTags: (string | null)[] = [
+    "Áo thun", "Quần jean",
+    null, "Váy hoa", null,
+    null, "Túi xách", "Kính mát",
+    null, "Áo thun", null,
+    null, null, null,
+    null, "Giày sneaker", null,
+  ]
+  const intentTags: (string | null)[] = [
+    null, "Chốt đơn",
+    null, "Chốt đơn", null,
+    null, null, null,
+    null, "Chốt đơn", null,
+    null, null, "Chốt đơn",
+    null, null, null,
+  ]
   const sentiments: ("positive"|"neutral"|"negative")[] = ["positive","positive","positive","neutral","negative","positive","neutral"]
   return Array.from({length: count}, (_, i) => ({
     id: i + 1,
@@ -35,6 +60,9 @@ function generateComments(count: number) {
     time: `${Math.max(1, i * 3)} giây trước`,
     sentiment: sentiments[i % sentiments.length],
     hasPhone: i % 7 === 1 || i % 11 === 6,
+    questionTag: questionTags[i % questionTags.length],
+    productTag: productTags[i % productTags.length],
+    intentTag: intentTags[i % intentTags.length],
   }))
 }
 
@@ -260,7 +288,7 @@ function CommentsPanel() {
                 <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
                   {comment.user.charAt(0)}
                 </div>
-                <div className="flex-1 min-w-0 space-y-0.5">
+                <div className="flex-1 min-w-0 space-y-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-sm font-medium">{comment.user}</span>
                     <SentimentBadge sentiment={comment.sentiment} />
@@ -269,7 +297,24 @@ function CommentsPanel() {
                     )}
                   </div>
                   <p className="text-sm text-muted-foreground break-words">{comment.text}</p>
-                  <p className="text-xs text-muted-foreground/60">{comment.time}</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {comment.intentTag && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                        <ShoppingCartIcon className="size-3" />{comment.intentTag}
+                      </span>
+                    )}
+                    {comment.questionTag && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                        <HelpCircleIcon className="size-3" />{comment.questionTag}
+                      </span>
+                    )}
+                    {comment.productTag && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:text-blue-400">
+                        <PackageIcon className="size-3" />{comment.productTag}
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground/60">{comment.time}</span>
+                  </div>
                 </div>
               </div>
             ))}
