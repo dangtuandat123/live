@@ -36,7 +36,6 @@ const mockSessions = [
   {
     id: "1",
     name: "Flash Sale Mùa Hè",
-    platform: "facebook",
     status: "ended",
     comments: 1247,
     views: 8432,
@@ -47,7 +46,6 @@ const mockSessions = [
   {
     id: "2",
     name: "Giới thiệu BST mới",
-    platform: "tiktok",
     status: "live",
     comments: 523,
     views: 3201,
@@ -58,7 +56,6 @@ const mockSessions = [
   {
     id: "3",
     name: "Thanh lý cuối tuần",
-    platform: "instagram",
     status: "ended",
     comments: 892,
     views: 5678,
@@ -69,7 +66,6 @@ const mockSessions = [
   {
     id: "4",
     name: "Review sản phẩm mới",
-    platform: "facebook",
     status: "ended",
     comments: 2103,
     views: 12450,
@@ -80,7 +76,6 @@ const mockSessions = [
   {
     id: "5",
     name: "Live Q&A khách hàng",
-    platform: "tiktok",
     status: "ended",
     comments: 756,
     views: 4320,
@@ -91,7 +86,6 @@ const mockSessions = [
   {
     id: "6",
     name: "Combo giá sốc",
-    platform: "facebook",
     status: "ended",
     comments: 1890,
     views: 9870,
@@ -100,16 +94,6 @@ const mockSessions = [
     date: "16/05/2026",
   },
 ]
-
-function PlatformBadge({ platform }: { platform: string }) {
-  const config: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
-    facebook: { label: "Facebook", variant: "default" },
-    tiktok: { label: "TikTok", variant: "secondary" },
-    instagram: { label: "Instagram", variant: "outline" },
-  }
-  const c = config[platform] ?? config.facebook
-  return <Badge variant={c.variant}>{c.label}</Badge>
-}
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "live") {
@@ -128,15 +112,12 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function LivesIndex() {
   const [search, setSearch] = React.useState("")
-  const [platformFilter, setPlatformFilter] = React.useState("all")
   const [statusFilter, setStatusFilter] = React.useState("all")
 
   const filtered = mockSessions.filter((s) => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase())
-    const matchPlatform =
-      platformFilter === "all" || s.platform === platformFilter
     const matchStatus = statusFilter === "all" || s.status === statusFilter
-    return matchSearch && matchPlatform && matchStatus
+    return matchSearch && matchStatus
   })
 
   return (
@@ -192,17 +173,6 @@ export default function LivesIndex() {
               className="pl-9"
             />
           </div>
-          <Select value={platformFilter} onValueChange={setPlatformFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Nền tảng" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tất cả</SelectItem>
-              <SelectItem value="facebook">Facebook</SelectItem>
-              <SelectItem value="tiktok">TikTok</SelectItem>
-              <SelectItem value="instagram">Instagram</SelectItem>
-            </SelectContent>
-          </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="Trạng thái" />
@@ -222,7 +192,6 @@ export default function LivesIndex() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Tên phiên</TableHead>
-                  <TableHead>Nền tảng</TableHead>
                   <TableHead>Trạng thái</TableHead>
                   <TableHead className="text-right">Bình luận</TableHead>
                   <TableHead className="text-right">Lượt xem</TableHead>
@@ -241,9 +210,6 @@ export default function LivesIndex() {
                       >
                         {session.name}
                       </Link>
-                    </TableCell>
-                    <TableCell>
-                      <PlatformBadge platform={session.platform} />
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={session.status} />

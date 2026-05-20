@@ -1212,7 +1212,7 @@ export default function LivesShow() {
           <div className="shrink-0">
             <h1 className="text-lg font-bold tracking-tight">Flash Sale Mùa Hè</h1>
             <div className="flex items-center gap-2 mt-1">
-              <Badge variant="default">Facebook</Badge>
+              <Badge variant="default">TikTok</Badge>
               <Badge variant="destructive" className="gap-1">
                 <span className="relative flex size-2">
                   <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-75" />
@@ -1262,7 +1262,7 @@ export default function LivesShow() {
                       <EyeIcon className="size-6 text-primary" />
                     </div>
                     <p className="text-sm font-medium">Đang phát trực tiếp</p>
-                    <p className="text-xs text-muted-foreground">Nhúng video từ Facebook Live</p>
+                    <p className="text-xs text-muted-foreground">Nhúng video từ TikTok Live</p>
                     <Badge variant="destructive" className="gap-1">
                       <span className="relative flex size-1.5">
                         <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-75" />

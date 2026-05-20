@@ -31,9 +31,7 @@ import {
 } from "lucide-react"
 
 const platforms = [
-  { name: "Facebook", connected: true, account: "Shop Thời Trang ABC" },
   { name: "TikTok", connected: true, account: "@shopthoitrang_abc" },
-  { name: "Instagram", connected: false, account: "" },
 ]
 
 export default function SettingsIndex() {
@@ -180,7 +178,7 @@ export default function SettingsIndex() {
           </CardContent>
         </Card>
 
-        {/* Keywords */}
+        {/* Từ khóa chốt đơn */}
         <Card>
           <CardHeader>
             <CardTitle>Từ khóa chốt đơn mặc định</CardTitle>

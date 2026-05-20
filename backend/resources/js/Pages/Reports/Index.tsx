@@ -11,7 +11,6 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import {
@@ -38,7 +37,7 @@ import {
   ChartLegendContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
+import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
 import {
   TrendingUpIcon,
   TrendingDownIcon,
@@ -94,26 +93,15 @@ const trendData = [
 const trendConfig = {
   views: { label: "Lượt xem", color: "var(--chart-1)" },
   comments: { label: "Bình luận", color: "var(--chart-2)" },
-  leads: { label: "Leads", color: "var(--chart-3)" },
-} satisfies ChartConfig
-
-const platformData = [
-  { platform: "Facebook", comments: 7234, views: 52340, sentiment: 79 },
-  { platform: "TikTok", comments: 4213, views: 28940, sentiment: 74 },
-  { platform: "Instagram", comments: 1400, views: 7954, sentiment: 72 },
-]
-
-const platformBarConfig = {
-  comments: { label: "Bình luận", color: "var(--chart-1)" },
-  views: { label: "Lượt xem", color: "var(--chart-2)" },
+  leads: { label: "KH tiềm năng", color: "var(--chart-3)" },
 } satisfies ChartConfig
 
 const recentSessions = [
-  { name: "Flash Sale Mùa Hè", platform: "Facebook", comments: 1247, views: 8432, leads: 45, sentiment: 82, date: "20/05" },
-  { name: "Giới thiệu BST mới", platform: "TikTok", comments: 523, views: 3201, leads: 12, sentiment: 75, date: "20/05" },
-  { name: "Thanh lý cuối tuần", platform: "Instagram", comments: 892, views: 5678, leads: 28, sentiment: 68, date: "19/05" },
-  { name: "Review sản phẩm mới", platform: "Facebook", comments: 2103, views: 12450, leads: 67, sentiment: 85, date: "18/05" },
-  { name: "Live Q&A khách hàng", platform: "TikTok", comments: 756, views: 4320, leads: 15, sentiment: 71, date: "17/05" },
+  { name: "Flash Sale Mùa Hè", comments: 1247, views: 8432, leads: 45, sentiment: 82, date: "20/05" },
+  { name: "Giới thiệu BST mới", comments: 523, views: 3201, leads: 12, sentiment: 75, date: "20/05" },
+  { name: "Thanh lý cuối tuần", comments: 892, views: 5678, leads: 28, sentiment: 68, date: "19/05" },
+  { name: "Review sản phẩm mới", comments: 2103, views: 12450, leads: 67, sentiment: 85, date: "18/05" },
+  { name: "Live Q&A khách hàng", comments: 756, views: 4320, leads: 15, sentiment: 71, date: "17/05" },
 ]
 
 // --- Main ---
@@ -200,9 +188,9 @@ export default function ReportsIndex() {
           <SparklesIcon className="size-4" />
           <AlertTitle>Gợi ý từ AI</AlertTitle>
           <AlertDescription>
-            Facebook đang là nền tảng hiệu quả nhất (cảm xúc tích cực 79%). TikTok có tăng trưởng lượt xem nhanh
-            nhưng tỷ lệ bình luận/lượt xem thấp hơn. Gợi ý: tăng tần suất live trên Facebook vào khung giờ 19h-21h,
-            và thử hình thức hỏi đáp trên TikTok để tăng tương tác.
+            Khung giờ 19h-21h đang cho hiệu suất tốt nhất (cảm xúc tích cực 85%). Các phiên có hình thức hỏi đáp
+            tăng tương tác gấp 2.3 lần so với phiên thường. Gợi ý: tập trung live vào khung giờ vàng,
+            và lồng thêm phần Q&A để tăng tỷ lệ bình luận.
           </AlertDescription>
         </Alert>
 
@@ -213,7 +201,7 @@ export default function ReportsIndex() {
               <TrendingUpIcon className="size-4" />
               Xu hướng theo kỳ
             </CardTitle>
-            <CardDescription>Lượt xem, bình luận và leads theo ngày trong khoảng thời gian đã chọn</CardDescription>
+            <CardDescription>Lượt xem, bình luận và KH tiềm năng theo ngày trong khoảng thời gian đã chọn</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={trendConfig} className="aspect-auto h-[280px] w-full">
@@ -244,89 +232,49 @@ export default function ReportsIndex() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          {/* Platform Comparison Bar Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle>So sánh nền tảng</CardTitle>
-              <CardDescription>Bình luận và lượt xem theo nền tảng</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer config={platformBarConfig} className="aspect-auto h-[220px] w-full">
-                <BarChart data={platformData} layout="vertical" margin={{ left: 20 }}>
-                  <CartesianGrid horizontal={false} />
-                  <YAxis
-                    dataKey="platform"
-                    type="category"
-                    tickLine={false}
-                    axisLine={false}
-                    width={80}
-                  />
-                  <XAxis type="number" hide />
-                  <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                  <Bar dataKey="comments" fill="var(--color-comments)" radius={[0, 4, 4, 0]} barSize={16} />
-                  <Bar dataKey="views" fill="var(--color-views)" radius={[0, 4, 4, 0]} barSize={16} />
-                  <ChartLegend content={<ChartLegendContent />} />
-                </BarChart>
-              </ChartContainer>
-              {/* Sentiment row */}
-              <div className="mt-4 space-y-2 border-t pt-4">
-                <p className="text-xs font-medium text-muted-foreground">Cảm xúc tích cực</p>
-                {platformData.map((p) => (
-                  <div key={p.platform} className="flex items-center gap-3 text-sm">
-                    <span className="w-20 text-muted-foreground">{p.platform}</span>
-                    <Progress value={p.sentiment} className="h-2 flex-1" />
-                    <span className="w-10 text-right font-medium tabular-nums">{p.sentiment}%</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Recent Sessions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Phiên Live gần đây</CardTitle>
-              <CardDescription>Hiệu suất từng phiên để so sánh</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Phiên</TableHead>
-                    <TableHead className="text-right">Bình luận</TableHead>
-                    <TableHead className="text-right">Lượt xem</TableHead>
-                    <TableHead className="text-right">
-                      <span className="flex items-center justify-end gap-1"><UsersIcon className="size-3" />Leads</span>
-                    </TableHead>
-                    <TableHead>Cảm xúc</TableHead>
+        {/* Recent Sessions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Phiên Live gần đây</CardTitle>
+            <CardDescription>Hiệu suất từng phiên để so sánh</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Phiên</TableHead>
+                  <TableHead className="text-right">Bình luận</TableHead>
+                  <TableHead className="text-right">Lượt xem</TableHead>
+                  <TableHead className="text-right">
+                    <span className="flex items-center justify-end gap-1"><UsersIcon className="size-3" />KH tiềm năng</span>
+                  </TableHead>
+                  <TableHead>Cảm xúc</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {recentSessions.map((s) => (
+                  <TableRow key={s.name}>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium text-sm">{s.name}</div>
+                        <div className="text-xs text-muted-foreground">{s.date}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">{s.comments.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{s.views.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{s.leads}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Progress value={s.sentiment} className="h-2 w-16" />
+                        <span className="text-xs tabular-nums">{s.sentiment}%</span>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentSessions.map((s) => (
-                    <TableRow key={s.name}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium text-sm">{s.name}</div>
-                          <div className="text-xs text-muted-foreground">{s.platform} · {s.date}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">{s.comments.toLocaleString()}</TableCell>
-                      <TableCell className="text-right">{s.views.toLocaleString()}</TableCell>
-                      <TableCell className="text-right">{s.leads}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Progress value={s.sentiment} className="h-2 w-16" />
-                          <span className="text-xs tabular-nums">{s.sentiment}%</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
     </AuthenticatedLayout>
   )

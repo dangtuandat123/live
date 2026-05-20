@@ -77,7 +77,6 @@ const stats = [
 const liveSession = {
   id: "2",
   name: "Giới thiệu BST mới",
-  platform: "tiktok",
   views: 3201,
   comments: 523,
   duration: "45m",
@@ -116,7 +115,6 @@ const recentSessions = [
   {
     id: "1",
     name: "Flash Sale Mùa Hè",
-    platform: "facebook",
     status: "ended",
     comments: 1247,
     views: 8432,
@@ -128,7 +126,6 @@ const recentSessions = [
   {
     id: "2",
     name: "Giới thiệu BST mới",
-    platform: "tiktok",
     status: "live",
     comments: 523,
     views: 3201,
@@ -140,7 +137,6 @@ const recentSessions = [
   {
     id: "3",
     name: "Thanh lý cuối tuần",
-    platform: "instagram",
     status: "ended",
     comments: 892,
     views: 5678,
@@ -152,7 +148,6 @@ const recentSessions = [
   {
     id: "4",
     name: "Review sản phẩm mới",
-    platform: "facebook",
     status: "ended",
     comments: 2103,
     views: 12450,
@@ -164,7 +159,6 @@ const recentSessions = [
   {
     id: "5",
     name: "Live Q&A khách hàng",
-    platform: "tiktok",
     status: "ended",
     comments: 756,
     views: 4320,
@@ -176,16 +170,6 @@ const recentSessions = [
 ]
 
 // --- Components ---
-
-function PlatformBadge({ platform }: { platform: string }) {
-  const config: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
-    facebook: { label: "Facebook", variant: "default" },
-    tiktok: { label: "TikTok", variant: "secondary" },
-    instagram: { label: "Instagram", variant: "outline" },
-  }
-  const c = config[platform] ?? config.facebook
-  return <Badge variant={c.variant}>{c.label}</Badge>
-}
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "live") {
@@ -390,12 +374,11 @@ export default function Dashboard() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Tên phiên</TableHead>
-                  <TableHead>Nền tảng</TableHead>
                   <TableHead>Trạng thái</TableHead>
                   <TableHead className="text-right">Bình luận</TableHead>
                   <TableHead className="text-right">Lượt xem</TableHead>
                   <TableHead className="text-right">
-                    <span className="flex items-center justify-end gap-1"><UsersIcon className="size-3" />Leads</span>
+                    <span className="flex items-center justify-end gap-1"><UsersIcon className="size-3" />KH tiềm năng</span>
                   </TableHead>
                   <TableHead>Cảm xúc</TableHead>
                   <TableHead>Thời lượng</TableHead>
@@ -412,9 +395,6 @@ export default function Dashboard() {
                       >
                         {session.name}
                       </Link>
-                    </TableCell>
-                    <TableCell>
-                      <PlatformBadge platform={session.platform} />
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={session.status} />
