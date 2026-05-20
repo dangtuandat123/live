@@ -9,14 +9,18 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from "@/components/ui/chart"
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, Pie, PieChart, Label } from "recharts"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, Pie, PieChart, Label as RechartsLabel } from "recharts"
 import {
   EyeIcon, MessageSquareIcon, SmileIcon, PhoneIcon, TrendingUpIcon, TrendingDownIcon, ArrowUpIcon, ShoppingCartIcon,
   ClockIcon, CircleStopIcon, UsersIcon, HelpCircleIcon, PackageIcon, BarChart3Icon,
   SparklesIcon, SearchIcon, LoaderIcon, MinusIcon, CopyIcon, CheckIcon,
   BellRingIcon, BellOffIcon, DownloadIcon, ClipboardListIcon, XIcon,
   AlertTriangleIcon, FlameIcon, LightbulbIcon, HeartCrackIcon, CrownIcon, PackageXIcon, RefreshCwIcon, ZapIcon,
+  PinIcon, PinOffIcon, ClipboardCopyIcon, FileTextIcon, MapPinIcon, TruckIcon,
 } from "lucide-react"
 import * as React from "react"
 
@@ -355,8 +359,33 @@ function CommentsPanel() {
   const [filter, setFilter] = React.useState("all")
   const [search, setSearch] = React.useState("")
   const [visibleCount, setVisibleCount] = React.useState(BATCH)
+  const [pinnedIds, setPinnedIds] = React.useState<Set<number>>(new Set())
+  const [markedOrderIds, setMarkedOrderIds] = React.useState<Set<number>>(new Set())
+  const [copiedId, setCopiedId] = React.useState<number | null>(null)
+
+  const togglePin = (id: number) => {
+    setPinnedIds((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+  const toggleOrder = (id: number) => {
+    setMarkedOrderIds((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+  const copyComment = (text: string, id: number) => {
+    navigator.clipboard.writeText(text)
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 1500)
+  }
 
   const filtered = allComments.filter((c) => {
+    if (filter === "pinned" && !pinnedIds.has(c.id)) return false
+    if (filter === "order" && !markedOrderIds.has(c.id) && c.intentTag !== "Chốt đơn") return false
     if (filter === "question" && !c.text.includes("?")) return false
     if ((filter === "positive" || filter === "negative") && c.sentiment !== filter) return false
     if (search && !c.text.toLowerCase().includes(search.toLowerCase()) && !c.user.toLowerCase().includes(search.toLowerCase())) return false
@@ -393,6 +422,8 @@ function CommentsPanel() {
         <div className="flex flex-wrap gap-1.5 pt-2">
           {([
             { key: "all", label: "Tất cả", count: allComments.length },
+            { key: "pinned", label: "📌 Ghim", count: pinnedIds.size },
+            { key: "order", label: "🛒 Chốt đơn", count: allComments.filter(c => c.intentTag === "Chốt đơn" || markedOrderIds.has(c.id)).length },
             { key: "question", label: "Hỏi", count: allComments.filter(c => c.text.includes("?")).length },
             { key: "positive", label: "Tích cực", count: allComments.filter(c => c.sentiment === "positive").length },
             { key: "negative", label: "Tiêu cực", count: allComments.filter(c => c.sentiment === "negative").length },
@@ -419,9 +450,11 @@ function CommentsPanel() {
       <FadeScrollArea>
           <div className="divide-y px-4">
             {visible.map((comment) => {
-              const sentimentColor = comment.sentiment === "positive" ? "border-l-emerald-500" : comment.sentiment === "negative" ? "border-l-red-500" : "border-l-muted-foreground/30"
+              const isPinned = pinnedIds.has(comment.id)
+              const isOrder = markedOrderIds.has(comment.id) || comment.intentTag === "Chốt đơn"
+              const sentimentColor = isPinned ? "border-l-yellow-500 bg-yellow-500/5" : comment.sentiment === "positive" ? "border-l-emerald-500" : comment.sentiment === "negative" ? "border-l-red-500" : "border-l-muted-foreground/30"
               return (
-                <div key={comment.id} className={`flex items-start gap-2.5 border-l-2 py-2.5 pl-3 ${sentimentColor}`}>
+                <div key={comment.id} className={`group relative flex items-start gap-2.5 border-l-2 py-2.5 pl-3 transition-colors ${sentimentColor}`}>
                   <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
                     {comment.user.charAt(0)}
                   </div>
@@ -432,8 +465,36 @@ function CommentsPanel() {
                         {comment.hasPhone && (
                           <Badge variant="outline" className="gap-1 text-[10px] px-1.5 py-0"><PhoneIcon className="size-2.5" />SĐT</Badge>
                         )}
+                        {isPinned && <PinIcon className="size-3 text-yellow-500" />}
+                        {isOrder && <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-emerald-600">Đơn hàng</Badge>}
                       </div>
-                      <span className="text-[11px] text-muted-foreground/50 whitespace-nowrap shrink-0">{comment.time}</span>
+                      {/* Time + Quick Actions — stacked to prevent layout shift */}
+                      <div className="relative shrink-0 flex items-center">
+                        <span className="text-[11px] text-muted-foreground/50 whitespace-nowrap group-hover:invisible">{comment.time}</span>
+                        <div className="absolute inset-0 flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => togglePin(comment.id)}
+                            className={`rounded p-1 transition-colors ${isPinned ? "text-yellow-500 bg-yellow-500/10" : "text-muted-foreground hover:bg-muted"}`}
+                            title={isPinned ? "Bỏ ghim" : "Ghim"}
+                          >
+                            {isPinned ? <PinOffIcon className="size-3" /> : <PinIcon className="size-3" />}
+                          </button>
+                          <button
+                            onClick={() => toggleOrder(comment.id)}
+                            className={`rounded p-1 transition-colors ${isOrder ? "text-emerald-500 bg-emerald-500/10" : "text-muted-foreground hover:bg-muted"}`}
+                            title={isOrder ? "Bỏ đánh dấu" : "Đánh dấu chốt đơn"}
+                          >
+                            <ShoppingCartIcon className="size-3" />
+                          </button>
+                          <button
+                            onClick={() => copyComment(comment.text, comment.id)}
+                            className="rounded p-1 text-muted-foreground hover:bg-muted transition-colors"
+                            title="Copy bình luận"
+                          >
+                            {copiedId === comment.id ? <CheckIcon className="size-3 text-emerald-500" /> : <ClipboardCopyIcon className="size-3" />}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                     <p className="text-sm text-muted-foreground break-words">{comment.text}</p>
                     {(comment.intentTag || comment.questionTag || comment.productTag) && (
@@ -614,6 +675,9 @@ function CustomersPanel() {
   const [search, setSearch] = React.useState("")
   const [copiedPhone, setCopiedPhone] = React.useState<number | null>(null)
   const [copiedAll, setCopiedAll] = React.useState(false)
+  const [orders, setOrders] = React.useState<Record<number, { status: string; note: string; qty: number }>>({})
+  const [orderDialog, setOrderDialog] = React.useState<{ open: boolean; customerIdx: number | null }>({ open: false, customerIdx: null })
+  const [orderForm, setOrderForm] = React.useState({ qty: 1, note: "", status: "pending" })
   const filtered = potentialCustomers.filter((c) =>
     !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search) || c.product.toLowerCase().includes(search.toLowerCase())
   )
@@ -627,13 +691,24 @@ function CustomersPanel() {
     setCopiedAll(true)
     setTimeout(() => setCopiedAll(false), 2000)
   }
+  const openOrderDialog = (idx: number) => {
+    const existing = orders[idx]
+    setOrderForm({ qty: existing?.qty ?? 1, note: existing?.note ?? "", status: existing?.status ?? "pending" })
+    setOrderDialog({ open: true, customerIdx: idx })
+  }
+  const saveOrder = () => {
+    if (orderDialog.customerIdx === null) return
+    setOrders((prev) => ({ ...prev, [orderDialog.customerIdx!]: { ...orderForm } }))
+    setOrderDialog({ open: false, customerIdx: null })
+  }
+  const orderCustomer = orderDialog.customerIdx !== null ? filtered[orderDialog.customerIdx] : null
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>Khách hàng tiềm năng</CardTitle>
-            <CardDescription>Trích xuất SĐT/địa chỉ từ bình luận · {filtered.length} khách</CardDescription>
+            <CardDescription>Trích xuất SĐT/địa chỉ từ bình luận · {filtered.length} khách · {Object.keys(orders).length} đơn</CardDescription>
           </div>
           <div className="flex items-center gap-1.5">
             <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={handleCopyAll}>
@@ -654,11 +729,12 @@ function CustomersPanel() {
       <div className="px-4">
         <table className="w-full table-fixed text-sm">
           <colgroup>
-            <col className="w-[18%]" />
-            <col className="w-[18%]" />
             <col className="w-[16%]" />
+            <col className="w-[16%]" />
+            <col className="w-[14%]" />
+            <col className="w-[18%]" />
             <col className="w-[22%]" />
-            <col className="w-[26%]" />
+            <col className="w-[14%]" />
           </colgroup>
           <thead className="[&_tr]:border-b">
             <tr className="border-b">
@@ -667,6 +743,7 @@ function CustomersPanel() {
               <th className="h-10 px-2 text-left font-medium text-foreground">Địa chỉ</th>
               <th className="h-10 px-2 text-left font-medium text-foreground">SP quan tâm</th>
               <th className="h-10 px-2 text-left font-medium text-foreground">Nội dung</th>
+              <th className="h-10 px-2 text-center font-medium text-foreground">Đơn</th>
             </tr>
           </thead>
         </table>
@@ -675,39 +752,111 @@ function CustomersPanel() {
         <div className="px-4">
           <table className="w-full table-fixed text-sm">
             <colgroup>
-              <col className="w-[18%]" />
-              <col className="w-[18%]" />
               <col className="w-[16%]" />
+              <col className="w-[16%]" />
+              <col className="w-[14%]" />
+              <col className="w-[18%]" />
               <col className="w-[22%]" />
-              <col className="w-[26%]" />
+              <col className="w-[14%]" />
             </colgroup>
             <tbody className="[&_tr:last-child]:border-0">
-              {filtered.map((c, i) => (
-                <tr key={i} className="border-b transition-colors hover:bg-muted/50">
-                  <td className="p-2 font-medium truncate">{c.name}</td>
-                  <td className="p-2">
-                    {c.phone ? (
-                      <div className="flex items-center gap-1">
-                        <Badge variant="outline" className="gap-1"><PhoneIcon className="size-3" />{c.phone}</Badge>
-                        <button
-                          onClick={() => copyPhone(c.phone, i)}
-                          className="shrink-0 rounded p-1 hover:bg-muted transition-colors"
-                          title="Copy SĐT"
-                        >
-                          {copiedPhone === i ? <CheckIcon className="size-3 text-emerald-500" /> : <CopyIcon className="size-3 text-muted-foreground" />}
+              {filtered.map((c, i) => {
+                const order = orders[i]
+                return (
+                  <tr key={i} className="border-b transition-colors hover:bg-muted/50">
+                    <td className="p-2 font-medium truncate">{c.name}</td>
+                    <td className="p-2">
+                      {c.phone ? (
+                        <div className="flex items-center gap-1">
+                          <Badge variant="outline" className="gap-1"><PhoneIcon className="size-3" />{c.phone}</Badge>
+                          <button onClick={() => copyPhone(c.phone, i)} className="shrink-0 rounded p-1 hover:bg-muted transition-colors" title="Copy SĐT">
+                            {copiedPhone === i ? <CheckIcon className="size-3 text-emerald-500" /> : <CopyIcon className="size-3 text-muted-foreground" />}
+                          </button>
+                        </div>
+                      ) : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    <td className="p-2 truncate">{c.address || <span className="text-muted-foreground">—</span>}</td>
+                    <td className="p-2"><Badge variant="secondary" className="truncate max-w-full">{c.product}</Badge></td>
+                    <td className="p-2 text-sm text-muted-foreground truncate">{c.comment}</td>
+                    <td className="p-2 text-center">
+                      {order ? (
+                        <button onClick={() => openOrderDialog(i)} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors">
+                          <CheckIcon className="size-2.5" />
+                          {order.status === "pending" ? "Chờ" : order.status === "confirmed" ? "Xác nhận" : "Ship"}
                         </button>
-                      </div>
-                    ) : <span className="text-muted-foreground">—</span>}
-                  </td>
-                  <td className="p-2 truncate">{c.address || <span className="text-muted-foreground">—</span>}</td>
-                  <td className="p-2"><Badge variant="secondary" className="truncate max-w-full">{c.product}</Badge></td>
-                  <td className="p-2 text-sm text-muted-foreground truncate">{c.comment}</td>
-                </tr>
-              ))}
+                      ) : (
+                        <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 gap-1" onClick={() => openOrderDialog(i)}>
+                          <FileTextIcon className="size-2.5" />Tạo đơn
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
       </FadeScrollArea>
+
+      {/* Order Creation Dialog */}
+      <Dialog open={orderDialog.open} onOpenChange={(open) => setOrderDialog({ open, customerIdx: open ? orderDialog.customerIdx : null })}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><FileTextIcon className="size-5" />Tạo đơn hàng</DialogTitle>
+            <DialogDescription>
+              {orderCustomer ? `${orderCustomer.name} — ${orderCustomer.product}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {orderCustomer && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Khách hàng</Label>
+                  <p className="font-medium">{orderCustomer.name}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">SĐT</Label>
+                  <p className="font-medium">{orderCustomer.phone || "— Chưa có"}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Địa chỉ</Label>
+                  <p className="font-medium">{orderCustomer.address || "— Chưa có"}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Sản phẩm</Label>
+                  <p className="font-medium">{orderCustomer.product}</p>
+                </div>
+              </div>
+              <Separator />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="order-qty">Số lượng</Label>
+                  <Input id="order-qty" type="number" min={1} value={orderForm.qty} onChange={(e) => setOrderForm((f) => ({ ...f, qty: parseInt(e.target.value) || 1 }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Trạng thái</Label>
+                  <Select value={orderForm.status} onValueChange={(v) => setOrderForm((f) => ({ ...f, status: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Chờ xác nhận</SelectItem>
+                      <SelectItem value="confirmed">Đã xác nhận</SelectItem>
+                      <SelectItem value="shipping">Đang giao</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="order-note">Ghi chú</Label>
+                <Input id="order-note" placeholder="VD: Ship nhanh, gói quà..." value={orderForm.note} onChange={(e) => setOrderForm((f) => ({ ...f, note: e.target.value }))} />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOrderDialog({ open: false, customerIdx: null })}>Hủy</Button>
+            <Button onClick={saveOrder} className="gap-1.5"><CheckIcon className="size-4" />Lưu đơn</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
@@ -939,7 +1088,7 @@ function StatsPanel() {
             <PieChart accessibilityLayer>
               <ChartTooltip content={<ChartTooltipContent hideLabel />} />
               <Pie data={sentimentData} dataKey="value" nameKey="name" innerRadius={50} strokeWidth={2}>
-                <Label content={({ viewBox }) => {
+                <RechartsLabel content={({ viewBox }) => {
                   if (viewBox && "cx" in viewBox && "cy" in viewBox) {
                     const total = sentimentData.reduce((s, d) => s + d.value, 0)
                     return (
