@@ -52,7 +52,7 @@ const stats = [
     icon: <EyeIcon className="size-4" />,
   },
   {
-    title: "Sentiment tích cực",
+    title: "Cảm xúc tích cực",
     value: "78%",
     change: "+2% so với tuần trước",
     trend: "up" as const,
@@ -151,7 +151,7 @@ export default function Dashboard() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbPage>Dashboard</BreadcrumbPage>
+                <BreadcrumbPage>Tổng quan</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -162,7 +162,7 @@ export default function Dashboard() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Tổng quan</h1>
             <p className="text-muted-foreground">
               Tổng quan hoạt động livestream của bạn
             </p>

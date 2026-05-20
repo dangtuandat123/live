@@ -170,7 +170,7 @@ function ProductFormDialog({
             <Input placeholder="Mô tả ngắn gọn về sản phẩm cho AI nhận diện" />
           </div>
           <div className="grid gap-2">
-            <Label>Keywords / Alias (AI dùng để nhận diện từ comment)</Label>
+            <Label>Từ khóa / Tên gọi khác (AI dùng để nhận diện từ bình luận)</Label>
             <div className="flex gap-2">
               <Input
                 placeholder="Nhập từ khóa rồi Enter"
@@ -263,7 +263,7 @@ export default function ProductsIndex() {
               </Button>
             }
             title="Thêm sản phẩm mới"
-            description="Thêm sản phẩm vào catalog. AI sẽ dùng tên và keywords để nhận diện sản phẩm từ bình luận."
+            description="Thêm sản phẩm vào catalog. AI sẽ dùng tên và từ khóa để nhận diện sản phẩm từ bình luận."
           />
         </div>
 
@@ -272,7 +272,7 @@ export default function ProductsIndex() {
           <div className="relative flex-1 max-w-sm">
             <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Tìm theo tên, SKU, keywords..."
+              placeholder="Tìm theo tên, SKU, từ khóa..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
@@ -294,7 +294,7 @@ export default function ProductsIndex() {
                   <TableHead>SKU</TableHead>
                   <TableHead>Danh mục</TableHead>
                   <TableHead className="text-right">Giá</TableHead>
-                  <TableHead>Keywords / Alias</TableHead>
+                  <TableHead>Từ khóa</TableHead>
                   <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
@@ -336,7 +336,7 @@ export default function ProductsIndex() {
                             </Button>
                           }
                           title="Sửa sản phẩm"
-                          description="Cập nhật thông tin và keywords cho sản phẩm."
+                          description="Cập nhật thông tin và từ khóa cho sản phẩm."
                         />
                         <Button variant="ghost" size="icon">
                           <Trash2Icon className="size-4" />

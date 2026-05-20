@@ -61,7 +61,7 @@ const overviewStats = [
     icon: <EyeIcon className="size-4" />,
   },
   {
-    title: "Avg. Sentiment",
+    title: "TB cảm xúc tích cực",
     value: "76%",
     prev: "72%",
     icon: <SmileIcon className="size-4" />,
@@ -184,9 +184,9 @@ export default function ReportsIndex() {
           <SparklesIcon className="size-4" />
           <AlertTitle>Gợi ý từ AI</AlertTitle>
           <AlertDescription>
-            Facebook đang là nền tảng hiệu quả nhất (sentiment 79%). TikTok có tăng trưởng view nhanh
-            nhưng tỷ lệ comment-to-view thấp hơn. Gợi ý: tăng tần suất live trên Facebook vào khung giờ 19h-21h,
-            và thử format Q&A trên TikTok để tăng tương tác.
+            Facebook đang là nền tảng hiệu quả nhất (cảm xúc tích cực 79%). TikTok có tăng trưởng lượt xem nhanh
+            nhưng tỷ lệ bình luận/lượt xem thấp hơn. Gợi ý: tăng tần suất live trên Facebook vào khung giờ 19h-21h,
+            và thử hình thức hỏi đáp trên TikTok để tăng tương tác.
           </AlertDescription>
         </Alert>
 
@@ -205,7 +205,7 @@ export default function ReportsIndex() {
                     <TableHead className="text-right">Phiên</TableHead>
                     <TableHead className="text-right">Bình luận</TableHead>
                     <TableHead className="text-right">Lượt xem</TableHead>
-                    <TableHead>Sentiment</TableHead>
+                    <TableHead>Cảm xúc</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -239,9 +239,9 @@ export default function ReportsIndex() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Phiên</TableHead>
-                    <TableHead className="text-right">BL</TableHead>
-                    <TableHead className="text-right">View</TableHead>
-                    <TableHead>Sentiment</TableHead>
+                    <TableHead className="text-right">Bình luận</TableHead>
+                    <TableHead className="text-right">Lượt xem</TableHead>
+                    <TableHead>Cảm xúc</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

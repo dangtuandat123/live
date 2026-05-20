@@ -80,7 +80,7 @@ export default function SettingsIndex() {
                   <Badge>Đang sử dụng</Badge>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  30 phiên live/tháng · AI sentiment · Trích xuất SĐT · Export PDF
+                  30 phiên live/tháng · Phân tích cảm xúc · Trích xuất SĐT · Xuất PDF
                 </p>
               </div>
               <div className="text-right">
@@ -183,7 +183,7 @@ export default function SettingsIndex() {
         {/* Keywords */}
         <Card>
           <CardHeader>
-            <CardTitle>Keywords chốt đơn mặc định</CardTitle>
+            <CardTitle>Từ khóa chốt đơn mặc định</CardTitle>
             <CardDescription>
               Các từ khóa này sẽ được áp dụng mặc định cho mọi phiên live mới
             </CardDescription>
@@ -195,7 +195,7 @@ export default function SettingsIndex() {
               ))}
             </div>
             <div className="flex gap-2">
-              <Input placeholder="Thêm keyword mới..." className="max-w-xs" />
+              <Input placeholder="Thêm từ khóa mới..." className="max-w-xs" />
               <Button variant="secondary">Thêm</Button>
             </div>
           </CardContent>
