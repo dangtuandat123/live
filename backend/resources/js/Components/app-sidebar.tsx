@@ -11,7 +11,14 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar"
-import { GalleryVerticalEndIcon, LayoutDashboardIcon } from "lucide-react"
+import {
+  GalleryVerticalEndIcon,
+  LayoutDashboardIcon,
+  PackageIcon,
+  VideoIcon,
+  BarChart3Icon,
+  SettingsIcon,
+} from "lucide-react"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const auth = usePage().props.auth
@@ -24,7 +31,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const teams = [
     {
-      name: "LiveStream App",
+      name: "LiveStream AI",
       logo: <GalleryVerticalEndIcon />,
       plan: "Pro",
     },
@@ -36,6 +43,30 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       url: route("dashboard"),
       icon: <LayoutDashboardIcon />,
       isActive: route().current("dashboard"),
+    },
+    {
+      title: "Sản phẩm",
+      url: route("products.index"),
+      icon: <PackageIcon />,
+      isActive: route().current("products.*"),
+    },
+    {
+      title: "Phiên Live",
+      url: route("lives.index"),
+      icon: <VideoIcon />,
+      isActive: route().current("lives.*"),
+    },
+    {
+      title: "Báo cáo",
+      url: route("reports.index"),
+      icon: <BarChart3Icon />,
+      isActive: route().current("reports.*"),
+    },
+    {
+      title: "Cài đặt",
+      url: route("settings.index"),
+      icon: <SettingsIcon />,
+      isActive: route().current("settings.*"),
     },
   ]
 
