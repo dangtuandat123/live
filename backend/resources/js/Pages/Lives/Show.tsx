@@ -15,8 +15,124 @@ import {
   EyeIcon, MessageSquareIcon, SmileIcon, PhoneIcon, TrendingUpIcon, TrendingDownIcon, ArrowUpIcon, ShoppingCartIcon,
   ClockIcon, CircleStopIcon, UsersIcon, HelpCircleIcon, PackageIcon, BarChart3Icon,
   SparklesIcon, SearchIcon, LoaderIcon, MinusIcon, CopyIcon, CheckIcon,
+  BellRingIcon, BellOffIcon, DownloadIcon, ClipboardListIcon, XIcon,
 } from "lucide-react"
 import * as React from "react"
+
+// --- Sound Alert System ---
+function playOrderChime() {
+  try {
+    const ctx = new AudioContext()
+    const now = ctx.currentTime
+    // Pleasant two-tone chime
+    const freqs = [523.25, 659.25, 783.99] // C5, E5, G5
+    freqs.forEach((freq, i) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = "sine"
+      osc.frequency.value = freq
+      gain.gain.setValueAtTime(0, now + i * 0.12)
+      gain.gain.linearRampToValueAtTime(0.15, now + i * 0.12 + 0.05)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.4)
+      osc.connect(gain).connect(ctx.destination)
+      osc.start(now + i * 0.12)
+      osc.stop(now + i * 0.12 + 0.5)
+    })
+    setTimeout(() => ctx.close(), 2000)
+  } catch { /* AudioContext not available */ }
+}
+
+type OrderAlert = {
+  id: number
+  user: string
+  product: string
+  comment: string
+  time: number
+}
+
+function OrderAlertToast({ alert, onDismiss }: { alert: OrderAlert; onDismiss: () => void }) {
+  React.useEffect(() => {
+    const timer = setTimeout(onDismiss, 6000)
+    return () => clearTimeout(timer)
+  }, [onDismiss])
+
+  return (
+    <div className="animate-in slide-in-from-right-full fade-in duration-300 flex items-start gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 backdrop-blur-sm p-3 shadow-lg max-w-sm">
+      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/20">
+        <ShoppingCartIcon className="size-4 text-emerald-500" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-emerald-400">🛒 Chốt đơn mới!</p>
+        <p className="text-xs text-foreground mt-0.5 font-medium">{alert.user}</p>
+        <p className="text-xs text-muted-foreground truncate">{alert.product} — {alert.comment}</p>
+      </div>
+      <button onClick={onDismiss} className="shrink-0 rounded p-0.5 hover:bg-muted transition-colors">
+        <XIcon className="size-3.5 text-muted-foreground" />
+      </button>
+    </div>
+  )
+}
+
+function useOrderAlerts(soundEnabled: boolean) {
+  const [alerts, setAlerts] = React.useState<OrderAlert[]>([])
+  const alertIdRef = React.useRef(0)
+
+  // Simulate new order comments arriving (in production, this comes from WebSocket)
+  React.useEffect(() => {
+    const mockOrders = [
+      { user: "Trần Văn Minh", product: "Quần jean slim fit", comment: "Chốt đơn size 30, ship HCM" },
+      { user: "Phạm Thị Mai", product: "Váy hoa mùa hè", comment: "Lấy 1 cái size M nhé" },
+      { user: "Cao Minh Đức", product: "Áo thun basic cotton", comment: "Chốt 3 cái size L, ship Hà Nội" },
+      { user: "Lý Quốc Bảo", product: "Giày sneaker trắng", comment: "Mua size 42, COD Bình Dương" },
+      { user: "Đặng Thu Hương", product: "Túi xách da PU", comment: "Chốt đơn màu be, ship Cần Thơ" },
+    ]
+    let idx = 0
+    const interval = setInterval(() => {
+      const order = mockOrders[idx % mockOrders.length]
+      const newAlert: OrderAlert = {
+        id: ++alertIdRef.current,
+        ...order,
+        time: Date.now(),
+      }
+      setAlerts((prev) => [newAlert, ...prev].slice(0, 5))
+      if (soundEnabled) playOrderChime()
+      idx++
+    }, 15000) // Every 15 seconds for demo
+    return () => clearInterval(interval)
+  }, [soundEnabled])
+
+  const dismiss = React.useCallback((id: number) => {
+    setAlerts((prev) => prev.filter((a) => a.id !== id))
+  }, [])
+
+  return { alerts, dismiss }
+}
+
+// --- Export Utilities ---
+function exportLeadsCSV(customers: typeof potentialCustomers) {
+  const header = "Tên,SĐT,Địa chỉ,Sản phẩm,Nội dung"
+  const rows = customers.map((c) =>
+    [c.name, c.phone || "", c.address || "", c.product, c.comment]
+      .map((v) => `"${v.replace(/"/g, '""')}"`)
+      .join(",")
+  )
+  const csv = [header, ...rows].join("\n")
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `leads_${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function copyLeadsToClipboard(customers: typeof potentialCustomers): string {
+  const text = customers
+    .map((c, i) => `${i + 1}. ${c.name} | ${c.phone || "—"} | ${c.address || "—"} | ${c.product} | ${c.comment}`)
+    .join("\n")
+  navigator.clipboard.writeText(text)
+  return text
+}
 
 // --- Mock Data ---
 function generateComments(count: number) {
@@ -480,6 +596,7 @@ function QuestionsPanel() {
 function CustomersPanel() {
   const [search, setSearch] = React.useState("")
   const [copiedPhone, setCopiedPhone] = React.useState<number | null>(null)
+  const [copiedAll, setCopiedAll] = React.useState(false)
   const filtered = potentialCustomers.filter((c) =>
     !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search) || c.product.toLowerCase().includes(search.toLowerCase())
   )
@@ -488,6 +605,11 @@ function CustomersPanel() {
     setCopiedPhone(idx)
     setTimeout(() => setCopiedPhone(null), 1500)
   }
+  const handleCopyAll = () => {
+    copyLeadsToClipboard(filtered)
+    setCopiedAll(true)
+    setTimeout(() => setCopiedAll(false), 2000)
+  }
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="pb-3">
@@ -495,6 +617,16 @@ function CustomersPanel() {
           <div>
             <CardTitle>Khách hàng tiềm năng</CardTitle>
             <CardDescription>Trích xuất SĐT/địa chỉ từ bình luận · {filtered.length} khách</CardDescription>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={handleCopyAll}>
+              {copiedAll ? <CheckIcon className="size-3 text-emerald-500" /> : <ClipboardListIcon className="size-3" />}
+              {copiedAll ? "Đã copy" : "Copy tất cả"}
+            </Button>
+            <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => exportLeadsCSV(filtered)}>
+              <DownloadIcon className="size-3" />
+              Xuất CSV
+            </Button>
           </div>
         </div>
         <div className="relative max-w-xs pt-2">
@@ -799,6 +931,9 @@ function StatsPanel() {
 
 // --- Main Page ---
 export default function LivesShow() {
+  const [soundEnabled, setSoundEnabled] = React.useState(true)
+  const { alerts, dismiss } = useOrderAlerts(soundEnabled)
+
   return (
     <AuthenticatedLayout>
       <Head title="Flash Sale Mùa Hè — Live" />
@@ -828,7 +963,7 @@ export default function LivesShow() {
       <div className="flex flex-1 flex-col gap-2 px-4 pb-4 overflow-hidden">
         {/* Session Header */}
         <div className="flex items-center justify-between">
-          <div>
+          <div className="shrink-0">
             <h1 className="text-lg font-bold tracking-tight">Flash Sale Mùa Hè</h1>
             <div className="flex items-center gap-2 mt-1">
               <Badge variant="default">Facebook</Badge>
@@ -844,7 +979,42 @@ export default function LivesShow() {
               </span>
             </div>
           </div>
-          <Button variant="destructive"><CircleStopIcon className="mr-2 size-4" />Kết thúc phiên</Button>
+
+          {/* Center: Latest Order Alert */}
+          <div className="flex-1 flex justify-center px-4 min-w-0">
+            {alerts.length > 0 && (() => {
+              const latest = alerts[0]
+              return (
+                <div className="animate-in slide-in-from-top-2 fade-in duration-300 flex items-center gap-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 backdrop-blur-sm px-3 py-1.5 max-w-md w-full">
+                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/20">
+                    <ShoppingCartIcon className="size-3.5 text-emerald-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-emerald-400">🛒 Chốt đơn mới!</p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      <span className="font-medium text-foreground">{latest.user}</span> — {latest.product}
+                    </p>
+                  </div>
+                  <button onClick={() => dismiss(latest.id)} className="shrink-0 rounded p-0.5 hover:bg-muted transition-colors">
+                    <XIcon className="size-3 text-muted-foreground" />
+                  </button>
+                </div>
+              )
+            })()}
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              className={`gap-1.5 ${soundEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20" : ""}`}
+              onClick={() => setSoundEnabled(!soundEnabled)}
+            >
+              {soundEnabled ? <BellRingIcon className="size-4" /> : <BellOffIcon className="size-4" />}
+              {soundEnabled ? "Thông báo" : "Tắt tiếng"}
+            </Button>
+            <Button variant="destructive"><CircleStopIcon className="mr-2 size-4" />Kết thúc phiên</Button>
+          </div>
         </div>
 
         {/* 2-Column Layout: Video + KPI (left) | Tabs (right) — stacks on mobile */}
