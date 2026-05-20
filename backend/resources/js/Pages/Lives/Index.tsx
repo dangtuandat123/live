@@ -28,7 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
-import { PlusIcon, SearchIcon } from "lucide-react"
+import { PlusIcon, SearchIcon, EyeIcon } from "lucide-react"
 import { Link } from "@inertiajs/react"
 import * as React from "react"
 
@@ -198,6 +198,7 @@ export default function LivesIndex() {
                   <TableHead>Sản phẩm</TableHead>
                   <TableHead>Thời lượng</TableHead>
                   <TableHead>Ngày</TableHead>
+                  <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -226,6 +227,14 @@ export default function LivesIndex() {
                     <TableCell>{session.duration}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {session.date}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={route("lives.show", session.id)}>
+                          <EyeIcon className="mr-1.5 size-4" />
+                          Xem
+                        </Link>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

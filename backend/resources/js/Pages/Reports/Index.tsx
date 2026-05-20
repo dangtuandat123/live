@@ -1,5 +1,5 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout"
-import { Head } from "@inertiajs/react"
+import { Head, Link } from "@inertiajs/react"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -37,17 +37,20 @@ import {
   ChartLegendContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import {
   TrendingUpIcon,
   TrendingDownIcon,
   VideoIcon,
   MessageSquareIcon,
-  EyeIcon,
   SmileIcon,
   SparklesIcon,
   DownloadIcon,
   UsersIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  SearchIcon,
+  EyeIcon,
 } from "lucide-react"
 import * as React from "react"
 
@@ -97,11 +100,37 @@ const trendConfig = {
 } satisfies ChartConfig
 
 const recentSessions = [
-  { name: "Flash Sale Mùa Hè", comments: 1247, views: 8432, leads: 45, sentiment: 82, date: "20/05" },
-  { name: "Giới thiệu BST mới", comments: 523, views: 3201, leads: 12, sentiment: 75, date: "20/05" },
-  { name: "Thanh lý cuối tuần", comments: 892, views: 5678, leads: 28, sentiment: 68, date: "19/05" },
-  { name: "Review sản phẩm mới", comments: 2103, views: 12450, leads: 67, sentiment: 85, date: "18/05" },
-  { name: "Live Q&A khách hàng", comments: 756, views: 4320, leads: 15, sentiment: 71, date: "17/05" },
+  { id: "1", name: "Flash Sale Mùa Hè", comments: 1247, views: 8432, leads: 45, sentiment: 82, date: "20/05" },
+  { id: "2", name: "Giới thiệu BST mới", comments: 523, views: 3201, leads: 12, sentiment: 75, date: "20/05" },
+  { id: "3", name: "Thanh lý cuối tuần", comments: 892, views: 5678, leads: 28, sentiment: 68, date: "19/05" },
+  { id: "4", name: "Review sản phẩm mới", comments: 2103, views: 12450, leads: 67, sentiment: 85, date: "18/05" },
+  { id: "5", name: "Live Q&A khách hàng", comments: 756, views: 4320, leads: 15, sentiment: 71, date: "17/05" },
+]
+
+const sessionCompareData = [
+  { name: "Review SP mới", views: 12450, comments: 2103 },
+  { name: "Flash Sale", views: 8432, comments: 1247 },
+  { name: "Thanh lý", views: 5678, comments: 892 },
+  { name: "Q&A KH", views: 4320, comments: 756 },
+  { name: "BST mới", views: 3201, comments: 523 },
+]
+
+const sessionBarConfig = {
+  views: { label: "Lượt xem", color: "var(--chart-1)" },
+  comments: { label: "Bình luận", color: "var(--chart-2)" },
+} satisfies ChartConfig
+
+const hotKeywords = [
+  { keyword: "giá bao nhiêu", count: 487, trend: "up" as const },
+  { keyword: "còn hàng không", count: 342, trend: "up" as const },
+  { keyword: "ship về HN", count: 256, trend: "down" as const },
+  { keyword: "có size L không", count: 198, trend: "up" as const },
+  { keyword: "mua 2 giảm không", count: 134, trend: "down" as const },
+  { keyword: "chất liệu gì", count: 121, trend: "up" as const },
+  { keyword: "giao hàng bao lâu", count: 98, trend: "up" as const },
+  { keyword: "màu khác không", count: 87, trend: "down" as const },
+  { keyword: "freeship không", count: 76, trend: "up" as const },
+  { keyword: "đổi trả được không", count: 65, trend: "down" as const },
 ]
 
 // --- Main ---
@@ -232,6 +261,78 @@ export default function ReportsIndex() {
           </CardContent>
         </Card>
 
+        {/* Bottom Row: Session Compare + Keywords */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* Session Comparison */}
+          <Card>
+            <CardHeader>
+              <CardTitle>So sánh phiên Live</CardTitle>
+              <CardDescription>Top 5 phiên theo lượt xem và bình luận</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer config={sessionBarConfig} className="aspect-auto h-[280px] w-full">
+                <BarChart data={sessionCompareData} layout="vertical" margin={{ left: 10 }}>
+                  <CartesianGrid horizontal={false} />
+                  <YAxis
+                    dataKey="name"
+                    type="category"
+                    tickLine={false}
+                    axisLine={false}
+                    width={90}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <XAxis type="number" hide />
+                  <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                  <Bar dataKey="views" fill="var(--color-views)" radius={[0, 4, 4, 0]} barSize={14} />
+                  <Bar dataKey="comments" fill="var(--color-comments)" radius={[0, 4, 4, 0]} barSize={14} />
+                  <ChartLegend content={<ChartLegendContent />} />
+                </BarChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+
+          {/* Hot Keywords */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <SearchIcon className="size-4" />
+                Từ khóa nổi bật trong kỳ
+              </CardTitle>
+              <CardDescription>Top 10 từ khóa khách nhắc nhiều nhất từ bình luận</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8">#</TableHead>
+                    <TableHead>Từ khóa</TableHead>
+                    <TableHead className="text-right">Số lần</TableHead>
+                    <TableHead className="w-12 text-right">Trend</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {hotKeywords.map((item, i) => (
+                    <TableRow key={item.keyword}>
+                      <TableCell className="font-medium text-muted-foreground">{i + 1}</TableCell>
+                      <TableCell>
+                        <span className="font-medium">"{item.keyword}"</span>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{item.count}</TableCell>
+                      <TableCell className="text-right">
+                        {item.trend === "up" ? (
+                          <ArrowUpIcon className="ml-auto size-4 text-green-500" />
+                        ) : (
+                          <ArrowDownIcon className="ml-auto size-4 text-red-500" />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Recent Sessions */}
         <Card>
           <CardHeader>
@@ -249,11 +350,12 @@ export default function ReportsIndex() {
                     <span className="flex items-center justify-end gap-1"><UsersIcon className="size-3" />KH tiềm năng</span>
                   </TableHead>
                   <TableHead>Cảm xúc</TableHead>
+                  <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {recentSessions.map((s) => (
-                  <TableRow key={s.name}>
+                  <TableRow key={s.id}>
                     <TableCell>
                       <div>
                         <div className="font-medium text-sm">{s.name}</div>
@@ -268,6 +370,14 @@ export default function ReportsIndex() {
                         <Progress value={s.sentiment} className="h-2 w-16" />
                         <span className="text-xs tabular-nums">{s.sentiment}%</span>
                       </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={route("lives.show", s.id)}>
+                          <EyeIcon className="mr-1.5 size-4" />
+                          Xem
+                        </Link>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

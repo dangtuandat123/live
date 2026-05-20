@@ -39,6 +39,7 @@ import {
   TrendingUpIcon,
   PackageIcon,
   UsersIcon,
+  SearchIcon,
 } from "lucide-react"
 
 // --- Mock Data ---
@@ -102,6 +103,14 @@ const trendConfig = {
     color: "var(--chart-2)",
   },
 } satisfies ChartConfig
+
+const hotKeywords = [
+  { keyword: "giá bao nhiêu", count: 487, trend: "up" as const },
+  { keyword: "còn hàng không", count: 342, trend: "up" as const },
+  { keyword: "ship về HN", count: 256, trend: "down" as const },
+  { keyword: "có size L không", count: 198, trend: "up" as const },
+  { keyword: "mua 2 giảm không", count: 134, trend: "down" as const },
+]
 
 const topProducts = [
   { name: "Áo thun basic cotton", mentions: 342, percent: 100 },
@@ -336,32 +345,66 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Top Products */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <PackageIcon className="size-4" />
-                Sản phẩm được nhắc nhiều
-              </CardTitle>
-              <CardDescription>Tuần này, từ bình luận phiên live</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {topProducts.map((product, i) => (
-                  <div key={product.name} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
+          {/* Right Sidebar: Keywords + Top Products */}
+          <div className="flex flex-col gap-4">
+            {/* Hot Keywords */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <SearchIcon className="size-4" />
+                  Từ khóa nổi bật
+                </CardTitle>
+                <CardDescription>Khách hàng đang hỏi gì trong live</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {hotKeywords.map((item, i) => (
+                    <div key={item.keyword} className="flex items-center justify-between text-sm">
                       <span className="flex items-center gap-2">
                         <span className="flex size-5 items-center justify-center rounded-full bg-muted text-xs font-medium">{i + 1}</span>
-                        <span className="truncate">{product.name}</span>
+                        <span className="truncate">"{item.keyword}"</span>
                       </span>
-                      <span className="font-medium tabular-nums">{product.mentions}</span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="font-medium tabular-nums">{item.count}</span>
+                        {item.trend === "up" ? (
+                          <ArrowUpIcon className="size-3 text-green-500" />
+                        ) : (
+                          <ArrowDownIcon className="size-3 text-red-500" />
+                        )}
+                      </span>
                     </div>
-                    <Progress value={product.percent} className="h-1.5" />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Top Products */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <PackageIcon className="size-4" />
+                  Top sản phẩm
+                </CardTitle>
+                <CardDescription>Được nhắc nhiều nhất tuần này</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {topProducts.map((product, i) => (
+                    <div key={product.name} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="flex items-center gap-2">
+                          <span className="flex size-5 items-center justify-center rounded-full bg-muted text-xs font-medium">{i + 1}</span>
+                          <span className="truncate">{product.name}</span>
+                        </span>
+                        <span className="font-medium tabular-nums">{product.mentions}</span>
+                      </div>
+                      <Progress value={product.percent} className="h-1.5" />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Recent Sessions Table */}
@@ -383,6 +426,7 @@ export default function Dashboard() {
                   <TableHead>Cảm xúc</TableHead>
                   <TableHead>Thời lượng</TableHead>
                   <TableHead>Ngày</TableHead>
+                  <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -417,6 +461,14 @@ export default function Dashboard() {
                     <TableCell>{session.duration}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {session.date}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={route("lives.show", session.id)}>
+                          <EyeIcon className="mr-1.5 size-4" />
+                          Xem
+                        </Link>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

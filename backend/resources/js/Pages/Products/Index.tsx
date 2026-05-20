@@ -49,6 +49,8 @@ import {
   XIcon,
   TrendingUpIcon,
   MessageSquareIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
 } from "lucide-react"
 import * as React from "react"
 
@@ -63,6 +65,7 @@ const mockProducts = [
     category: "Áo",
     keywords: ["áo thun", "áo phông", "basic tee", "áo cotton"],
     mentions: 342,
+    prevMentions: 280,
     isLive: true,
   },
   {
@@ -73,6 +76,7 @@ const mockProducts = [
     category: "Quần",
     keywords: ["quần jean", "quần bò", "slim fit", "quần dài"],
     mentions: 195,
+    prevMentions: 210,
     isLive: false,
   },
   {
@@ -83,6 +87,7 @@ const mockProducts = [
     category: "Váy",
     keywords: ["váy hoa", "váy mùa hè", "đầm hoa", "dress"],
     mentions: 278,
+    prevMentions: 195,
     isLive: true,
   },
   {
@@ -93,6 +98,7 @@ const mockProducts = [
     category: "Phụ kiện",
     keywords: ["túi xách", "túi da", "bag", "ví"],
     mentions: 156,
+    prevMentions: 160,
     isLive: false,
   },
   {
@@ -103,6 +109,7 @@ const mockProducts = [
     category: "Giày dép",
     keywords: ["giày sneaker", "giày trắng", "giày thể thao", "sneaker"],
     mentions: 98,
+    prevMentions: 65,
     isLive: false,
   },
   {
@@ -113,6 +120,7 @@ const mockProducts = [
     category: "Phụ kiện",
     keywords: ["kính mát", "kính râm", "sunglasses"],
     mentions: 43,
+    prevMentions: 50,
     isLive: false,
   },
 ]
@@ -403,9 +411,14 @@ export default function ProductsIndex() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1.5">
                         <Progress value={(product.mentions / maxMentions) * 100} className="h-1.5 w-16" />
                         <span className="text-sm font-medium tabular-nums w-8 text-right">{product.mentions}</span>
+                        {product.mentions >= product.prevMentions ? (
+                          <ArrowUpIcon className="size-3 text-green-500" />
+                        ) : (
+                          <ArrowDownIcon className="size-3 text-red-500" />
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
