@@ -1,3 +1,4 @@
+import * as React from "react"
 import {
   Avatar,
   AvatarFallback,
@@ -11,6 +12,12 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuPortal,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu"
 import {
   SidebarMenu,
@@ -18,7 +25,17 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { ChevronsUpDownIcon, SparklesIcon, BadgeCheckIcon, CreditCardIcon, BellIcon, LogOutIcon } from "lucide-react"
+import {
+  ChevronsUpDownIcon,
+  SparklesIcon,
+  BadgeCheckIcon,
+  CreditCardIcon,
+  BellIcon,
+  LogOutIcon,
+  SunIcon,
+  MoonIcon,
+  LaptopIcon,
+} from "lucide-react"
 
 export function NavUser({
   user,
@@ -30,6 +47,42 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const [theme, setThemeState] = React.useState<"light" | "dark" | "system">(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("theme") as "light" | "dark" | "system") || "system"
+    }
+    return "system"
+  })
+
+  const setTheme = (value: "light" | "dark" | "system") => {
+    setThemeState(value)
+    localStorage.setItem("theme", value)
+
+    const root = window.document.documentElement
+    root.classList.remove("light", "dark")
+
+    if (value === "system") {
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+      root.classList.add(systemTheme)
+    } else {
+      root.classList.add(value)
+    }
+  }
+
+  React.useEffect(() => {
+    const root = window.document.documentElement
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
+
+    const handleSystemThemeChange = () => {
+      if (theme === "system") {
+        root.classList.remove("light", "dark")
+        root.classList.add(mediaQuery.matches ? "dark" : "light")
+      }
+    }
+
+    mediaQuery.addEventListener("change", handleSystemThemeChange)
+    return () => mediaQuery.removeEventListener("change", handleSystemThemeChange)
+  }, [theme])
 
   return (
     <SidebarMenu>
@@ -80,25 +133,47 @@ export function NavUser({
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem>
-                <BadgeCheckIcon
-                />
+                <BadgeCheckIcon />
                 Account
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <CreditCardIcon
-                />
+                <CreditCardIcon />
                 Billing
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <BellIcon
-                />
+                <BellIcon />
                 Notifications
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <SunIcon className="dark:hidden size-4" />
+                <MoonIcon className="hidden dark:block size-4" />
+                Giao diện
+              </DropdownMenuSubTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuSubContent>
+                  <DropdownMenuRadioGroup value={theme} onValueChange={(val) => setTheme(val as "light" | "dark" | "system")}>
+                    <DropdownMenuRadioItem value="light">
+                      <SunIcon className="mr-2 size-4" />
+                      Sáng
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="dark">
+                      <MoonIcon className="mr-2 size-4" />
+                      Tối
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="system">
+                      <LaptopIcon className="mr-2 size-4" />
+                      Hệ thống
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuPortal>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
             <DropdownMenuItem>
-              <LogOutIcon
-              />
+              <LogOutIcon />
               Log out
             </DropdownMenuItem>
           </DropdownMenuContent>

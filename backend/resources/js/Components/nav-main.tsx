@@ -19,18 +19,18 @@ export function NavMain({
 }) {
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Platform</SidebarGroupLabel>
-      <SidebarMenu>
+      <SidebarMenu className="gap-1">
         {items.map((item) => (
           <SidebarMenuItem key={item.title}>
             <SidebarMenuButton
               asChild
               isActive={item.isActive}
               tooltip={item.title}
+              className="h-10 [&_svg]:size-[18px]"
             >
               <Link href={item.url}>
                 {item.icon}
-                <span>{item.title}</span>
+                <span className="text-sm font-medium">{item.title}</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
