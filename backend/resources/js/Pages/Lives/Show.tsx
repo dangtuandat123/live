@@ -1195,7 +1195,7 @@ export default function LivesShow() {
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href={route("lives.index")}>Phiên Live</BreadcrumbLink>
+                <BreadcrumbLink href={route("lives.index")}>Phân tích phiên live</BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>

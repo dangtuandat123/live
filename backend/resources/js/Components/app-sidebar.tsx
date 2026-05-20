@@ -45,16 +45,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       isActive: route().current("dashboard"),
     },
     {
+      title: "Phân tích phiên live",
+      url: route("lives.index"),
+      icon: <VideoIcon />,
+      isActive: route().current("lives.*"),
+    },
+    {
       title: "Sản phẩm",
       url: route("products.index"),
       icon: <PackageIcon />,
       isActive: route().current("products.*"),
-    },
-    {
-      title: "Phiên Live",
-      url: route("lives.index"),
-      icon: <VideoIcon />,
-      isActive: route().current("lives.*"),
     },
     {
       title: "Báo cáo",

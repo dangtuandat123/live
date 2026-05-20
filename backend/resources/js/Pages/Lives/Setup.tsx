@@ -94,7 +94,7 @@ export default function LivesSetup() {
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem className="hidden md:block">
                 <BreadcrumbLink href={route("lives.index")}>
-                  Phiên Live
+                  Phân tích phiên live
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />

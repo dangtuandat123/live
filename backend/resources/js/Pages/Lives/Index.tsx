@@ -148,7 +148,7 @@ export default function LivesIndex() {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Phiên Live" />
+      <Head title="Phân tích phiên live" />
       <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
         <div className="flex items-center gap-2 px-4">
           <SidebarTrigger className="-ml-1" />
@@ -165,7 +165,7 @@ export default function LivesIndex() {
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
-                <BreadcrumbPage>Phiên Live</BreadcrumbPage>
+                <BreadcrumbPage>Phân tích phiên live</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -176,7 +176,7 @@ export default function LivesIndex() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Phiên Live</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Phân tích phiên live</h1>
             <p className="text-muted-foreground">
               Quản lý và theo dõi tất cả phiên livestream TikTok
             </p>
