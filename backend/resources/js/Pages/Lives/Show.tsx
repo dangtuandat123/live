@@ -1044,15 +1044,15 @@ function StatsPanel() {
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <FadeScrollArea>
-        <div className="grid gap-4 md:grid-cols-2 px-4 pb-4">
-      {/* Activity Timeline */}
-      <Card className="md:col-span-2">
+      <div className="flex-1 overflow-y-auto">
+        <div className="grid gap-4 md:grid-cols-2 min-h-full">
+          {/* Activity Timeline */}
+          <Card className="md:col-span-2 flex flex-col">
         <CardHeader>
           <CardTitle>Hoạt động theo thời gian</CardTitle>
           <CardDescription>Bình luận và lượt xem realtime mỗi 5 phút</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1">
           <ChartContainer config={activityConfig} className="aspect-auto h-[250px] w-full">
             <AreaChart accessibilityLayer data={activityData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid vertical={false} />
@@ -1078,13 +1078,13 @@ function StatsPanel() {
       </Card>
 
       {/* Sentiment Donut */}
-      <Card>
+      <Card className="flex flex-col">
         <CardHeader>
           <CardTitle>Phân bổ cảm xúc</CardTitle>
           <CardDescription>Tỷ lệ tích cực / trung lập / tiêu cực</CardDescription>
         </CardHeader>
-        <CardContent>
-          <ChartContainer config={sentimentConfig} className="aspect-auto h-[250px] w-full">
+        <CardContent className="flex-1">
+          <ChartContainer config={sentimentConfig} className="aspect-auto h-full min-h-[200px] w-full">
             <PieChart accessibilityLayer>
               <ChartTooltip content={<ChartTooltipContent hideLabel />} />
               <Pie data={sentimentData} dataKey="value" nameKey="name" innerRadius={50} strokeWidth={2}>
@@ -1107,13 +1107,13 @@ function StatsPanel() {
       </Card>
 
       {/* Top Products Bar */}
-      <Card>
+      <Card className="flex flex-col">
         <CardHeader>
           <CardTitle>Top sản phẩm</CardTitle>
           <CardDescription>Lượt nhắc và câu hỏi theo sản phẩm</CardDescription>
         </CardHeader>
-        <CardContent>
-          <ChartContainer config={productConfig} className="aspect-auto h-[250px] w-full">
+        <CardContent className="flex-1">
+          <ChartContainer config={productConfig} className="aspect-auto h-full min-h-[200px] w-full">
             <BarChart accessibilityLayer data={productData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
@@ -1128,13 +1128,13 @@ function StatsPanel() {
       </Card>
 
       {/* Conversion Funnel */}
-      <Card className="md:col-span-2">
+      <Card className="md:col-span-2 flex flex-col">
         <CardHeader>
           <CardTitle>Phễu chuyển đổi</CardTitle>
           <CardDescription>Từ người xem → bình luận → để lại thông tin → chốt đơn</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-end justify-around gap-2 min-h-[120px]">
+        <CardContent className="flex-1">
+          <div className="flex items-end justify-around gap-2 h-full min-h-[120px]">
             {funnelData.map((item, i) => {
               const maxVal = funnelData[0].value
               const heightPct = Math.max(15, (item.value / maxVal) * 100)
@@ -1154,7 +1154,7 @@ function StatsPanel() {
         </CardContent>
       </Card>
         </div>
-      </FadeScrollArea>
+      </div>
     </div>
   )
 }
@@ -1361,7 +1361,7 @@ export default function LivesShow() {
             <TabsContent value="products" className="flex-1 min-h-0 overflow-y-auto"><ProductsPanel /></TabsContent>
             <TabsContent value="questions" className="flex-1 min-h-0 overflow-y-auto"><QuestionsPanel /></TabsContent>
             <TabsContent value="customers" className="flex-1 min-h-0 overflow-y-auto"><CustomersPanel /></TabsContent>
-            <TabsContent value="stats" className="flex-1 min-h-0 overflow-y-auto"><StatsPanel /></TabsContent>
+            <TabsContent value="stats" className="flex-1 min-h-0"><StatsPanel /></TabsContent>
             <TabsContent value="ai" className="flex-1 min-h-0 overflow-y-auto"><AIInsightsPanel /></TabsContent>
           </Tabs>
         </div>
