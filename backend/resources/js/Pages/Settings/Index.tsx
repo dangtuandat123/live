@@ -1,4 +1,5 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout"
+import { Head, useForm, usePage } from "@inertiajs/react"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -28,15 +29,56 @@ import {
   XCircleIcon,
   CrownIcon,
   SparklesIcon,
+  CheckIcon,
+  LoaderIcon,
 } from "lucide-react"
+import type { PageProps } from "@/types"
+
+interface SettingsData {
+  ai_language: string
+  auto_extract_phone: boolean
+  auto_extract_address: boolean
+  realtime_alerts: boolean
+}
+
+interface Props extends PageProps {
+  settings: SettingsData
+}
 
 const platforms = [
   { name: "TikTok", connected: true, account: "@shopthoitrang_abc" },
 ]
 
-export default function SettingsIndex() {
+export default function SettingsIndex({ settings }: Props) {
+  const { auth } = usePage<Props>().props
+
+  // AI Settings Form
+  const aiForm = useForm({
+    ai_language: settings.ai_language,
+    auto_extract_phone: settings.auto_extract_phone,
+    auto_extract_address: settings.auto_extract_address,
+    realtime_alerts: settings.realtime_alerts,
+  })
+
+  // Profile Form
+  const profileForm = useForm({
+    name: auth.user.name,
+    email: auth.user.email,
+  })
+
+  function submitAiSettings(e: React.FormEvent) {
+    e.preventDefault()
+    aiForm.put(route("settings.update-ai"), { preserveScroll: true })
+  }
+
+  function submitProfile(e: React.FormEvent) {
+    e.preventDefault()
+    profileForm.put(route("settings.update-profile"), { preserveScroll: true })
+  }
+
   return (
     <AuthenticatedLayout>
+      <Head title="Cài đặt" />
       <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 border-b border-border/40 bg-background/95 backdrop-blur-md sticky top-0 z-40">
         <div className="flex items-center gap-2 px-4">
           <SidebarTrigger className="-ml-1" />
@@ -135,87 +177,115 @@ export default function SettingsIndex() {
         </Card>
 
         {/* AI Preferences */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Tùy chỉnh AI</CardTitle>
-            <CardDescription>Cấu hình cách AI phân tích bình luận</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <Label>Ngôn ngữ phân tích</Label>
-              <Select defaultValue="vi">
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="vi">Tiếng Việt</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="auto">Tự động nhận diện</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Trích xuất SĐT tự động</Label>
-                <p className="text-xs text-muted-foreground">AI tự động tìm và trích xuất số điện thoại từ bình luận</p>
+        <form onSubmit={submitAiSettings}>
+          <Card>
+            <CardHeader>
+              <CardTitle>Tùy chỉnh AI</CardTitle>
+              <CardDescription>Cấu hình cách AI phân tích bình luận</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-2">
+                <Label>Ngôn ngữ phân tích</Label>
+                <Select
+                  value={aiForm.data.ai_language}
+                  onValueChange={(value) => aiForm.setData("ai_language", value)}
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="vi">Tiếng Việt</SelectItem>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="auto">Tự động nhận diện</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <Switch defaultChecked />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Trích xuất địa chỉ tự động</Label>
-                <p className="text-xs text-muted-foreground">AI tự động tìm địa chỉ giao hàng từ bình luận</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Trích xuất SĐT tự động</Label>
+                  <p className="text-xs text-muted-foreground">AI tự động tìm và trích xuất số điện thoại từ bình luận</p>
+                </div>
+                <Switch
+                  checked={aiForm.data.auto_extract_phone}
+                  onCheckedChange={(checked) => aiForm.setData("auto_extract_phone", checked)}
+                />
               </div>
-              <Switch defaultChecked />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Cảnh báo realtime</Label>
-                <p className="text-xs text-muted-foreground">Nhận cảnh báo khi có nhiều bình luận tiêu cực hoặc câu hỏi chưa trả lời</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Trích xuất địa chỉ tự động</Label>
+                  <p className="text-xs text-muted-foreground">AI tự động tìm địa chỉ giao hàng từ bình luận</p>
+                </div>
+                <Switch
+                  checked={aiForm.data.auto_extract_address}
+                  onCheckedChange={(checked) => aiForm.setData("auto_extract_address", checked)}
+                />
               </div>
-              <Switch defaultChecked />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Từ khóa chốt đơn */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Từ khóa chốt đơn mặc định</CardTitle>
-            <CardDescription>
-              Các từ khóa này sẽ được áp dụng mặc định cho mọi phiên live mới
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex flex-wrap gap-1.5">
-              {["mua", "chốt", "ship", "giá", "size", "đặt hàng", "order", "lấy", "giao"].map((kw) => (
-                <Badge key={kw} variant="secondary">{kw}</Badge>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Input placeholder="Thêm từ khóa mới..." className="max-w-xs" />
-              <Button variant="secondary">Thêm</Button>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Cảnh báo realtime</Label>
+                  <p className="text-xs text-muted-foreground">Nhận cảnh báo khi có nhiều bình luận tiêu cực hoặc câu hỏi chưa trả lời</p>
+                </div>
+                <Switch
+                  checked={aiForm.data.realtime_alerts}
+                  onCheckedChange={(checked) => aiForm.setData("realtime_alerts", checked)}
+                />
+              </div>
+              <Button type="submit" disabled={aiForm.processing} className="gap-2">
+                {aiForm.processing ? (
+                  <LoaderIcon className="size-4 animate-spin" />
+                ) : aiForm.recentlySuccessful ? (
+                  <CheckIcon className="size-4" />
+                ) : null}
+                {aiForm.recentlySuccessful ? "Đã lưu" : "Lưu cài đặt AI"}
+              </Button>
+              {aiForm.errors.ai_language && (
+                <p className="text-sm text-destructive">{aiForm.errors.ai_language}</p>
+              )}
+            </CardContent>
+          </Card>
+        </form>
 
         {/* Profile */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Thông tin tài khoản</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="name">Tên</Label>
-              <Input id="name" defaultValue="Nguyễn Văn A" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" defaultValue="seller@example.com" />
-            </div>
-            <Button>Lưu thay đổi</Button>
-          </CardContent>
-        </Card>
+        <form onSubmit={submitProfile}>
+          <Card>
+            <CardHeader>
+              <CardTitle>Thông tin tài khoản</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-2">
+                <Label htmlFor="name">Tên</Label>
+                <Input
+                  id="name"
+                  value={profileForm.data.name}
+                  onChange={(e) => profileForm.setData("name", e.target.value)}
+                />
+                {profileForm.errors.name && (
+                  <p className="text-sm text-destructive">{profileForm.errors.name}</p>
+                )}
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={profileForm.data.email}
+                  onChange={(e) => profileForm.setData("email", e.target.value)}
+                />
+                {profileForm.errors.email && (
+                  <p className="text-sm text-destructive">{profileForm.errors.email}</p>
+                )}
+              </div>
+              <Button type="submit" disabled={profileForm.processing} className="gap-2">
+                {profileForm.processing ? (
+                  <LoaderIcon className="size-4 animate-spin" />
+                ) : profileForm.recentlySuccessful ? (
+                  <CheckIcon className="size-4" />
+                ) : null}
+                {profileForm.recentlySuccessful ? "Đã lưu" : "Lưu thay đổi"}
+              </Button>
+            </CardContent>
+          </Card>
+        </form>
       </div>
     </AuthenticatedLayout>
   )

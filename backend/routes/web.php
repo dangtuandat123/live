@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -47,9 +48,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('reports.index');
 
     // Settings
-    Route::get('/settings', function () {
-        return Inertia::render('Settings/Index');
-    })->name('settings.index');
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+    Route::put('/settings/ai', [SettingsController::class, 'updateSettings'])->name('settings.update-ai');
+    Route::put('/settings/profile', [SettingsController::class, 'updateProfile'])->name('settings.update-profile');
 });
 
 Route::middleware('auth')->group(function () {

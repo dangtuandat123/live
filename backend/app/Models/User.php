@@ -18,11 +18,19 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
+    public const DEFAULT_SETTINGS = [
+        'ai_language' => 'vi',
+        'auto_extract_phone' => true,
+        'auto_extract_address' => true,
+        'realtime_alerts' => true,
+    ];
+
     protected $fillable = [
         'name',
         'email',
         'password',
         'role',
+        'settings',
     ];
 
     public function isAdmin(): bool
@@ -50,6 +58,15 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'settings' => 'array',
         ];
+    }
+
+    /**
+     * Get merged settings with defaults.
+     */
+    public function getSettingsWithDefaults(): array
+    {
+        return array_merge(self::DEFAULT_SETTINGS, $this->settings ?? []);
     }
 }
