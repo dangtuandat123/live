@@ -472,7 +472,7 @@ export default function LivesShow() {
                 <CardTitle className="text-xs">🔍 Từ khóa được nhắc nhiều</CardTitle>
               </CardHeader>
               <CardContent className="px-3">
-                <div className="flex flex-wrap gap-1.5">
+                <div className="grid grid-cols-2 gap-1.5">
                   {[
                     { keyword: "size", count: 154 },
                     { keyword: "màu sắc", count: 138 },
@@ -485,9 +485,9 @@ export default function LivesShow() {
                     { keyword: "tư vấn", count: 95 },
                     { keyword: "giao hóa tốc", count: 92 },
                   ].map((item) => (
-                    <div key={item.keyword} className="flex items-center gap-1 rounded border bg-muted/50 px-1.5 py-0.5 text-xs">
-                      <span>{item.keyword}</span>
-                      <span className="font-semibold text-foreground">{item.count}</span>
+                    <div key={item.keyword} className="flex items-center justify-between rounded-md bg-muted/60 px-2 py-1 text-xs">
+                      <span className="text-muted-foreground">{item.keyword}</span>
+                      <span className="font-bold tabular-nums">{item.count}</span>
                     </div>
                   ))}
                 </div>
