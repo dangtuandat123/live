@@ -1,0 +1,152 @@
+import AdminLayout from "@/Layouts/AdminLayout"
+import { Head, router } from "@inertiajs/react"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+import { Separator } from "@/components/ui/separator"
+import { SidebarTrigger } from "@/components/ui/sidebar"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { ShieldCheckIcon } from "lucide-react"
+import type { User } from "@/types"
+
+interface Props {
+  users: User[]
+}
+
+export default function UsersIndex({ users }: Props) {
+  function handleRoleChange(userId: number, newRole: string) {
+    router.put(route("admin.users.update-role", userId), {
+      role: newRole,
+    }, {
+      preserveScroll: true,
+    })
+  }
+
+  return (
+    <AdminLayout>
+      <Head title="Admin - Quản lý người dùng" />
+      <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 border-b border-border/40 bg-background/95 backdrop-blur-md sticky top-0 z-40">
+        <div className="flex items-center gap-2 px-4">
+          <SidebarTrigger className="-ml-1" />
+          <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem className="hidden md:block">
+                <BreadcrumbLink href={route("admin.dashboard")}>Admin</BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator className="hidden md:block" />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Quản lý người dùng</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+      </header>
+
+      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Quản lý người dùng</h1>
+            <p className="text-muted-foreground">
+              Xem danh sách và phân quyền người dùng trên hệ thống
+            </p>
+          </div>
+          <Badge variant="secondary" className="gap-1.5">
+            <ShieldCheckIcon className="size-3.5" />
+            {users.length} người dùng
+          </Badge>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Danh sách người dùng</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">ID</TableHead>
+                  <TableHead>Tên</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Vai trò</TableHead>
+                  <TableHead>Xác thực email</TableHead>
+                  <TableHead>Ngày đăng ký</TableHead>
+                  <TableHead className="text-right">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-mono text-muted-foreground">
+                      #{user.id}
+                    </TableCell>
+                    <TableCell className="font-medium">{user.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                    <TableCell>
+                      <Badge variant={user.role === "admin" ? "destructive" : "outline"}>
+                        {user.role === "admin" ? "Admin" : "User"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {user.email_verified_at ? (
+                        <Badge variant="secondary" className="gap-1">
+                          ✓ Đã xác thực
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          Chưa xác thực
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {user.email_verified_at
+                        ? new Date(user.email_verified_at).toLocaleDateString("vi-VN")
+                        : "—"
+                      }
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Select
+                        defaultValue={user.role}
+                        onValueChange={(value) => handleRoleChange(user.id, value)}
+                      >
+                        <SelectTrigger className="w-28 h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="user">User</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    </AdminLayout>
+  )
+}

@@ -58,4 +58,30 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
+/*
+|--------------------------------------------------------------------------
+| Admin Area (React Inertia CSR - chỉ admin truy cập)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(function () {
+    Route::get('/dashboard', function () {
+        return Inertia::render('Admin/Dashboard');
+    })->name('admin.dashboard');
+
+    Route::get('/users', function () {
+        $users = \App\Models\User::orderByDesc('created_at')->get();
+        return Inertia::render('Admin/Users/Index', ['users' => $users]);
+    })->name('admin.users.index');
+
+    Route::put('/users/{user}/role', function (\Illuminate\Http\Request $request, \App\Models\User $user) {
+        $request->validate(['role' => ['required', 'in:user,admin']]);
+        $user->update(['role' => $request->role]);
+        return back()->with('success', 'Đã cập nhật quyền thành công.');
+    })->name('admin.users.update-role');
+
+    Route::get('/settings', function () {
+        return Inertia::render('Admin/Settings/Index');
+    })->name('admin.settings.index');
+});
+
 require __DIR__.'/auth.php';

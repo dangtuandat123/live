@@ -18,6 +18,7 @@ import {
   VideoIcon,
   BarChart3Icon,
   SettingsIcon,
+  ShieldCheckIcon,
 } from "lucide-react"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -68,6 +69,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       icon: <SettingsIcon />,
       isActive: route().current("settings.*"),
     },
+    // Admin link - chỉ hiển thị cho admin
+    ...(auth.user?.role === "admin" ? [{
+      title: "Quản trị hệ thống",
+      url: route("admin.dashboard"),
+      icon: <ShieldCheckIcon />,
+      isActive: route().current("admin.*"),
+    }] : []),
   ]
 
   return (
