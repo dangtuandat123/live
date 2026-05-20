@@ -230,7 +230,7 @@ export default function Dashboard() {
           <Button asChild>
             <Link href={route("lives.create")}>
               <PlusIcon className="mr-2 size-4" />
-              Tạo phiên Live
+              Tạo phân tích phiên live
             </Link>
           </Button>
         </div>

@@ -110,10 +110,10 @@ export default function LivesSetup() {
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Tạo phiên Live mới
+            Tạo phân tích phiên live mới
           </h1>
           <p className="text-muted-foreground">
-            Thiết lập thông tin phiên live để AI bắt đầu phân tích
+            Thiết lập thông tin để AI bắt đầu phân tích phiên live
           </p>
         </div>
 

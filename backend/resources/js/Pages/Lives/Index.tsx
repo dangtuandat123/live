@@ -184,7 +184,7 @@ export default function LivesIndex() {
           <Button asChild>
             <Link href={route("lives.create")}>
               <PlusIcon className="mr-2 size-4" />
-              Tạo phiên mới
+              Tạo phân tích phiên live
             </Link>
           </Button>
         </div>
