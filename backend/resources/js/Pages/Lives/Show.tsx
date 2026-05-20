@@ -155,7 +155,7 @@ function CommentsPanel() {
             ))}
           </div>
           {hasMore && (
-            <div className="pt-3 text-center">
+            <div className="py-3 text-center">
               <Button variant="outline" size="sm" onClick={() => setVisibleCount((p) => p + BATCH)}>
                 <ChevronDownIcon className="mr-1.5 size-3.5" />
                 Tải thêm {Math.min(BATCH, filtered.length - visibleCount)} bình luận
