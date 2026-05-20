@@ -43,11 +43,11 @@ function generateComments(count: number) {
 const allComments = generateComments(200)
 
 const topProducts = [
-  { name: "Áo thun basic cotton", mentions: 342, sentiment: 85, questions: 45 },
-  { name: "Váy hoa mùa hè", mentions: 287, sentiment: 92, questions: 32 },
-  { name: "Quần jean slim fit", mentions: 198, sentiment: 78, questions: 28 },
-  { name: "Túi xách da PU", mentions: 156, sentiment: 88, questions: 19 },
-  { name: "Giày sneaker trắng", mentions: 124, sentiment: 71, questions: 22 },
+  { name: "Áo thun basic cotton", image: "https://picsum.photos/seed/tshirt/80/80", mentions: 342, sentiment: 85, questions: 45 },
+  { name: "Váy hoa mùa hè", image: "https://picsum.photos/seed/dress/80/80", mentions: 287, sentiment: 92, questions: 32 },
+  { name: "Quần jean slim fit", image: "https://picsum.photos/seed/jeans/80/80", mentions: 198, sentiment: 78, questions: 28 },
+  { name: "Túi xách da PU", image: "https://picsum.photos/seed/bag/80/80", mentions: 156, sentiment: 88, questions: 19 },
+  { name: "Giày sneaker trắng", image: "https://picsum.photos/seed/sneaker/80/80", mentions: 124, sentiment: 71, questions: 22 },
 ]
 
 const topQuestions = [
@@ -190,7 +190,12 @@ function ProductsPanel() {
             {topProducts.map((product, i) => (
               <TableRow key={product.name}>
                 <TableCell className="font-bold text-muted-foreground">{i + 1}</TableCell>
-                <TableCell className="font-medium">{product.name}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2.5">
+                    <img src={product.image} alt={product.name} className="size-9 rounded-md object-cover" />
+                    <span className="font-medium">{product.name}</span>
+                  </div>
+                </TableCell>
                 <TableCell className="text-right">{product.mentions}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -377,9 +382,9 @@ export default function LivesShow() {
           {/* Left Column: Video + KPIs */}
           <div className="flex flex-col gap-4">
             {/* Video Embed */}
-            <Card>
+            <Card className="overflow-hidden py-0 gap-0">
               <CardContent className="p-0">
-                <div className="aspect-video w-full rounded-t-lg bg-muted/50 flex items-center justify-center relative overflow-hidden">
+                <div className="aspect-video w-full bg-muted/50 flex items-center justify-center relative overflow-hidden">
                   {/* Placeholder for video embed iframe */}
                   <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/10" />
                   <div className="text-center z-10 space-y-2">
@@ -397,85 +402,93 @@ export default function LivesShow() {
                     </Badge>
                   </div>
                 </div>
+                {/* Stats bar at bottom of video card */}
+                <div className="grid grid-cols-3 divide-x border-t">
+                  <div className="p-2.5 text-center">
+                    <div className="text-lg font-bold">3,247</div>
+                    <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                      <EyeIcon className="size-3" />Lượt xem
+                    </p>
+                  </div>
+                  <div className="p-2.5 text-center">
+                    <div className="text-lg font-bold">523</div>
+                    <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                      <MessageSquareIcon className="size-3" />Bình luận
+                    </p>
+                  </div>
+                  <div className="p-2.5 text-center">
+                    <div className="text-lg font-bold">12</div>
+                    <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                      <PhoneIcon className="size-3" />KH tiềm năng
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
-            {/* KPI Cards — 3 columns */}
-            <div className="grid grid-cols-3 gap-3">
-              <Card>
-                <CardContent className="p-3 text-center">
-                  <div className="text-2xl font-bold">3,247</div>
-                  <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                    <EyeIcon className="size-3" />Xem
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-3 text-center">
-                  <div className="text-2xl font-bold">523</div>
-                  <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                    <MessageSquareIcon className="size-3" />BL
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-3 text-center">
-                  <div className="text-2xl font-bold">12</div>
-                  <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                    <PhoneIcon className="size-3" />Leads
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
             {/* Sentiment AI Card */}
-            <Card>
-              <CardHeader className="p-4 pb-3">
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <SmileIcon className="size-4" />
+            <Card size="sm">
+              <CardHeader className="px-3 pt-0">
+                <CardTitle className="flex items-center gap-2 text-xs">
+                  <SmileIcon className="size-3.5" />
                   Cảm xúc AI
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-4 pt-0">
-                <div className="flex items-start gap-4">
-                  {/* Left: big percentage */}
+              <CardContent className="px-3">
+                <div className="flex items-start gap-3">
                   <div>
-                    <div className="text-3xl font-bold text-green-500">78%</div>
+                    <div className="text-2xl font-bold text-green-500">78%</div>
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <TrendingUpIcon className="size-3 text-green-500" />
-                      +12.5%
+                      <TrendingUpIcon className="size-3 text-green-500" />+12.5%
                     </p>
                   </div>
-                  {/* Right: legend */}
-                  <div className="flex-1 space-y-1.5 text-sm">
+                  <div className="flex-1 space-y-1 text-xs">
                     <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <span className="size-2 rounded-full bg-green-500" />
-                        Tích cực
-                      </span>
+                      <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-green-500" />Tích cực</span>
                       <span className="font-medium">78%</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <span className="size-2 rounded-full bg-amber-500" />
-                        Trung lập
-                      </span>
+                      <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-amber-500" />Trung lập</span>
                       <span className="font-medium">15%</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <span className="size-2 rounded-full bg-red-500" />
-                        Tiêu cực
-                      </span>
+                      <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-red-500" />Tiêu cực</span>
                       <span className="font-medium">7%</span>
                     </div>
                   </div>
                 </div>
-                {/* Stacked bar */}
-                <div className="mt-3 flex h-2.5 w-full overflow-hidden rounded-full">
+                <div className="mt-2 flex h-2 w-full overflow-hidden rounded-full">
                   <div className="bg-green-500" style={{ width: "78%" }} />
                   <div className="bg-amber-500" style={{ width: "15%" }} />
                   <div className="bg-red-500" style={{ width: "7%" }} />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Top Keywords Card */}
+            <Card size="sm">
+              <CardHeader className="px-3 pt-0">
+                <CardTitle className="text-xs">🔍 Từ khóa được nhắc nhiều</CardTitle>
+              </CardHeader>
+              <CardContent className="px-3">
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { keyword: "size", count: 154 },
+                    { keyword: "màu sắc", count: 138 },
+                    { keyword: "giá", count: 132 },
+                    { keyword: "freeship", count: 125 },
+                    { keyword: "bảo hành", count: 120 },
+                    { keyword: "đổ bên", count: 112 },
+                    { keyword: "so sánh", count: 109 },
+                    { keyword: "chất liệu", count: 99 },
+                    { keyword: "tư vấn", count: 95 },
+                    { keyword: "giao hóa tốc", count: 92 },
+                  ].map((item) => (
+                    <div key={item.keyword} className="flex items-center gap-1 rounded border bg-muted/50 px-1.5 py-0.5 text-xs">
+                      <span>{item.keyword}</span>
+                      <span className="font-semibold text-foreground">{item.count}</span>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
