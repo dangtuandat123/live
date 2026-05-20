@@ -15,6 +15,12 @@ class LiveEvent extends Model
         'tiktok_nickname',
         'data',
         'event_at',
+        'sentiment',
+        'intent_tag',
+        'question_tag',
+        'product_tag',
+        'has_phone',
+        'ai_processed',
     ];
 
     protected function casts(): array
@@ -22,6 +28,8 @@ class LiveEvent extends Model
         return [
             'data' => 'array',
             'event_at' => 'datetime',
+            'has_phone' => 'boolean',
+            'ai_processed' => 'boolean',
         ];
     }
 

@@ -1,5 +1,5 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout"
-import { Head } from "@inertiajs/react"
+import { Head, router, usePage } from "@inertiajs/react"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -19,10 +19,98 @@ import {
   ClockIcon, CircleStopIcon, UsersIcon, HelpCircleIcon, PackageIcon, BarChart3Icon,
   SparklesIcon, SearchIcon, LoaderIcon, MinusIcon, CopyIcon, CheckIcon,
   BellRingIcon, BellOffIcon, DownloadIcon, ClipboardListIcon, XIcon,
-  AlertTriangleIcon, FlameIcon, LightbulbIcon, HeartCrackIcon, CrownIcon, PackageXIcon, RefreshCwIcon, ZapIcon,
+  AlertTriangleIcon, FlameIcon, LightbulbIcon, HeartCrackIcon, ZapIcon,
   PinIcon, PinOffIcon, ClipboardCopyIcon, FileTextIcon, MapPinIcon, TruckIcon,
 } from "lucide-react"
 import * as React from "react"
+
+// --- Types ---
+interface SessionData {
+  id: number
+  name: string
+  platform: string
+  status: string
+  tiktok_username: string
+  tiktok_session_id: string | null
+  duration: string
+  started_at: string | null
+  ended_at: string | null
+  error_message: string | null
+  products: { id: number; name: string; sku: string; price: number; image: string | null }[]
+  keywords: string[]
+}
+
+interface StatsData {
+  total_views: number
+  total_comments: number
+  total_likes: number
+  total_gifts: number
+  total_follows: number
+  total_shares: number
+  viewer_count: number
+  leads_count: number
+  sentiment_positive: number
+  sentiment_neutral: number
+  sentiment_negative: number
+}
+
+interface CommentData {
+  id: number
+  user: string
+  unique_id: string | null
+  text: string
+  time: string
+  event_at: string | null
+  sentiment: string
+  intent_tag: string | null
+  question_tag: string | null
+  product_tag: string | null
+  has_phone: boolean
+}
+
+interface TopProduct {
+  name: string
+  mentions: number
+  sentiment: number
+  questions: number
+}
+
+interface PotentialCustomer {
+  name: string
+  phone: string
+  product: string
+  comment: string
+  time: string
+}
+
+interface TopQuestion {
+  question: string
+  count: number
+  product: string
+}
+
+interface PageProps {
+  session: SessionData
+  stats: StatsData | null
+  comments: CommentData[]
+  topProducts: TopProduct[]
+  potentialCustomers: PotentialCustomer[]
+  topQuestions: TopQuestion[]
+}
+
+// --- Context for sharing data across sub-components ---
+const LiveContext = React.createContext<{
+  session: SessionData
+  stats: StatsData
+  comments: CommentData[]
+  topProducts: TopProduct[]
+  potentialCustomers: PotentialCustomer[]
+  topQuestions: TopQuestion[]
+}>(null!)
+
+function useLiveData() {
+  return React.useContext(LiveContext)
+}
 
 // --- Sound Alert System ---
 function playOrderChime() {
@@ -130,10 +218,10 @@ function useOrderAlerts(soundEnabled: boolean) {
 }
 
 // --- Export Utilities ---
-function exportLeadsCSV(customers: typeof potentialCustomers) {
-  const header = "Tên,SĐT,Địa chỉ,Sản phẩm,Nội dung"
+function exportLeadsCSV(customers: PotentialCustomer[]) {
+  const header = "Tên,SĐT,Sản phẩm,Nội dung"
   const rows = customers.map((c) =>
-    [c.name, c.phone || "", c.address || "", c.product, c.comment]
+    [c.name, c.phone || "", c.product, c.comment]
       .map((v) => `"${v.replace(/"/g, '""')}"`)
       .join(",")
   )
@@ -147,119 +235,16 @@ function exportLeadsCSV(customers: typeof potentialCustomers) {
   URL.revokeObjectURL(url)
 }
 
-function copyLeadsToClipboard(customers: typeof potentialCustomers): string {
+function copyLeadsToClipboard(customers: PotentialCustomer[]): string {
   const text = customers
-    .map((c, i) => `${i + 1}. ${c.name} | ${c.phone || "—"} | ${c.address || "—"} | ${c.product} | ${c.comment}`)
+    .map((c, i) => `${i + 1}. ${c.name} | ${c.phone || "—"} | ${c.product} | ${c.comment}`)
     .join("\n")
   navigator.clipboard.writeText(text)
   return text
 }
 
-// --- Mock Data ---
-function generateComments(count: number) {
-  const names = ["Nguyễn Thị Lan","Trần Văn Minh","Lê Hồng Phúc","Phạm Thị Mai","Hoàng Đức Long","Vũ Thị Hà","Đỗ Minh Tuấn","Ngô Thanh Huyền","Bùi Văn Sơn","Trịnh Thị Ngọc","Lý Quốc Bảo","Đặng Thu Hương","Cao Minh Đức","Tô Thanh Tâm","Hồ Ngọc Anh"]
-  const texts = [
-    "Áo thun này bao nhiêu tiền chị ơi?","Mình muốn mua quần jean size 30, ship về HCM. SĐT 0901234567",
-    "Chất lượng vải thế nào ạ?","Váy hoa đẹp quá! Cho mình 1 cái size M nhé","Giá đắt quá, shop khác rẻ hơn",
-    "Mua 2 cái được giảm giá không?","Túi xách có mấy màu? 0987654321","Kính mát chống UV không ạ?",
-    "Ship tỉnh mất mấy ngày?","Chốt đơn áo thun trắng size L! Đà Nẵng","Có size XXL không shop?",
-    "Hàng có sẵn không hay phải đợi?","Màu đen còn không ạ?","Đẹp quá, cho mình 2 cái nhé",
-    "Chất liệu cotton 100% hả shop?","Giày size 42 còn không?","Mình ở Hà Nội ship mấy ngày?",
-  ]
-  // AI-generated tags (mock) — in production, these come from AI classification
-  const questionTags: (string | null)[] = [
-    "Hỏi giá", null,
-    "Hỏi chất liệu", null, null,
-    "Hỏi giảm giá", "Hỏi màu", "Hỏi tính năng",
-    "Hỏi ship", null, "Hỏi size",
-    "Hỏi tồn kho", "Hỏi màu", null,
-    "Hỏi chất liệu", "Hỏi size", "Hỏi ship",
-  ]
-  const productTags: (string | null)[] = [
-    "Áo thun", "Quần jean",
-    null, "Váy hoa", null,
-    null, "Túi xách", "Kính mát",
-    null, "Áo thun", null,
-    null, null, null,
-    null, "Giày sneaker", null,
-  ]
-  const intentTags: (string | null)[] = [
-    null, "Chốt đơn",
-    null, "Chốt đơn", null,
-    null, null, null,
-    null, "Chốt đơn", null,
-    null, null, "Chốt đơn",
-    null, null, null,
-  ]
-  const sentiments: ("positive"|"neutral"|"negative")[] = ["positive","positive","positive","neutral","negative","positive","neutral"]
-  return Array.from({length: count}, (_, i) => ({
-    id: i + 1,
-    user: names[i % names.length],
-    text: texts[i % texts.length],
-    time: `${Math.max(1, i * 3)} giây trước`,
-    sentiment: sentiments[i % sentiments.length],
-    hasPhone: i % 7 === 1 || i % 11 === 6,
-    questionTag: questionTags[i % questionTags.length],
-    productTag: productTags[i % productTags.length],
-    intentTag: intentTags[i % intentTags.length],
-  }))
-}
 
-const allComments = generateComments(200)
 
-const topProducts = [
-  { name: "Áo thun basic cotton", image: "https://picsum.photos/seed/tshirt/80/80", mentions: 342, sentiment: 85, questions: 45, trend: "up" as const },
-  { name: "Váy hoa mùa hè", image: "https://picsum.photos/seed/dress/80/80", mentions: 287, sentiment: 92, questions: 32, trend: "up" as const },
-  { name: "Quần jean slim fit", image: "https://picsum.photos/seed/jeans/80/80", mentions: 198, sentiment: 78, questions: 28, trend: "stable" as const },
-  { name: "Túi xách da PU", image: "https://picsum.photos/seed/bag/80/80", mentions: 156, sentiment: 88, questions: 19, trend: "down" as const },
-  { name: "Giày sneaker trắng", image: "https://picsum.photos/seed/sneaker/80/80", mentions: 124, sentiment: 71, questions: 22, trend: "up" as const },
-  { name: "Kính mát thời trang", image: "https://picsum.photos/seed/glasses/80/80", mentions: 112, sentiment: 80, questions: 15, trend: "stable" as const },
-  { name: "Nón bucket unisex", image: "https://picsum.photos/seed/hat/80/80", mentions: 98, sentiment: 75, questions: 12, trend: "down" as const },
-  { name: "Dây chuyền bạc", image: "https://picsum.photos/seed/necklace/80/80", mentions: 87, sentiment: 90, questions: 10, trend: "up" as const },
-  { name: "Balo du lịch", image: "https://picsum.photos/seed/backpack/80/80", mentions: 76, sentiment: 82, questions: 8, trend: "stable" as const },
-  { name: "Đồng hồ thông minh", image: "https://picsum.photos/seed/watch/80/80", mentions: 65, sentiment: 88, questions: 14, trend: "up" as const },
-  { name: "Áo khoác dù", image: "https://picsum.photos/seed/jacket/80/80", mentions: 54, sentiment: 73, questions: 9, trend: "down" as const },
-  { name: "Sandal quai hậu", image: "https://picsum.photos/seed/sandal/80/80", mentions: 48, sentiment: 79, questions: 7, trend: "stable" as const },
-  { name: "Ví cầm tay nam", image: "https://picsum.photos/seed/wallet/80/80", mentions: 42, sentiment: 85, questions: 5, trend: "down" as const },
-  { name: "Thắt lưng da bò", image: "https://picsum.photos/seed/belt/80/80", mentions: 38, sentiment: 77, questions: 6, trend: "stable" as const },
-  { name: "Mũ lưỡi trai", image: "https://picsum.photos/seed/cap/80/80", mentions: 31, sentiment: 81, questions: 4, trend: "up" as const },
-]
-
-const topQuestions = [
-  { question: "Giá bao nhiêu?", count: 89, product: "Chung", answer: "Giá hiện trên màn hình ạ, inbox shop để nhận giá sỉ" },
-  { question: "Có size nào?", count: 67, product: "Áo thun, Quần jean", answer: "Có đủ S/M/L/XL, inbox shop để tư vấn size" },
-  { question: "Ship mất mấy ngày?", count: 54, product: "Chung", answer: "Nội thành 1-2 ngày, tỉnh 3-5 ngày ạ" },
-  { question: "Có bảo hành không?", count: 38, product: "Giày sneaker", answer: "Bảo hành 6 tháng lỗi do nhà sản xuất" },
-  { question: "Mua 2 giảm giá không?", count: 31, product: "Chung", answer: "Mua 2 giảm 10%, mua 3 giảm 15% ạ" },
-  { question: "Chất liệu gì?", count: 28, product: "Áo thun, Váy hoa", answer: "Cotton 100% co giãn 4 chiều" },
-  { question: "Có màu khác không?", count: 25, product: "Túi xách da PU", answer: "Có đen, nâu, be, hồng pastel ạ" },
-  { question: "Mặc có nóng không?", count: 22, product: "Áo thun basic cotton", answer: "Cotton thoáng mát, thấm hút mồ hôi tốt" },
-  { question: "Đổi trả được không?", count: 20, product: "Chung", answer: "Đổi trả miễn phí trong 7 ngày" },
-  { question: "Có COD không?", count: 18, product: "Chung", answer: "Có COD toàn quốc, nhận hàng mới thanh toán" },
-  { question: "Size chart ở đâu?", count: 16, product: "Quần jean, Váy hoa", answer: "Inbox shop gửi bảng size chi tiết ạ" },
-  { question: "Hàng Việt Nam hay TQ?", count: 14, product: "Áo thun basic cotton", answer: "Hàng Việt Nam, sản xuất tại Bình Dương" },
-  { question: "Giặt máy được không?", count: 12, product: "Váy hoa mùa hè", answer: "Giặt máy bình thường, không xổ vải" },
-  { question: "Có hộp đựng không?", count: 10, product: "Giày sneaker", answer: "Có fullbox + túi đựng kèm ạ" },
-  { question: "Combo mua 3 giá sao?", count: 9, product: "Chung", answer: "Combo 3 giảm 15%, inbox shop báo giá" },
-]
-
-const potentialCustomers = [
-  { name: "Trần Văn Minh", phone: "0901234567", address: "HCM", product: "Quần jean slim fit", comment: "Mua size 30, ship HCM" },
-  { name: "Đỗ Minh Tuấn", phone: "0987654321", address: "", product: "Túi xách da PU", comment: "Hỏi mấy màu" },
-  { name: "Phạm Thị Mai", phone: "", address: "123 Lê Lợi Q1", product: "Váy hoa mùa hè", comment: "Mua size M" },
-  { name: "Trịnh Thị Ngọc", phone: "", address: "Đà Nẵng", product: "Áo thun basic cotton", comment: "Chốt đơn size L" },
-  { name: "Lý Quốc Bảo", phone: "0912345678", address: "Bình Dương", product: "Giày sneaker trắng", comment: "Mua size 42" },
-  { name: "Đặng Thu Hương", phone: "", address: "Cần Thơ", product: "Váy hoa mùa hè", comment: "Mua 2 cái size S" },
-  { name: "Cao Minh Đức", phone: "0978123456", address: "Hà Nội", product: "Áo thun basic cotton", comment: "Chốt 3 cái size L" },
-  { name: "Ngô Thanh Tùng", phone: "0933456789", address: "Hải Phòng", product: "Kính mát thời trang", comment: "Lấy 2 cái ship Hải Phòng" },
-  { name: "Vũ Thị Lan", phone: "", address: "Nghệ An", product: "Nón bucket unisex", comment: "Cho mình 1 cái màu đen" },
-  { name: "Hoàng Đức Long", phone: "0966789012", address: "HCM", product: "Balo du lịch", comment: "Mua 1 cái, có giảm giá không?" },
-  { name: "Bùi Minh Châu", phone: "", address: "Bình Định", product: "Dây chuyền bạc", comment: "Hỏi có hộp tặng không" },
-  { name: "Đinh Văn Hải", phone: "0945678901", address: "Long An", product: "Đồng hồ thông minh", comment: "Chốt 1 cái ship Long An" },
-  { name: "Lê Thị Hồng", phone: "", address: "Quảng Ninh", product: "Sandal quai hậu", comment: "Size 37 còn không?" },
-  { name: "Phan Quốc Việt", phone: "0923456789", address: "Đắk Lắk", product: "Áo khoác dù", comment: "Mua size XL màu xanh" },
-  { name: "Trương Thị Yến", phone: "", address: "Huế", product: "Ví cầm tay nam", comment: "Lấy 1 cái tặng chồng" },
-]
 
 function InfiniteScrollSentinel({ onLoadMore }: { onLoadMore: () => void }) {
   const ref = React.useRef<HTMLDivElement>(null)
@@ -355,6 +340,7 @@ function SentimentBadge({ sentiment }: { sentiment: string }) {
 // --- Sub-components for each tab ---
 
 function CommentsPanel() {
+  const { comments: allComments } = useLiveData()
   const BATCH = 50
   const [filter, setFilter] = React.useState("all")
   const [search, setSearch] = React.useState("")
@@ -385,7 +371,7 @@ function CommentsPanel() {
 
   const filtered = allComments.filter((c) => {
     if (filter === "pinned" && !pinnedIds.has(c.id)) return false
-    if (filter === "order" && !markedOrderIds.has(c.id) && c.intentTag !== "Chốt đơn") return false
+    if (filter === "order" && !markedOrderIds.has(c.id) && c.intent_tag !== "Chốt đơn") return false
     if (filter === "question" && !c.text.includes("?")) return false
     if ((filter === "positive" || filter === "negative") && c.sentiment !== filter) return false
     if (search && !c.text.toLowerCase().includes(search.toLowerCase()) && !c.user.toLowerCase().includes(search.toLowerCase())) return false
@@ -423,7 +409,7 @@ function CommentsPanel() {
           {([
             { key: "all", label: "Tất cả", count: allComments.length },
             { key: "pinned", label: "📌 Ghim", count: pinnedIds.size },
-            { key: "order", label: "🛒 Chốt đơn", count: allComments.filter(c => c.intentTag === "Chốt đơn" || markedOrderIds.has(c.id)).length },
+            { key: "order", label: "🛒 Chốt đơn", count: allComments.filter(c => c.intent_tag === "Chốt đơn" || markedOrderIds.has(c.id)).length },
             { key: "question", label: "Hỏi", count: allComments.filter(c => c.text.includes("?")).length },
             { key: "positive", label: "Tích cực", count: allComments.filter(c => c.sentiment === "positive").length },
             { key: "negative", label: "Tiêu cực", count: allComments.filter(c => c.sentiment === "negative").length },
@@ -451,7 +437,7 @@ function CommentsPanel() {
           <div className="divide-y px-4">
             {visible.map((comment) => {
               const isPinned = pinnedIds.has(comment.id)
-              const isOrder = markedOrderIds.has(comment.id) || comment.intentTag === "Chốt đơn"
+              const isOrder = markedOrderIds.has(comment.id) || comment.intent_tag === "Chốt đơn"
               const sentimentColor = isPinned ? "border-l-yellow-500 bg-yellow-500/5" : comment.sentiment === "positive" ? "border-l-emerald-500" : comment.sentiment === "negative" ? "border-l-red-500" : "border-l-muted-foreground/30"
               return (
                 <div key={comment.id} className={`group relative flex items-start gap-2.5 border-l-2 py-2.5 pl-3 transition-colors ${sentimentColor}`}>
@@ -462,7 +448,7 @@ function CommentsPanel() {
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                         <span className="text-sm font-medium">{comment.user}</span>
-                        {comment.hasPhone && (
+                        {comment.has_phone && (
                           <Badge variant="outline" className="gap-1 text-[10px] px-1.5 py-0"><PhoneIcon className="size-2.5" />SĐT</Badge>
                         )}
                         {isPinned && <PinIcon className="size-3 text-yellow-500" />}
@@ -497,21 +483,21 @@ function CommentsPanel() {
                       </div>
                     </div>
                     <p className="text-sm text-muted-foreground break-words">{comment.text}</p>
-                    {(comment.intentTag || comment.questionTag || comment.productTag) && (
+                    {(comment.intent_tag || comment.question_tag || comment.product_tag) && (
                       <div className="flex items-center gap-1 flex-wrap pt-0.5">
-                        {comment.intentTag && (
+                        {comment.intent_tag && (
                           <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">
-                            <ShoppingCartIcon className="size-2.5" />{comment.intentTag}
+                            <ShoppingCartIcon className="size-2.5" />{comment.intent_tag}
                           </span>
                         )}
-                        {comment.questionTag && (
+                        {comment.question_tag && (
                           <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10">
-                            <HelpCircleIcon className="size-2.5" />{comment.questionTag}
+                            <HelpCircleIcon className="size-2.5" />{comment.question_tag}
                           </span>
                         )}
-                        {comment.productTag && (
+                        {comment.product_tag && (
                           <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10">
-                            <PackageIcon className="size-2.5" />{comment.productTag}
+                            <PackageIcon className="size-2.5" />{comment.product_tag}
                           </span>
                         )}
                       </div>
@@ -528,6 +514,7 @@ function CommentsPanel() {
 }
 
 function ProductsPanel() {
+  const { topProducts } = useLiveData()
   return (
     <Card className="h-full flex flex-col">
       <CardHeader>
@@ -570,15 +557,12 @@ function ProductsPanel() {
                   <td className="p-2 font-bold text-muted-foreground">{i + 1}</td>
                   <td className="p-2">
                     <div className="flex items-center gap-2.5">
-                      <img src={product.image} alt={product.name} className="size-9 rounded-md object-cover" />
+                      <div className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary">{product.name.charAt(0)}</div>
                       <span className="font-medium truncate">{product.name}</span>
                     </div>
                   </td>
                   <td className="p-2 text-right">
                     <div className="inline-flex items-center gap-1">
-                      {product.trend === "up" && <TrendingUpIcon className="size-3.5 text-emerald-500" />}
-                      {product.trend === "down" && <TrendingDownIcon className="size-3.5 text-red-500" />}
-                      {product.trend === "stable" && <MinusIcon className="size-3.5 text-muted-foreground/50" />}
                       {product.mentions}
                     </div>
                   </td>
@@ -600,6 +584,7 @@ function ProductsPanel() {
 }
 
 function QuestionsPanel() {
+  const { topQuestions } = useLiveData()
   const [copiedIdx, setCopiedIdx] = React.useState<number | null>(null)
   const copyAnswer = (text: string, idx: number) => {
     navigator.clipboard.writeText(text)
@@ -650,16 +635,7 @@ function QuestionsPanel() {
                   <td className="p-2 text-right"><Badge variant="secondary">{q.count}</Badge></td>
                   <td className="p-2 text-muted-foreground text-sm truncate">{q.product}</td>
                   <td className="p-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-muted-foreground truncate flex-1">{q.answer}</span>
-                      <button
-                        onClick={() => copyAnswer(q.answer, i)}
-                        className="shrink-0 rounded p-1 hover:bg-muted transition-colors"
-                        title="Copy câu trả lời"
-                      >
-                        {copiedIdx === i ? <CheckIcon className="size-3 text-emerald-500" /> : <CopyIcon className="size-3 text-muted-foreground" />}
-                      </button>
-                    </div>
+                    <span className="text-xs text-muted-foreground">{q.count} lần</span>
                   </td>
                 </tr>
               ))}
@@ -672,6 +648,7 @@ function QuestionsPanel() {
 }
 
 function CustomersPanel() {
+  const { potentialCustomers } = useLiveData()
   const [search, setSearch] = React.useState("")
   const [copiedPhone, setCopiedPhone] = React.useState<number | null>(null)
   const [copiedAll, setCopiedAll] = React.useState(false)
@@ -740,7 +717,7 @@ function CustomersPanel() {
             <tr className="border-b">
               <th className="h-10 px-2 text-left font-medium text-foreground">Tên</th>
               <th className="h-10 px-2 text-left font-medium text-foreground">SĐT</th>
-              <th className="h-10 px-2 text-left font-medium text-foreground">Địa chỉ</th>
+              <th className="h-10 px-2 text-left font-medium text-foreground">Thời gian</th>
               <th className="h-10 px-2 text-left font-medium text-foreground">SP quan tâm</th>
               <th className="h-10 px-2 text-left font-medium text-foreground">Nội dung</th>
               <th className="h-10 px-2 text-center font-medium text-foreground">Đơn</th>
@@ -775,7 +752,7 @@ function CustomersPanel() {
                         </div>
                       ) : <span className="text-muted-foreground">—</span>}
                     </td>
-                    <td className="p-2 truncate">{c.address || <span className="text-muted-foreground">—</span>}</td>
+                    <td className="p-2 truncate">{c.time || <span className="text-muted-foreground">—</span>}</td>
                     <td className="p-2"><Badge variant="secondary" className="truncate max-w-full">{c.product}</Badge></td>
                     <td className="p-2 text-sm text-muted-foreground truncate">{c.comment}</td>
                     <td className="p-2 text-center">
@@ -819,8 +796,8 @@ function CustomersPanel() {
                   <p className="font-medium">{orderCustomer.phone || "— Chưa có"}</p>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Địa chỉ</Label>
-                  <p className="font-medium">{orderCustomer.address || "— Chưa có"}</p>
+                  <Label className="text-xs text-muted-foreground">Thời gian</Label>
+                  <p className="font-medium">{orderCustomer.time || "— Chưa có"}</p>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Sản phẩm</Label>
@@ -862,6 +839,79 @@ function CustomersPanel() {
 }
 
 function AIInsightsPanel() {
+  const { stats, topProducts, topQuestions, potentialCustomers, comments } = useLiveData()
+
+  const sentimentTotal = stats.sentiment_positive + stats.sentiment_neutral + stats.sentiment_negative
+  const positivePct = sentimentTotal > 0 ? Math.round((stats.sentiment_positive / sentimentTotal) * 100) : 0
+  const negativePct = sentimentTotal > 0 ? Math.round((stats.sentiment_negative / sentimentTotal) * 100) : 0
+  const topProduct = topProducts[0]
+  const topQuestion = topQuestions[0]
+  const conversionRate = stats.total_comments > 0 ? ((stats.leads_count / stats.total_comments) * 100).toFixed(1) : "0"
+
+  // Build dynamic alerts from real data
+  const dynamicAlerts: { icon: any; title: string; desc: string; color: string; severity: string }[] = []
+
+  if (topQuestion && topQuestion.count > 3) {
+    dynamicAlerts.push({
+      icon: AlertTriangleIcon,
+      title: "Câu hỏi phổ biến",
+      desc: `"${topQuestion.question}" được hỏi ${topQuestion.count} lần — nên trả lời ngay.`,
+      color: "amber",
+      severity: "Cao",
+    })
+  }
+
+  if (topProduct && topProduct.sentiment >= 80) {
+    dynamicAlerts.push({
+      icon: FlameIcon,
+      title: "Sản phẩm đang hot",
+      desc: `"${topProduct.name}" có cảm xúc tích cực ${topProduct.sentiment}% với ${topProduct.mentions} lượt nhắc.`,
+      color: "emerald",
+      severity: "Thông tin",
+    })
+  }
+
+  if (negativePct > 10) {
+    dynamicAlerts.push({
+      icon: HeartCrackIcon,
+      title: "Cảm xúc tiêu cực tăng",
+      desc: `Tỷ lệ tiêu cực hiện tại: ${negativePct}% (${stats.sentiment_negative} bình luận).`,
+      color: "red",
+      severity: "Cao",
+    })
+  }
+
+  if (stats.leads_count > 0) {
+    dynamicAlerts.push({
+      icon: ZapIcon,
+      title: "Khách hàng chốt đơn",
+      desc: `${stats.leads_count} khách đã thể hiện ý định mua hàng. Tỷ lệ chuyển đổi: ${conversionRate}%.`,
+      color: "blue",
+      severity: "Trung bình",
+    })
+  }
+
+  if (potentialCustomers.length > 0) {
+    const withPhone = potentialCustomers.filter(c => c.phone).length
+    dynamicAlerts.push({
+      icon: LightbulbIcon,
+      title: "Khách tiềm năng",
+      desc: `${potentialCustomers.length} khách tiềm năng${withPhone > 0 ? `, ${withPhone} để lại SĐT` : ""}.`,
+      color: "cyan",
+      severity: "Thông tin",
+    })
+  }
+
+  if (dynamicAlerts.length === 0) {
+    dynamicAlerts.push({
+      icon: SparklesIcon,
+      title: "Đang thu thập dữ liệu",
+      desc: "AI đang phân tích bình luận. Cảnh báo sẽ hiện khi có đủ dữ liệu.",
+      color: "blue",
+      severity: "Thông tin",
+    })
+  }
+
   return (
     <div className="grid gap-4 md:grid-cols-2 h-full min-h-0">
       {/* Tổng kết */}
@@ -871,12 +921,22 @@ function AIInsightsPanel() {
         </CardHeader>
         <FadeScrollArea>
           <div className="space-y-3 px-4 text-sm text-muted-foreground">
-            <p><strong className="text-foreground">Phiên live đang diễn ra tốt</strong> với tỷ lệ tương tác cao. Sản phẩm "Áo thun basic cotton" được quan tâm nhiều nhất với 342 lượt nhắc.</p>
-            <p><strong className="text-foreground">Cảm xúc tích cực chiếm 58%</strong>, chủ yếu liên quan đến chất lượng sản phẩm và giá cả hợp lý.</p>
-            <p><strong className="text-foreground">Gợi ý:</strong> Nên trả lời câu hỏi về "size" và "ship". Có thể đưa ra combo giảm giá vì nhiều khách hỏi về mua nhiều.</p>
-            <p><strong className="text-foreground">Sản phẩm nổi bật:</strong> "Váy hoa mùa hè" có cảm xúc tích cực 92%, "Áo thun basic cotton" dẫn đầu lượt nhắc. Nên push thêm combo 2 sản phẩm này.</p>
-            <p><strong className="text-foreground">Khách hàng:</strong> 45 khách để lại SĐT/ĐC, tỷ lệ chuyển đổi 8.6% từ bình luận. Top lead: Trần Văn Minh (SĐT + địa chỉ đầy đủ).</p>
-            <p><strong className="text-foreground">So sánh:</strong> Phiên này tốt hơn 23% so với phiên trước về lượt tương tác, nhưng tỷ lệ chốt đơn giảm 5% — cần push mạnh hơn CTA.</p>
+            {sentimentTotal > 0 ? (
+              <>
+                <p><strong className="text-foreground">Cảm xúc tích cực chiếm {positivePct}%</strong> ({stats.sentiment_positive} bình luận tích cực / {sentimentTotal} tổng).</p>
+                {topProduct && (
+                  <p><strong className="text-foreground">Sản phẩm nổi bật:</strong> "{topProduct.name}" được nhắc nhiều nhất với {topProduct.mentions} lượt, cảm xúc tích cực {topProduct.sentiment}%.</p>
+                )}
+                {topQuestions.length > 0 && (
+                  <p><strong className="text-foreground">Gợi ý:</strong> Nên trả lời câu hỏi về {topQuestions.slice(0, 3).map(q => `"${q.question}"`).join(", ")}.</p>
+                )}
+                {potentialCustomers.length > 0 && (
+                  <p><strong className="text-foreground">Khách hàng:</strong> {potentialCustomers.length} khách tiềm năng, tỷ lệ chuyển đổi {conversionRate}% từ bình luận.</p>
+                )}
+              </>
+            ) : (
+              <p>AI đang xử lý bình luận. Tổng kết sẽ hiện khi có đủ dữ liệu phân tích.</p>
+            )}
           </div>
         </FadeScrollArea>
       </Card>
@@ -886,83 +946,15 @@ function AIInsightsPanel() {
         <CardHeader><CardTitle className="flex items-center gap-2"><BellRingIcon className="size-4" />Cảnh báo AI</CardTitle></CardHeader>
         <FadeScrollArea>
           <div className="space-y-2 px-4">
-            {[
-              {
-                icon: AlertTriangleIcon,
-                title: "Câu hỏi chưa trả lời",
-                desc: '28 câu hỏi về "chất liệu" chưa được trả lời trong 5 phút qua.',
-                color: "amber",
-                severity: "Cao",
-                time: "2 phút trước",
-              },
-              {
-                icon: FlameIcon,
-                title: "Sản phẩm đang hot",
-                desc: '"Váy hoa mùa hè" có cảm xúc tích cực 92% — bán chạy nhất phiên này.',
-                color: "emerald",
-                severity: "Thông tin",
-                time: "5 phút trước",
-              },
-              {
-                icon: LightbulbIcon,
-                title: "Cơ hội upsell",
-                desc: '31 khách hỏi "mua 2 giảm giá không" — nên tạo combo giảm giá ngay.',
-                color: "blue",
-                severity: "Trung bình",
-                time: "8 phút trước",
-              },
-              {
-                icon: HeartCrackIcon,
-                title: "Cảm xúc giảm",
-                desc: 'Tỷ lệ tiêu cực tăng từ 5% lên 12% trong 10 phút qua. Chủ đề: "giá đắt", "ship chậm".',
-                color: "red",
-                severity: "Cao",
-                time: "3 phút trước",
-              },
-              {
-                icon: CrownIcon,
-                title: "Khách VIP online",
-                desc: 'Khách "Trần Văn Minh" đã mua 5 lần trước — đang hỏi về "Túi xách da PU".',
-                color: "violet",
-                severity: "Trung bình",
-                time: "6 phút trước",
-              },
-              {
-                icon: PackageXIcon,
-                title: "Sắp hết hàng",
-                desc: '"Giày sneaker trắng" chỉ còn 3 đôi size 42 — có 8 người đang hỏi size này.',
-                color: "orange",
-                severity: "Cao",
-                time: "1 phút trước",
-              },
-              {
-                icon: RefreshCwIcon,
-                title: "Khách quay lại",
-                desc: '15 khách đã xem live trước quay lại hôm nay — tỷ lệ retention 12%.',
-                color: "cyan",
-                severity: "Thông tin",
-                time: "10 phút trước",
-              },
-              {
-                icon: ZapIcon,
-                title: "Đỉnh tương tác",
-                desc: 'Đỉnh tương tác ở phút 40-45, nên giới thiệu SP mới ngay bây giờ.',
-                color: "yellow",
-                severity: "Trung bình",
-                time: "4 phút trước",
-              },
-            ].map((alert) => {
+            {dynamicAlerts.map((alert) => {
               const colorMap: Record<string, { icon: string; border: string; bg: string; badge: string; badgeBg: string }> = {
                 amber:   { icon: "text-amber-500",   border: "border-l-amber-500",   bg: "hover:bg-amber-500/5",   badge: "text-amber-600",   badgeBg: "bg-amber-500/10" },
                 emerald: { icon: "text-emerald-500", border: "border-l-emerald-500", bg: "hover:bg-emerald-500/5", badge: "text-emerald-600", badgeBg: "bg-emerald-500/10" },
                 blue:    { icon: "text-blue-500",    border: "border-l-blue-500",    bg: "hover:bg-blue-500/5",    badge: "text-blue-600",    badgeBg: "bg-blue-500/10" },
                 red:     { icon: "text-red-500",     border: "border-l-red-500",     bg: "hover:bg-red-500/5",     badge: "text-red-600",     badgeBg: "bg-red-500/10" },
-                violet:  { icon: "text-violet-500",  border: "border-l-violet-500",  bg: "hover:bg-violet-500/5",  badge: "text-violet-600",  badgeBg: "bg-violet-500/10" },
-                orange:  { icon: "text-orange-500",  border: "border-l-orange-500",  bg: "hover:bg-orange-500/5",  badge: "text-orange-600",  badgeBg: "bg-orange-500/10" },
                 cyan:    { icon: "text-cyan-500",    border: "border-l-cyan-500",    bg: "hover:bg-cyan-500/5",    badge: "text-cyan-600",    badgeBg: "bg-cyan-500/10" },
-                yellow:  { icon: "text-yellow-500",  border: "border-l-yellow-500",  bg: "hover:bg-yellow-500/5",  badge: "text-yellow-600",  badgeBg: "bg-yellow-500/10" },
               }
-              const c = colorMap[alert.color] ?? colorMap.amber
+              const c = colorMap[alert.color] ?? colorMap.blue
               const Icon = alert.icon
               return (
                 <div key={alert.title} className={`flex items-start gap-3 rounded-lg border-l-[3px] ${c.border} p-3 transition-colors ${c.bg}`}>
@@ -970,10 +962,7 @@ function AIInsightsPanel() {
                     <Icon className="size-4" />
                   </div>
                   <div className="flex-1 min-w-0 space-y-0.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-semibold">{alert.title}</span>
-                      <span className="text-[10px] text-muted-foreground/60 whitespace-nowrap">{alert.time}</span>
-                    </div>
+                    <span className="text-sm font-semibold">{alert.title}</span>
                     <p className="text-xs text-muted-foreground leading-relaxed">{alert.desc}</p>
                     <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${c.badge} ${c.badgeBg}`}>
                       {alert.severity}
@@ -990,25 +979,17 @@ function AIInsightsPanel() {
 }
 
 function StatsPanel() {
+  const { stats, topProducts, potentialCustomers } = useLiveData()
+
+  // Dữ liệu hoạt động — tóm tắt từ thống kê thật (chưa có time-series từ backend)
   const activityData = [
-    { time: "0:00", comments: 12, viewers: 820 },
-    { time: "0:05", comments: 28, viewers: 1050 },
-    { time: "0:10", comments: 45, viewers: 1320 },
-    { time: "0:15", comments: 38, viewers: 1480 },
-    { time: "0:20", comments: 62, viewers: 1720 },
-    { time: "0:25", comments: 71, viewers: 2100 },
-    { time: "0:30", comments: 55, viewers: 2340 },
-    { time: "0:35", comments: 48, viewers: 2180 },
-    { time: "0:40", comments: 82, viewers: 2560 },
-    { time: "0:45", comments: 95, viewers: 2890 },
-    { time: "0:50", comments: 78, viewers: 3100 },
-    { time: "0:55", comments: 64, viewers: 3200 },
+    { time: "Hiện tại", comments: stats.total_comments, viewers: stats.total_views },
   ]
 
   const sentimentData = [
-    { name: "positive", value: 115, fill: "var(--color-positive)" },
-    { name: "neutral", value: 57, fill: "var(--color-neutral)" },
-    { name: "negative", value: 28, fill: "var(--color-negative)" },
+    { name: "positive", value: stats.sentiment_positive, fill: "var(--color-positive)" },
+    { name: "neutral", value: stats.sentiment_neutral, fill: "var(--color-neutral)" },
+    { name: "negative", value: stats.sentiment_negative, fill: "var(--color-negative)" },
   ]
 
   const productData = topProducts.slice(0, 6).map((p) => ({
@@ -1018,10 +999,10 @@ function StatsPanel() {
   }))
 
   const funnelData = [
-    { stage: "Người xem", value: 3247 },
-    { stage: "Bình luận", value: 523 },
-    { stage: "Có SĐT/ĐC", value: 45 },
-    { stage: "Chốt đơn", value: 18 },
+    { stage: "Người xem", value: stats.total_views },
+    { stage: "Bình luận", value: stats.total_comments },
+    { stage: "Có SĐT/ĐC", value: potentialCustomers.length },
+    { stage: "Chốt đơn", value: stats.leads_count },
   ]
 
   const activityConfig = {
@@ -1176,13 +1157,69 @@ function StatsPanel() {
 }
 
 // --- Main Page ---
-export default function LivesShow() {
+export default function LivesShow({ session: initialSession, stats: initialStats, comments: initialComments, topProducts: initialTopProducts, potentialCustomers: initialPotentialCustomers, topQuestions: initialTopQuestions }: PageProps) {
   const [soundEnabled, setSoundEnabled] = React.useState(true)
   const { alerts, dismiss } = useOrderAlerts(soundEnabled)
 
+  // Live state — updated via polling
+  const [session, setSession] = React.useState(initialSession)
+  const [stats, setStats] = React.useState<StatsData>(initialStats ?? {
+    total_views: 0, total_comments: 0, total_likes: 0, total_gifts: 0,
+    total_follows: 0, total_shares: 0, viewer_count: 0, leads_count: 0,
+    sentiment_positive: 0, sentiment_neutral: 0, sentiment_negative: 0,
+  })
+  const [comments, setComments] = React.useState<CommentData[]>(initialComments ?? [])
+  const [topProducts, setTopProducts] = React.useState(initialTopProducts ?? [])
+  const [potentialCustomers, setPotentialCustomers] = React.useState(initialPotentialCustomers ?? [])
+  const [topQuestions, setTopQuestions] = React.useState(initialTopQuestions ?? [])
+
+  // Polling for live updates
+  React.useEffect(() => {
+    if (session.status !== 'live' && session.status !== 'connecting') return
+    if (!session.tiktok_session_id) return
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(route('lives.fetch-events', session.id), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '',
+            'Accept': 'application/json',
+          },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.comments) setComments(data.comments)
+          if (data.stats) setStats(data.stats)
+          if (data.topProducts) setTopProducts(data.topProducts)
+          if (data.potentialCustomers) setPotentialCustomers(data.potentialCustomers)
+          if (data.topQuestions) setTopQuestions(data.topQuestions)
+          if (data.status) setSession(prev => ({ ...prev, status: data.status, duration: data.duration ?? prev.duration }))
+        }
+      } catch { /* network error — skip */ }
+    }, 8000)
+
+    return () => clearInterval(interval)
+  }, [session.id, session.status, session.tiktok_session_id])
+
+  // Stop session handler
+  const handleStop = () => {
+    if (confirm('Bạn có chắc chắn muốn kết thúc phiên phân tích?')) {
+      router.post(route('lives.stop', session.id))
+    }
+  }
+
+  // Sentiment calculation
+  const sentimentTotal = stats.sentiment_positive + stats.sentiment_neutral + stats.sentiment_negative
+  const sentimentPositivePct = sentimentTotal > 0 ? Math.round((stats.sentiment_positive / sentimentTotal) * 100) : 0
+  const sentimentNeutralPct = sentimentTotal > 0 ? Math.round((stats.sentiment_neutral / sentimentTotal) * 100) : 0
+  const sentimentNegativePct = sentimentTotal > 0 ? 100 - sentimentPositivePct - sentimentNeutralPct : 0
+
   return (
     <AuthenticatedLayout>
-      <Head title="Flash Sale Mùa Hè — Live" />
+      <LiveContext.Provider value={{ session, stats, comments, topProducts, potentialCustomers, topQuestions }}>
+      <Head title={`${session.name} — Live`} />
       <div className="flex flex-1 max-h-svh flex-col overflow-hidden">
       <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 border-b border-border/40 bg-background/95 backdrop-blur-md sticky top-0 z-40">
         <div className="flex items-center gap-2 px-4">
@@ -1199,7 +1236,7 @@ export default function LivesShow() {
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
-                <BreadcrumbPage>Flash Sale Mùa Hè</BreadcrumbPage>
+                <BreadcrumbPage>{session.name}</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -1210,18 +1247,26 @@ export default function LivesShow() {
         {/* Session Header */}
         <div className="flex items-center justify-between">
           <div className="shrink-0">
-            <h1 className="text-lg font-bold tracking-tight">Flash Sale Mùa Hè</h1>
+            <h1 className="text-lg font-bold tracking-tight">{session.name}</h1>
             <div className="flex items-center gap-2 mt-1">
               <Badge variant="default">TikTok</Badge>
-              <Badge variant="destructive" className="gap-1">
-                <span className="relative flex size-2">
-                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-75" />
-                  <span className="relative inline-flex size-2 rounded-full bg-current" />
-                </span>
-                Đang Live
-              </Badge>
+              {session.status === 'live' ? (
+                <Badge variant="destructive" className="gap-1">
+                  <span className="relative flex size-2">
+                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-75" />
+                    <span className="relative inline-flex size-2 rounded-full bg-current" />
+                  </span>
+                  Đang Live
+                </Badge>
+              ) : session.status === 'connecting' ? (
+                <Badge variant="secondary" className="gap-1">Đang kết nối...</Badge>
+              ) : session.status === 'error' ? (
+                <Badge variant="destructive">Lỗi</Badge>
+              ) : (
+                <Badge variant="secondary">Đã kết thúc</Badge>
+              )}
               <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                <ClockIcon className="size-3.5" />1h 23m
+                <ClockIcon className="size-3.5" />{session.duration}
               </span>
             </div>
           </div>
@@ -1241,8 +1286,8 @@ export default function LivesShow() {
               {soundEnabled ? <BellRingIcon className="size-4" /> : <BellOffIcon className="size-4" />}
               {soundEnabled ? "Thông báo" : "Tắt tiếng"}
             </Button>
-            <Button variant="destructive" size="sm" asChild>
-              <a href={route("lives.index")}><CircleStopIcon className="mr-2 size-4" />Kết thúc phiên phân tích</a>
+            <Button variant="destructive" size="sm" onClick={handleStop} disabled={session.status === 'ended'}>
+              <CircleStopIcon className="mr-2 size-4" />Kết thúc phiên phân tích
             </Button>
           </div>
         </div>
@@ -1261,33 +1306,35 @@ export default function LivesShow() {
                     <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/10">
                       <EyeIcon className="size-6 text-primary" />
                     </div>
-                    <p className="text-sm font-medium">Đang phát trực tiếp</p>
-                    <p className="text-xs text-muted-foreground">Nhúng video từ TikTok Live</p>
-                    <Badge variant="destructive" className="gap-1">
-                      <span className="relative flex size-1.5">
-                        <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-75" />
-                        <span className="relative inline-flex size-1.5 rounded-full bg-current" />
-                      </span>
-                      3,247 đang xem
-                    </Badge>
+                    <p className="text-sm font-medium">{session.status === 'live' ? 'Đang phát trực tiếp' : session.status === 'connecting' ? 'Đang kết nối...' : 'Phiên đã kết thúc'}</p>
+                    <p className="text-xs text-muted-foreground">@{session.tiktok_username}</p>
+                    {session.status === 'live' && (
+                      <Badge variant="destructive" className="gap-1">
+                        <span className="relative flex size-1.5">
+                          <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-75" />
+                          <span className="relative inline-flex size-1.5 rounded-full bg-current" />
+                        </span>
+                        {stats.viewer_count.toLocaleString()} đang xem
+                      </Badge>
+                    )}
                   </div>
                 </div>
                 {/* Stats bar at bottom of video card */}
                 <div className="grid grid-cols-3 divide-x border-t">
                   <div className="p-2.5 text-center">
-                    <div className="text-lg font-bold">3,247</div>
+                    <div className="text-lg font-bold">{stats.total_views.toLocaleString()}</div>
                     <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
                       <EyeIcon className="size-3" />Lượt xem
                     </p>
                   </div>
                   <div className="p-2.5 text-center">
-                    <div className="text-lg font-bold">523</div>
+                    <div className="text-lg font-bold">{stats.total_comments.toLocaleString()}</div>
                     <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
                       <MessageSquareIcon className="size-3" />Bình luận
                     </p>
                   </div>
                   <div className="p-2.5 text-center">
-                    <div className="text-lg font-bold">15</div>
+                    <div className="text-lg font-bold">{stats.leads_count}</div>
                     <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
                       <PhoneIcon className="size-3" />KH tiềm năng
                     </p>
@@ -1307,30 +1354,27 @@ export default function LivesShow() {
               <CardContent className="px-3">
                 <div className="flex items-start gap-3">
                   <div>
-                    <div className="text-2xl font-bold text-green-500">58%</div>
-                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <TrendingUpIcon className="size-3 text-green-500" />+12.5%
-                    </p>
+                    <div className="text-2xl font-bold text-green-500">{sentimentPositivePct}%</div>
                   </div>
                   <div className="flex-1 space-y-1 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-green-500" />Tích cực</span>
-                      <span className="font-medium">58%</span>
+                      <span className="font-medium">{sentimentPositivePct}%</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-amber-500" />Trung lập</span>
-                      <span className="font-medium">28%</span>
+                      <span className="font-medium">{sentimentNeutralPct}%</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-red-500" />Tiêu cực</span>
-                      <span className="font-medium">14%</span>
+                      <span className="font-medium">{sentimentNegativePct}%</span>
                     </div>
                   </div>
                 </div>
                 <div className="mt-2 flex h-2 w-full overflow-hidden rounded-full">
-                  <div className="bg-green-500" style={{ width: "58%" }} />
-                  <div className="bg-amber-500" style={{ width: "28%" }} />
-                  <div className="bg-red-500" style={{ width: "14%" }} />
+                  <div className="bg-green-500" style={{ width: `${sentimentPositivePct}%` }} />
+                  <div className="bg-amber-500" style={{ width: `${sentimentNeutralPct}%` }} />
+                  <div className="bg-red-500" style={{ width: `${sentimentNegativePct}%` }} />
                 </div>
               </CardContent>
             </Card>
@@ -1342,24 +1386,14 @@ export default function LivesShow() {
               </CardHeader>
               <CardContent className="px-3 flex-1 min-h-0 overflow-hidden">
                 <div className="flex flex-wrap gap-1.5 overflow-hidden h-full relative">
-                  {[
-                    { keyword: "size", count: 154 },
-                    { keyword: "màu sắc", count: 138 },
-                    { keyword: "giá", count: 132 },
-                    { keyword: "freeship", count: 125 },
-                    { keyword: "bảo hành", count: 120 },
-                    { keyword: "độ bền", count: 112 },
-                    { keyword: "so sánh", count: 109 },
-                    { keyword: "chất liệu", count: 99 },
-                    { keyword: "tư vấn", count: 95 },
-                    { keyword: "giao hoả tốc", count: 92 },
-                  ].map((item) => (
-                    <div key={item.keyword} className="flex items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-xs">
-                      <span>{item.keyword}</span>
+                  {topQuestions.length > 0 ? topQuestions.map((item) => (
+                    <div key={item.question} className="flex items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-xs">
+                      <span>{item.question}</span>
                       <span className="font-bold tabular-nums">{item.count}</span>
                     </div>
-                  ))}
-                  <div className="flex items-center rounded-md bg-muted/40 px-2 py-0.5 text-xs text-muted-foreground">...</div>
+                  )) : (
+                    <div className="text-xs text-muted-foreground">Chưa có dữ liệu</div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1385,6 +1419,7 @@ export default function LivesShow() {
         </div>
       </div>
       </div>
+      </LiveContext.Provider>
     </AuthenticatedLayout>
   )
 }

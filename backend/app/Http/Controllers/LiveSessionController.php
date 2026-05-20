@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\AnalyzeCommentsJob;
 use App\Models\LiveEvent;
 use App\Models\LiveSession;
 use App\Models\LiveStat;
@@ -27,6 +28,7 @@ class LiveSessionController extends Controller
         $query = LiveSession::forUser($userId)
             ->with('stats')
             ->withCount(['events as comments_count' => fn ($q) => $q->where('event_type', 'comment')])
+            ->withCount('products')
             ->orderByDesc('created_at');
 
         if ($search = $request->input('search')) {
@@ -49,7 +51,7 @@ class LiveSessionController extends Controller
                 'leads' => $session->stats?->leads_count ?? 0,
                 'sentiment' => $this->calculateSentimentScore($session->stats),
                 'duration' => $session->duration_formatted,
-                'products' => $session->products()->count(),
+                'products' => $session->products_count ?? 0,
                 'date' => $session->created_at?->format('d/m/Y') ?? '',
                 'thumbnail' => $session->thumbnail,
             ];
@@ -176,9 +178,14 @@ class LiveSessionController extends Controller
                 'id' => $e->id,
                 'user' => $e->tiktok_nickname ?? 'Unknown',
                 'unique_id' => $e->tiktok_unique_id,
-                'text' => $e->data['message'] ?? '',
+                'text' => $e->data['comment'] ?? '',
                 'time' => $e->event_at?->diffForHumans() ?? '',
                 'event_at' => $e->event_at?->toISOString(),
+                'sentiment' => $e->sentiment ?? 'neutral',
+                'intent_tag' => $e->intent_tag,
+                'question_tag' => $e->question_tag,
+                'product_tag' => $e->product_tag,
+                'has_phone' => $e->has_phone ?? false,
             ]);
 
         // Sync status từ Python service nếu đang live
@@ -225,6 +232,9 @@ class LiveSessionController extends Controller
                 'sentiment_negative' => $liveSession->stats->sentiment_negative,
             ] : null,
             'comments' => $comments,
+            'topProducts' => $this->getTopProducts($liveSession),
+            'potentialCustomers' => $this->getPotentialCustomers($liveSession),
+            'topQuestions' => $this->getTopQuestions($liveSession),
         ]);
     }
 
@@ -288,6 +298,11 @@ class LiveSessionController extends Controller
             }
         }
 
+        // Dispatch AI phân tích nếu có events mới
+        if ($newEventsCount > 0) {
+            AnalyzeCommentsJob::dispatch($liveSession->id);
+        }
+
         // Lấy comments mới nhất cho frontend
         $latestComments = $liveSession->events()
             ->where('event_type', 'comment')
@@ -298,9 +313,14 @@ class LiveSessionController extends Controller
                 'id' => $e->id,
                 'user' => $e->tiktok_nickname ?? 'Unknown',
                 'unique_id' => $e->tiktok_unique_id,
-                'text' => $e->data['message'] ?? '',
+                'text' => $e->data['comment'] ?? '',
                 'time' => $e->event_at?->diffForHumans() ?? '',
                 'event_at' => $e->event_at?->toISOString(),
+                'sentiment' => $e->sentiment ?? 'neutral',
+                'intent_tag' => $e->intent_tag,
+                'question_tag' => $e->question_tag,
+                'product_tag' => $e->product_tag,
+                'has_phone' => $e->has_phone ?? false,
             ]);
 
         $liveSession->load('stats');
@@ -311,6 +331,9 @@ class LiveSessionController extends Controller
             'stats' => $liveSession->stats,
             'status' => $liveSession->status,
             'duration' => $liveSession->duration_formatted,
+            'topProducts' => $this->getTopProducts($liveSession),
+            'potentialCustomers' => $this->getPotentialCustomers($liveSession),
+            'topQuestions' => $this->getTopQuestions($liveSession),
         ]);
     }
 
@@ -339,31 +362,25 @@ class LiveSessionController extends Controller
 
         $count = 0;
         foreach ($data['events'] as $event) {
-            // Tránh duplicate bằng cách check timestamp + user + type
             $eventAt = isset($event['timestamp'])
                 ? Carbon::parse($event['timestamp'])
                 : now();
 
-            $exists = $session->events()
-                ->where('event_type', $event['type'] ?? 'unknown')
-                ->where('tiktok_user_id', $event['user_id'] ?? '')
-                ->where('event_at', $eventAt)
-                ->exists();
-
-            if ($exists) {
+            try {
+                LiveEvent::create([
+                    'live_session_id' => $session->id,
+                    'event_type' => $event['type'] ?? 'unknown',
+                    'tiktok_user_id' => $event['user_id'] ?? null,
+                    'tiktok_unique_id' => $event['unique_id'] ?? null,
+                    'tiktok_nickname' => $event['nickname'] ?? null,
+                    'data' => $event['data'] ?? [],
+                    'event_at' => $eventAt,
+                ]);
+                $count++;
+            } catch (\Illuminate\Database\UniqueConstraintViolationException) {
+                // Duplicate event — bỏ qua (bảo vệ bởi unique index)
                 continue;
             }
-
-            LiveEvent::create([
-                'live_session_id' => $session->id,
-                'event_type' => $event['type'] ?? 'unknown',
-                'tiktok_user_id' => $event['user_id'] ?? null,
-                'tiktok_unique_id' => $event['unique_id'] ?? null,
-                'tiktok_nickname' => $event['nickname'] ?? null,
-                'data' => $event['data'] ?? [],
-                'event_at' => $eventAt,
-            ]);
-            $count++;
         }
 
         // Update status từ service
@@ -421,5 +438,94 @@ class LiveSessionController extends Controller
             return 0;
         }
         return (int) round(($stats->sentiment_positive / $total) * 100);
+    }
+
+    /**
+     * Top sản phẩm được nhắc đến trong bình luận (từ AI tags).
+     */
+    private function getTopProducts(LiveSession $session): array
+    {
+        $rows = $session->events()
+            ->where('event_type', 'comment')
+            ->whereNotNull('product_tag')
+            ->where('product_tag', '!=', '')
+            ->selectRaw("
+                product_tag as name,
+                COUNT(*) as mentions,
+                SUM(CASE WHEN sentiment = 'positive' THEN 1 ELSE 0 END) as positive_count,
+                SUM(CASE WHEN question_tag IS NOT NULL AND question_tag != '' THEN 1 ELSE 0 END) as questions
+            ")
+            ->groupBy('product_tag')
+            ->orderByDesc('mentions')
+            ->limit(15)
+            ->get();
+
+        return $rows->map(fn ($r) => [
+            'name' => $r->name,
+            'mentions' => (int) $r->mentions,
+            'sentiment' => $r->mentions > 0 ? (int) round(($r->positive_count / $r->mentions) * 100) : 0,
+            'questions' => (int) $r->questions,
+        ])->toArray();
+    }
+
+    /**
+     * Khách hàng tiềm năng (chốt đơn / có SĐT).
+     */
+    private function getPotentialCustomers(LiveSession $session): array
+    {
+        return $session->events()
+            ->where('event_type', 'comment')
+            ->where(function ($q) {
+                $q->where('intent_tag', 'Chốt đơn')
+                  ->orWhere('has_phone', true);
+            })
+            ->orderByDesc('event_at')
+            ->limit(50)
+            ->get()
+            ->map(fn (LiveEvent $e) => [
+                'name' => $e->tiktok_nickname ?? 'Unknown',
+                'phone' => $e->has_phone ? $this->extractPhone($e->data['comment'] ?? '') : '',
+                'product' => $e->product_tag ?? '',
+                'comment' => $e->data['comment'] ?? '',
+                'time' => $e->event_at?->diffForHumans() ?? '',
+            ])
+            ->toArray();
+    }
+
+    /**
+     * Top câu hỏi (từ AI question_tag).
+     */
+    private function getTopQuestions(LiveSession $session): array
+    {
+        $rows = $session->events()
+            ->where('event_type', 'comment')
+            ->whereNotNull('question_tag')
+            ->where('question_tag', '!=', '')
+            ->selectRaw("
+                question_tag as question,
+                COUNT(*) as cnt,
+                GROUP_CONCAT(DISTINCT NULLIF(product_tag, '') SEPARATOR ', ') as products
+            ")
+            ->groupBy('question_tag')
+            ->orderByDesc('cnt')
+            ->limit(15)
+            ->get();
+
+        return $rows->map(fn ($r) => [
+            'question' => $r->question,
+            'count' => (int) $r->cnt,
+            'product' => $r->products ?: 'Chung',
+        ])->toArray();
+    }
+
+    /**
+     * Extract phone number from Vietnamese text.
+     */
+    private function extractPhone(string $text): string
+    {
+        if (preg_match('/0\d{9,10}/', $text, $matches)) {
+            return $matches[0];
+        }
+        return '';
     }
 }
