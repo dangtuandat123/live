@@ -1,4 +1,5 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout"
+import { Head } from "@inertiajs/react"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -12,6 +13,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
 import {
   Select,
   SelectContent,
@@ -27,8 +29,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig,
+} from "@/components/ui/chart"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import {
   TrendingUpIcon,
   TrendingDownIcon,
@@ -38,8 +48,11 @@ import {
   SmileIcon,
   SparklesIcon,
   DownloadIcon,
+  UsersIcon,
 } from "lucide-react"
 import * as React from "react"
+
+// --- Mock Data ---
 
 const overviewStats = [
   {
@@ -68,46 +81,49 @@ const overviewStats = [
   },
 ]
 
-const platformStats = [
-  {
-    platform: "Facebook",
-    sessions: 12,
-    comments: 7234,
-    views: 52340,
-    sentiment: 79,
-    topProduct: "Áo thun basic cotton",
-  },
-  {
-    platform: "TikTok",
-    sessions: 8,
-    comments: 4213,
-    views: 28940,
-    sentiment: 74,
-    topProduct: "Váy hoa mùa hè",
-  },
-  {
-    platform: "Instagram",
-    sessions: 4,
-    comments: 1400,
-    views: 7954,
-    sentiment: 72,
-    topProduct: "Túi xách da PU",
-  },
+const trendData = [
+  { date: "14/05", views: 4320, comments: 756, leads: 15 },
+  { date: "15/05", views: 6210, comments: 980, leads: 22 },
+  { date: "16/05", views: 9870, comments: 1890, leads: 38 },
+  { date: "17/05", views: 5678, comments: 892, leads: 28 },
+  { date: "18/05", views: 12450, comments: 2103, leads: 67 },
+  { date: "19/05", views: 3201, comments: 523, leads: 12 },
+  { date: "20/05", views: 8432, comments: 1247, leads: 45 },
 ]
 
-const recentSessions = [
-  { name: "Flash Sale Mùa Hè", platform: "Facebook", comments: 1247, views: 8432, sentiment: 82, date: "20/05" },
-  { name: "Giới thiệu BST mới", platform: "TikTok", comments: 523, views: 3201, sentiment: 75, date: "20/05" },
-  { name: "Thanh lý cuối tuần", platform: "Instagram", comments: 892, views: 5678, sentiment: 68, date: "19/05" },
-  { name: "Review sản phẩm mới", platform: "Facebook", comments: 2103, views: 12450, sentiment: 85, date: "18/05" },
-  { name: "Live Q&A khách hàng", platform: "TikTok", comments: 756, views: 4320, sentiment: 71, date: "17/05" },
+const trendConfig = {
+  views: { label: "Lượt xem", color: "var(--chart-1)" },
+  comments: { label: "Bình luận", color: "var(--chart-2)" },
+  leads: { label: "Leads", color: "var(--chart-3)" },
+} satisfies ChartConfig
+
+const platformData = [
+  { platform: "Facebook", comments: 7234, views: 52340, sentiment: 79 },
+  { platform: "TikTok", comments: 4213, views: 28940, sentiment: 74 },
+  { platform: "Instagram", comments: 1400, views: 7954, sentiment: 72 },
 ]
+
+const platformBarConfig = {
+  comments: { label: "Bình luận", color: "var(--chart-1)" },
+  views: { label: "Lượt xem", color: "var(--chart-2)" },
+} satisfies ChartConfig
+
+const recentSessions = [
+  { name: "Flash Sale Mùa Hè", platform: "Facebook", comments: 1247, views: 8432, leads: 45, sentiment: 82, date: "20/05" },
+  { name: "Giới thiệu BST mới", platform: "TikTok", comments: 523, views: 3201, leads: 12, sentiment: 75, date: "20/05" },
+  { name: "Thanh lý cuối tuần", platform: "Instagram", comments: 892, views: 5678, leads: 28, sentiment: 68, date: "19/05" },
+  { name: "Review sản phẩm mới", platform: "Facebook", comments: 2103, views: 12450, leads: 67, sentiment: 85, date: "18/05" },
+  { name: "Live Q&A khách hàng", platform: "TikTok", comments: 756, views: 4320, leads: 15, sentiment: 71, date: "17/05" },
+]
+
+// --- Main ---
 
 export default function ReportsIndex() {
   const [period, setPeriod] = React.useState("7d")
 
   return (
     <AuthenticatedLayout>
+      <Head title="Báo cáo" />
       <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
         <div className="flex items-center gap-2 px-4">
           <SidebarTrigger className="-ml-1" />
@@ -190,45 +206,84 @@ export default function ReportsIndex() {
           </AlertDescription>
         </Alert>
 
+        {/* Trend Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUpIcon className="size-4" />
+              Xu hướng theo kỳ
+            </CardTitle>
+            <CardDescription>Lượt xem, bình luận và leads theo ngày trong khoảng thời gian đã chọn</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={trendConfig} className="aspect-auto h-[280px] w-full">
+              <AreaChart data={trendData}>
+                <defs>
+                  <linearGradient id="fillViews" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-views)" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="var(--color-views)" stopOpacity={0.1} />
+                  </linearGradient>
+                  <linearGradient id="fillComments" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-comments)" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="var(--color-comments)" stopOpacity={0.1} />
+                  </linearGradient>
+                  <linearGradient id="fillLeads" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-leads)" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="var(--color-leads)" stopOpacity={0.1} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} />
+                <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
+                <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
+                <Area dataKey="views" type="natural" fill="url(#fillViews)" stroke="var(--color-views)" strokeWidth={2} />
+                <Area dataKey="comments" type="natural" fill="url(#fillComments)" stroke="var(--color-comments)" strokeWidth={2} />
+                <Area dataKey="leads" type="natural" fill="url(#fillLeads)" stroke="var(--color-leads)" strokeWidth={2} />
+                <ChartLegend content={<ChartLegendContent />} />
+              </AreaChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
         <div className="grid gap-4 lg:grid-cols-2">
-          {/* Platform Comparison */}
+          {/* Platform Comparison Bar Chart */}
           <Card>
             <CardHeader>
               <CardTitle>So sánh nền tảng</CardTitle>
-              <CardDescription>Hiệu suất theo từng nền tảng trong khoảng thời gian đã chọn</CardDescription>
+              <CardDescription>Bình luận và lượt xem theo nền tảng</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nền tảng</TableHead>
-                    <TableHead className="text-right">Phiên</TableHead>
-                    <TableHead className="text-right">Bình luận</TableHead>
-                    <TableHead className="text-right">Lượt xem</TableHead>
-                    <TableHead>Cảm xúc</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {platformStats.map((p) => (
-                    <TableRow key={p.platform}>
-                      <TableCell className="font-medium">{p.platform}</TableCell>
-                      <TableCell className="text-right">{p.sessions}</TableCell>
-                      <TableCell className="text-right">{p.comments.toLocaleString()}</TableCell>
-                      <TableCell className="text-right">{p.views.toLocaleString()}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Progress value={p.sentiment} className="h-2 w-16" />
-                          <span className="text-xs">{p.sentiment}%</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <ChartContainer config={platformBarConfig} className="aspect-auto h-[220px] w-full">
+                <BarChart data={platformData} layout="vertical" margin={{ left: 20 }}>
+                  <CartesianGrid horizontal={false} />
+                  <YAxis
+                    dataKey="platform"
+                    type="category"
+                    tickLine={false}
+                    axisLine={false}
+                    width={80}
+                  />
+                  <XAxis type="number" hide />
+                  <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                  <Bar dataKey="comments" fill="var(--color-comments)" radius={[0, 4, 4, 0]} barSize={16} />
+                  <Bar dataKey="views" fill="var(--color-views)" radius={[0, 4, 4, 0]} barSize={16} />
+                  <ChartLegend content={<ChartLegendContent />} />
+                </BarChart>
+              </ChartContainer>
+              {/* Sentiment row */}
+              <div className="mt-4 space-y-2 border-t pt-4">
+                <p className="text-xs font-medium text-muted-foreground">Cảm xúc tích cực</p>
+                {platformData.map((p) => (
+                  <div key={p.platform} className="flex items-center gap-3 text-sm">
+                    <span className="w-20 text-muted-foreground">{p.platform}</span>
+                    <Progress value={p.sentiment} className="h-2 flex-1" />
+                    <span className="w-10 text-right font-medium tabular-nums">{p.sentiment}%</span>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
 
-          {/* Top Sessions */}
+          {/* Recent Sessions */}
           <Card>
             <CardHeader>
               <CardTitle>Phiên Live gần đây</CardTitle>
@@ -241,6 +296,9 @@ export default function ReportsIndex() {
                     <TableHead>Phiên</TableHead>
                     <TableHead className="text-right">Bình luận</TableHead>
                     <TableHead className="text-right">Lượt xem</TableHead>
+                    <TableHead className="text-right">
+                      <span className="flex items-center justify-end gap-1"><UsersIcon className="size-3" />Leads</span>
+                    </TableHead>
                     <TableHead>Cảm xúc</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -255,10 +313,11 @@ export default function ReportsIndex() {
                       </TableCell>
                       <TableCell className="text-right">{s.comments.toLocaleString()}</TableCell>
                       <TableCell className="text-right">{s.views.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">{s.leads}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Progress value={s.sentiment} className="h-2 w-16" />
-                          <span className="text-xs">{s.sentiment}%</span>
+                          <span className="text-xs tabular-nums">{s.sentiment}%</span>
                         </div>
                       </TableCell>
                     </TableRow>

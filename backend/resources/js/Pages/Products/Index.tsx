@@ -1,4 +1,5 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout"
+import { Head } from "@inertiajs/react"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -13,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Progress } from "@/components/ui/progress"
 import {
   Table,
   TableBody,
@@ -45,8 +47,12 @@ import {
   Trash2Icon,
   PackageIcon,
   XIcon,
+  TrendingUpIcon,
+  MessageSquareIcon,
 } from "lucide-react"
 import * as React from "react"
+
+// --- Mock Data ---
 
 const mockProducts = [
   {
@@ -56,6 +62,8 @@ const mockProducts = [
     price: 189000,
     category: "Áo",
     keywords: ["áo thun", "áo phông", "basic tee", "áo cotton"],
+    mentions: 342,
+    isLive: true,
   },
   {
     id: "2",
@@ -64,6 +72,8 @@ const mockProducts = [
     price: 450000,
     category: "Quần",
     keywords: ["quần jean", "quần bò", "slim fit", "quần dài"],
+    mentions: 195,
+    isLive: false,
   },
   {
     id: "3",
@@ -72,6 +82,8 @@ const mockProducts = [
     price: 320000,
     category: "Váy",
     keywords: ["váy hoa", "váy mùa hè", "đầm hoa", "dress"],
+    mentions: 278,
+    isLive: true,
   },
   {
     id: "4",
@@ -80,6 +92,8 @@ const mockProducts = [
     price: 280000,
     category: "Phụ kiện",
     keywords: ["túi xách", "túi da", "bag", "ví"],
+    mentions: 156,
+    isLive: false,
   },
   {
     id: "5",
@@ -88,6 +102,8 @@ const mockProducts = [
     price: 520000,
     category: "Giày dép",
     keywords: ["giày sneaker", "giày trắng", "giày thể thao", "sneaker"],
+    mentions: 98,
+    isLive: false,
   },
   {
     id: "6",
@@ -96,8 +112,16 @@ const mockProducts = [
     price: 150000,
     category: "Phụ kiện",
     keywords: ["kính mát", "kính râm", "sunglasses"],
+    mentions: 43,
+    isLive: false,
   },
 ]
+
+const maxMentions = Math.max(...mockProducts.map((p) => p.mentions))
+const totalMentions = mockProducts.reduce((sum, p) => sum + p.mentions, 0)
+const topProduct = mockProducts.reduce((top, p) => (p.mentions > top.mentions ? p : top), mockProducts[0])
+
+// --- Components ---
 
 function ProductFormDialog({
   trigger,
@@ -211,6 +235,8 @@ function ProductFormDialog({
   )
 }
 
+// --- Main ---
+
 export default function ProductsIndex() {
   const [search, setSearch] = React.useState("")
 
@@ -223,6 +249,7 @@ export default function ProductsIndex() {
 
   return (
     <AuthenticatedLayout>
+      <Head title="Sản phẩm" />
       <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
         <div className="flex items-center gap-2 px-4">
           <SidebarTrigger className="-ml-1" />
@@ -267,7 +294,47 @@ export default function ProductsIndex() {
           />
         </div>
 
-        {/* Search & Stats */}
+        {/* KPI Cards */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Tổng sản phẩm</CardTitle>
+              <PackageIcon className="size-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{mockProducts.length}</div>
+              <p className="text-xs text-muted-foreground">
+                {mockProducts.filter((p) => p.isLive).length} đang dùng trong phiên live
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">SP được nhắc nhiều nhất</CardTitle>
+              <TrendingUpIcon className="size-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold truncate">{topProduct.name}</div>
+              <p className="text-xs text-muted-foreground">
+                {topProduct.mentions} lượt nhắc tuần này
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Tổng lượt nhắc</CardTitle>
+              <MessageSquareIcon className="size-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalMentions.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">
+                Từ bình luận trong tất cả phiên live
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Search */}
         <div className="flex items-center gap-4">
           <div className="relative flex-1 max-w-sm">
             <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -278,10 +345,6 @@ export default function ProductsIndex() {
               className="pl-9"
             />
           </div>
-          <Badge variant="outline" className="gap-1.5">
-            <PackageIcon className="size-3.5" />
-            {mockProducts.length} sản phẩm
-          </Badge>
         </div>
 
         {/* Products Table */}
@@ -295,6 +358,7 @@ export default function ProductsIndex() {
                   <TableHead>Danh mục</TableHead>
                   <TableHead className="text-right">Giá</TableHead>
                   <TableHead>Từ khóa</TableHead>
+                  <TableHead className="text-right">Lượt nhắc</TableHead>
                   <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
@@ -302,7 +366,18 @@ export default function ProductsIndex() {
                 {filtered.map((product) => (
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">
-                      {product.name}
+                      <div className="flex items-center gap-2">
+                        {product.name}
+                        {product.isLive && (
+                          <Badge variant="destructive" className="gap-1 text-[10px] px-1.5 py-0">
+                            <span className="relative flex size-1.5">
+                              <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-75" />
+                              <span className="relative inline-flex size-1.5 rounded-full bg-current" />
+                            </span>
+                            Live
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {product.sku}
@@ -325,6 +400,12 @@ export default function ProductsIndex() {
                             +{product.keywords.length - 3}
                           </Badge>
                         )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Progress value={(product.mentions / maxMentions) * 100} className="h-1.5 w-16" />
+                        <span className="text-sm font-medium tabular-nums w-8 text-right">{product.mentions}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">

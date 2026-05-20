@@ -39,7 +39,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const navMain = [
     {
-      title: "Dashboard",
+      title: "Tổng quan",
       url: route("dashboard"),
       icon: <LayoutDashboardIcon />,
       isActive: route().current("dashboard"),
