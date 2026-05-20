@@ -13,14 +13,26 @@
 
         <title>{{ config('app.name', 'LiveStream') }} - Nền tảng Livestream Chốt Đơn #1</title>
 
+        <!-- Theme Script -->
+        <script>
+            try {
+                const theme = localStorage.getItem('theme') || 'system';
+                if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            } catch (_) {}
+        </script>
+
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=be-vietnam-pro:300,400,500,600,700,800&display=swap" rel="stylesheet" />
 
-        <!-- Styles -->
+        <!-- Styles & Scripts -->
         @vite(['resources/css/app.css'])
     </head>
-    <body class="font-sans antialiased bg-background text-foreground">
+    <body class="font-sans antialiased bg-background text-foreground min-h-screen selection:bg-primary/20 selection:text-primary-foreground">
         @yield('content')
     </body>
 </html>
