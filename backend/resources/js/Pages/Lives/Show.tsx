@@ -170,7 +170,7 @@ function CommentsPanel() {
 
 function ProductsPanel() {
   return (
-    <Card className="h-full">
+    <Card className="min-h-full">
       <CardHeader>
         <CardTitle>Sản phẩm được nhắc đến</CardTitle>
         <CardDescription>Xếp hạng theo số lượt nhắc trong bình luận (cập nhật realtime)</CardDescription>
@@ -215,7 +215,7 @@ function ProductsPanel() {
 
 function QuestionsPanel() {
   return (
-    <Card className="h-full">
+    <Card className="min-h-full">
       <CardHeader>
         <CardTitle>Câu hỏi thường gặp</CardTitle>
         <CardDescription>Phân loại và gom nhóm câu hỏi bởi AI</CardDescription>
@@ -252,7 +252,7 @@ function CustomersPanel() {
     !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search) || c.product.toLowerCase().includes(search.toLowerCase())
   )
   return (
-    <Card className="h-full">
+    <Card className="min-h-full">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div>
