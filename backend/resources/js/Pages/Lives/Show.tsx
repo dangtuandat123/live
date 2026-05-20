@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   EyeIcon, MessageSquareIcon, SmileIcon, PhoneIcon, TrendingUpIcon,
   ClockIcon, CircleStopIcon, UsersIcon, HelpCircleIcon, PackageIcon,
-  SparklesIcon, SearchIcon, ChevronDownIcon,
+  SparklesIcon, SearchIcon, LoaderIcon,
 } from "lucide-react"
 import * as React from "react"
 
@@ -67,6 +67,15 @@ const topQuestions = [
   { question: "Có bảo hành không?", count: 38, product: "Giày sneaker" },
   { question: "Mua 2 giảm giá không?", count: 31, product: "Chung" },
   { question: "Chất liệu gì?", count: 28, product: "Áo thun, Váy hoa" },
+  { question: "Có màu khác không?", count: 25, product: "Túi xách da PU" },
+  { question: "Mặc có nóng không?", count: 22, product: "Áo thun basic cotton" },
+  { question: "Đổi trả được không?", count: 20, product: "Chung" },
+  { question: "Có COD không?", count: 18, product: "Chung" },
+  { question: "Size chart ở đâu?", count: 16, product: "Quần jean, Váy hoa" },
+  { question: "Hàng Việt Nam hay TQ?", count: 14, product: "Áo thun basic cotton" },
+  { question: "Giặt máy được không?", count: 12, product: "Váy hoa mùa hè" },
+  { question: "Có hộp đựng không?", count: 10, product: "Giày sneaker" },
+  { question: "Combo mua 3 giá sao?", count: 9, product: "Chung" },
 ]
 
 const potentialCustomers = [
@@ -77,7 +86,46 @@ const potentialCustomers = [
   { name: "Lý Quốc Bảo", phone: "0912345678", address: "Bình Dương", product: "Giày sneaker trắng", comment: "Mua size 42" },
   { name: "Đặng Thu Hương", phone: "", address: "Cần Thơ", product: "Váy hoa mùa hè", comment: "Mua 2 cái size S" },
   { name: "Cao Minh Đức", phone: "0978123456", address: "Hà Nội", product: "Áo thun basic cotton", comment: "Chốt 3 cái size L" },
+  { name: "Ngô Thanh Tùng", phone: "0933456789", address: "Hải Phòng", product: "Kính mát thời trang", comment: "Lấy 2 cái ship Hải Phòng" },
+  { name: "Vũ Thị Lan", phone: "", address: "Nghệ An", product: "Nón bucket unisex", comment: "Cho mình 1 cái màu đen" },
+  { name: "Hoàng Đức Long", phone: "0966789012", address: "HCM", product: "Balo du lịch", comment: "Mua 1 cái, có giảm giá không?" },
+  { name: "Bùi Minh Châu", phone: "", address: "Bình Định", product: "Dây chuyền bạc", comment: "Hỏi có hộp tặng không" },
+  { name: "Đinh Văn Hải", phone: "0945678901", address: "Long An", product: "Đồng hồ thông minh", comment: "Chốt 1 cái ship Long An" },
+  { name: "Lê Thị Hồng", phone: "", address: "Quảng Ninh", product: "Sandal quai hậu", comment: "Size 37 còn không?" },
+  { name: "Phan Quốc Việt", phone: "0923456789", address: "Đắk Lắk", product: "Áo khoác dù", comment: "Mua size XL màu xanh" },
+  { name: "Trương Thị Yến", phone: "", address: "Huế", product: "Ví cầm tay nam", comment: "Lấy 1 cái tặng chồng" },
 ]
+
+function InfiniteScrollSentinel({ onLoadMore }: { onLoadMore: () => void }) {
+  const ref = React.useRef<HTMLDivElement>(null)
+  const [loading, setLoading] = React.useState(false)
+
+  React.useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !loading) {
+          setLoading(true)
+          setTimeout(() => {
+            onLoadMore()
+            setLoading(false)
+          }, 400)
+        }
+      },
+      { threshold: 0.1 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [onLoadMore, loading])
+
+  return (
+    <div ref={ref} className="flex items-center justify-center py-4">
+      <LoaderIcon className="size-5 animate-spin text-muted-foreground" />
+      <span className="ml-2 text-sm text-muted-foreground">Đang tải...</span>
+    </div>
+  )
+}
 
 function SentimentBadge({ sentiment }: { sentiment: string }) {
   const config: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
@@ -164,14 +212,7 @@ function CommentsPanel() {
               </div>
             ))}
           </div>
-          {hasMore && (
-            <div className="py-3 text-center">
-              <Button variant="outline" size="sm" onClick={() => setVisibleCount((p) => p + BATCH)}>
-                <ChevronDownIcon className="mr-1.5 size-3.5" />
-                Tải thêm {Math.min(BATCH, filtered.length - visibleCount)} bình luận
-              </Button>
-            </div>
-          )}
+          {hasMore && <InfiniteScrollSentinel onLoadMore={() => setVisibleCount((p) => p + BATCH)} />}
         </ScrollArea>
         {/* Fade overlays */}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-card to-transparent z-10" />
