@@ -182,36 +182,37 @@ function InlineOrderAlert({ alerts, dismiss }: { alerts: OrderAlert[]; dismiss: 
   )
 }
 
-function useOrderAlerts(soundEnabled: boolean) {
+function useOrderAlerts(soundEnabled: boolean, comments: CommentData[]) {
   const [alerts, setAlerts] = React.useState<OrderAlert[]>([])
   const alertIdRef = React.useRef(0)
+  const seenOrderIdsRef = React.useRef<Set<number>>(new Set())
+  const initializedRef = React.useRef(false)
 
-  // Simulate new order comments arriving (in production, this comes from WebSocket)
   React.useEffect(() => {
-    const mockOrders = [
-      { user: "Trần Văn Minh", product: "Quần jean slim fit", comment: "Chốt đơn size 30, ship HCM" },
-      { user: "Phạm Thị Mai", product: "Váy hoa mùa hè", comment: "Lấy 1 cái size M nhé" },
-      { user: "Cao Minh Đức", product: "Áo thun basic cotton", comment: "Chốt 3 cái size L, ship Hà Nội" },
-      { user: "Lý Quốc Bảo", product: "Giày sneaker trắng", comment: "Mua size 42, COD Bình Dương" },
-      { user: "Đặng Thu Hương", product: "Túi xách da PU", comment: "Chốt đơn màu be, ship Cần Thơ" },
-    ]
-    let idx = 0
-    const interval = setInterval(() => {
-      const order = mockOrders[idx % mockOrders.length]
-      const newAlert: OrderAlert = {
+    const orderComments = comments.filter(c => c.intent_tag === "Chốt đơn")
+    if (!initializedRef.current) {
+      // Lần load đầu — đánh dấu tất cả đơn hiện tại, không alert
+      orderComments.forEach(c => seenOrderIdsRef.current.add(c.id))
+      initializedRef.current = true
+      return
+    }
+    const newOrders = orderComments.filter(c => !seenOrderIdsRef.current.has(c.id))
+    if (newOrders.length > 0) {
+      const newAlerts = newOrders.map(c => ({
         id: ++alertIdRef.current,
-        ...order,
+        user: c.user,
+        product: c.product_tag || c.text,
+        comment: c.text,
         time: Date.now(),
-      }
-      setAlerts((prev) => [newAlert, ...prev].slice(0, 5))
+      }))
+      setAlerts(prev => [...newAlerts, ...prev].slice(0, 5))
       if (soundEnabled) playOrderChime()
-      idx++
-    }, 15000) // Every 15 seconds for demo
-    return () => clearInterval(interval)
-  }, [soundEnabled])
+      newOrders.forEach(c => seenOrderIdsRef.current.add(c.id))
+    }
+  }, [comments, soundEnabled])
 
   const dismiss = React.useCallback((id: number) => {
-    setAlerts((prev) => prev.filter((a) => a.id !== id))
+    setAlerts(prev => prev.filter(a => a.id !== id))
   }, [])
 
   return { alerts, dismiss }
@@ -372,7 +373,7 @@ function CommentsPanel() {
   const filtered = allComments.filter((c) => {
     if (filter === "pinned" && !pinnedIds.has(c.id)) return false
     if (filter === "order" && !markedOrderIds.has(c.id) && c.intent_tag !== "Chốt đơn") return false
-    if (filter === "question" && !c.text.includes("?")) return false
+    if (filter === "question" && !c.question_tag) return false
     if ((filter === "positive" || filter === "negative") && c.sentiment !== filter) return false
     if (search && !c.text.toLowerCase().includes(search.toLowerCase()) && !c.user.toLowerCase().includes(search.toLowerCase())) return false
     return true
@@ -410,7 +411,7 @@ function CommentsPanel() {
             { key: "all", label: "Tất cả", count: allComments.length },
             { key: "pinned", label: "📌 Ghim", count: pinnedIds.size },
             { key: "order", label: "🛒 Chốt đơn", count: allComments.filter(c => c.intent_tag === "Chốt đơn" || markedOrderIds.has(c.id)).length },
-            { key: "question", label: "Hỏi", count: allComments.filter(c => c.text.includes("?")).length },
+            { key: "question", label: "Hỏi", count: allComments.filter(c => c.question_tag).length },
             { key: "positive", label: "Tích cực", count: allComments.filter(c => c.sentiment === "positive").length },
             { key: "negative", label: "Tiêu cực", count: allComments.filter(c => c.sentiment === "negative").length },
           ] as const).map((tab) => (
@@ -448,6 +449,7 @@ function CommentsPanel() {
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                         <span className="text-sm font-medium">{comment.user}</span>
+                        <SentimentBadge sentiment={comment.sentiment} />
                         {comment.has_phone && (
                           <Badge variant="outline" className="gap-1 text-[10px] px-1.5 py-0"><PhoneIcon className="size-2.5" />SĐT</Badge>
                         )}
@@ -635,7 +637,14 @@ function QuestionsPanel() {
                   <td className="p-2 text-right"><Badge variant="secondary">{q.count}</Badge></td>
                   <td className="p-2 text-muted-foreground text-sm truncate">{q.product}</td>
                   <td className="p-2">
-                    <span className="text-xs text-muted-foreground">{q.count} lần</span>
+                    <span className="text-xs text-muted-foreground">
+                      {q.question === "Hỏi giá" ? "Nên báo giá trực tiếp" :
+                       q.question === "Hỏi size" ? "Nên tư vấn size" :
+                       q.question === "Hỏi màu" ? "Nên show màu sắc" :
+                       q.question === "Hỏi tồn kho" ? "Nên check kho" :
+                       q.question === "Hỏi ship" ? "Thông báo phí ship" :
+                       `${q.count} lần`}
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -753,7 +762,7 @@ function CustomersPanel() {
                       ) : <span className="text-muted-foreground">—</span>}
                     </td>
                     <td className="p-2 truncate">{c.time || <span className="text-muted-foreground">—</span>}</td>
-                    <td className="p-2"><Badge variant="secondary" className="truncate max-w-full">{c.product}</Badge></td>
+                    <td className="p-2">{c.product ? <Badge variant="secondary" className="truncate max-w-full">{c.product}</Badge> : <span className="text-muted-foreground">—</span>}</td>
                     <td className="p-2 text-sm text-muted-foreground truncate">{c.comment}</td>
                     <td className="p-2 text-center">
                       {order ? (
@@ -1159,7 +1168,6 @@ function StatsPanel() {
 // --- Main Page ---
 export default function LivesShow({ session: initialSession, stats: initialStats, comments: initialComments, topProducts: initialTopProducts, potentialCustomers: initialPotentialCustomers, topQuestions: initialTopQuestions }: PageProps) {
   const [soundEnabled, setSoundEnabled] = React.useState(true)
-  const { alerts, dismiss } = useOrderAlerts(soundEnabled)
 
   // Live state — updated via polling
   const [session, setSession] = React.useState(initialSession)
@@ -1172,6 +1180,9 @@ export default function LivesShow({ session: initialSession, stats: initialStats
   const [topProducts, setTopProducts] = React.useState(initialTopProducts ?? [])
   const [potentialCustomers, setPotentialCustomers] = React.useState(initialPotentialCustomers ?? [])
   const [topQuestions, setTopQuestions] = React.useState(initialTopQuestions ?? [])
+
+  // Order alerts — detect real "Chốt đơn" từ AI data
+  const { alerts, dismiss } = useOrderAlerts(soundEnabled, comments)
 
   // Polling for live updates
   React.useEffect(() => {
@@ -1386,12 +1397,22 @@ export default function LivesShow({ session: initialSession, stats: initialStats
               </CardHeader>
               <CardContent className="px-3 flex-1 min-h-0 overflow-hidden">
                 <div className="flex flex-wrap gap-1.5 overflow-hidden h-full relative">
-                  {topQuestions.length > 0 ? topQuestions.map((item) => (
-                    <div key={item.question} className="flex items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-xs">
-                      <span>{item.question}</span>
-                      <span className="font-bold tabular-nums">{item.count}</span>
-                    </div>
-                  )) : (
+                  {topQuestions.length > 0 || topProducts.length > 0 ? (
+                    <>
+                      {topQuestions.map((item) => (
+                        <div key={`q-${item.question}`} className="flex items-center gap-1 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-xs">
+                          <span>{item.question}</span>
+                          <span className="font-bold tabular-nums">{item.count}</span>
+                        </div>
+                      ))}
+                      {topProducts.slice(0, 6).map((item) => (
+                        <div key={`p-${item.name}`} className="flex items-center gap-1 rounded-md bg-blue-500/10 text-blue-700 dark:text-blue-400 px-2 py-0.5 text-xs">
+                          <span>{item.name}</span>
+                          <span className="font-bold tabular-nums">{item.mentions}</span>
+                        </div>
+                      ))}
+                    </>
+                  ) : (
                     <div className="text-xs text-muted-foreground">Chưa có dữ liệu</div>
                   )}
                 </div>

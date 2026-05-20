@@ -61,6 +61,7 @@ Với mỗi bình luận (format: ID|nội dung), phân loại:
 
 Lưu ý viết tắt VN: "đã mua"=chốt đơn, sp=sản phẩm, sz=size, ship=giao hàng, hcm=HCM.
 "Đã mua", "Mua", "Chốt", "Lấy", "Order", "COD" → intent_tag = "Chốt đơn", sentiment = "positive".
+product_tag phải là tên đầy đủ chuẩn hóa (VD: "15plus"→"iPhone 15 Plus", "14prm"→"iPhone 14 Pro Max", "13th"→"iPhone 13"). Không dùng viết tắt.
 PROMPT;
     }
 
