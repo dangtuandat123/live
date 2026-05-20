@@ -1,5 +1,5 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout"
-import { Head } from "@inertiajs/react"
+import { Head, router } from "@inertiajs/react"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -13,7 +13,6 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Progress } from "@/components/ui/progress"
 import {
   Select,
   SelectContent,
@@ -38,113 +37,70 @@ import {
 import { Link } from "@inertiajs/react"
 import * as React from "react"
 
-// --- Mock Data ---
+// --- Types ---
 
-const mockSessions = [
-  {
-    id: "1",
-    name: "Flash Sale Mùa Hè",
-    status: "ended",
-    comments: 1247,
-    views: 8432,
-    leads: 45,
-    sentiment: 82,
-    duration: "2h 15m",
-    products: 5,
-    date: "20/05/2026",
-    thumbnail: "https://images.unsplash.com/photo-1607083206869-4c7672e72a8a?w=240&h=420&fit=crop&auto=format",
-  },
-  {
-    id: "2",
-    name: "Giới thiệu BST mới",
-    status: "live",
-    comments: 523,
-    views: 3201,
-    leads: 12,
-    sentiment: 75,
-    duration: "45m",
-    products: 3,
-    date: "20/05/2026",
-    thumbnail: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=240&h=420&fit=crop&auto=format",
-  },
-  {
-    id: "3",
-    name: "Thanh lý cuối tuần",
-    status: "ended",
-    comments: 892,
-    views: 5678,
-    leads: 28,
-    sentiment: 68,
-    duration: "1h 30m",
-    products: 8,
-    date: "19/05/2026",
-    thumbnail: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=240&h=420&fit=crop&auto=format",
-  },
-  {
-    id: "4",
-    name: "Review sản phẩm mới",
-    status: "ended",
-    comments: 2103,
-    views: 12450,
-    leads: 67,
-    sentiment: 85,
-    duration: "3h 05m",
-    products: 4,
-    date: "18/05/2026",
-    thumbnail: "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=240&h=420&fit=crop&auto=format",
-  },
-  {
-    id: "5",
-    name: "Live Q&A khách hàng",
-    status: "ended",
-    comments: 756,
-    views: 4320,
-    leads: 15,
-    sentiment: 71,
-    duration: "1h 10m",
-    products: 2,
-    date: "17/05/2026",
-    thumbnail: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=240&h=420&fit=crop&auto=format",
-  },
-  {
-    id: "6",
-    name: "Combo giá sốc",
-    status: "ended",
-    comments: 1890,
-    views: 9870,
-    leads: 52,
-    sentiment: 79,
-    duration: "2h 45m",
-    products: 6,
-    date: "16/05/2026",
-    thumbnail: "https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=240&h=420&fit=crop&auto=format",
-  },
-]
+interface Session {
+  id: number
+  name: string
+  status: string
+  comments: number
+  views: number
+  leads: number
+  sentiment: number
+  duration: string
+  products: number
+  date: string
+  thumbnail: string | null
+}
 
-const totalViews = mockSessions.reduce((s, x) => s + x.views, 0)
-const totalComments = mockSessions.reduce((s, x) => s + x.comments, 0)
-const liveSessions = mockSessions.filter((s) => s.status === "live")
+interface PaginatedSessions {
+  data: Session[]
+  current_page: number
+  last_page: number
+  total: number
+}
 
-export default function LivesIndex() {
-  const [search, setSearch] = React.useState("")
-  const [statusFilter, setStatusFilter] = React.useState("all")
-  const [page, setPage] = React.useState(1)
-  const perPage = 12
+interface KPI {
+  total_sessions: number
+  live_count: number
+  live_views: number
+  total_views: number
+  total_comments: number
+}
 
-  const filtered = mockSessions.filter((s) => {
-    const matchSearch = s.name.toLowerCase().includes(search.toLowerCase())
-    const matchStatus = statusFilter === "all" || s.status === statusFilter
-    return matchSearch && matchStatus
-  })
+interface Props {
+  sessions: PaginatedSessions
+  kpi: KPI
+  filters: { search: string | null; status: string | null }
+}
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
-  const safePage = Math.min(page, totalPages)
-  const paginated = filtered.slice((safePage - 1) * perPage, safePage * perPage)
+export default function LivesIndex({ sessions, kpi, filters }: Props) {
+  const [search, setSearch] = React.useState(filters.search ?? "")
+  const [statusFilter, setStatusFilter] = React.useState(filters.status ?? "all")
 
-  // Reset to page 1 when filters change
-  React.useEffect(() => {
-    setPage(1)
-  }, [search, statusFilter])
+  // Debounced search
+  const searchTimerRef = React.useRef<ReturnType<typeof setTimeout>>(undefined)
+  const applyFilters = (newSearch?: string, newStatus?: string) => {
+    const params: Record<string, string> = {}
+    const s = newSearch ?? search
+    const st = newStatus ?? statusFilter
+    if (s) params.search = s
+    if (st && st !== "all") params.status = st
+    router.get(route("lives.index"), params, { preserveState: true, replace: true })
+  }
+
+  const handleSearch = (value: string) => {
+    setSearch(value)
+    clearTimeout(searchTimerRef.current)
+    searchTimerRef.current = setTimeout(() => applyFilters(value), 400)
+  }
+
+  const handleStatusChange = (value: string) => {
+    setStatusFilter(value)
+    applyFilters(undefined, value)
+  }
+
+  const paginated = sessions.data
 
   return (
     <AuthenticatedLayout>
@@ -197,9 +153,9 @@ export default function LivesIndex() {
               <VideoIcon className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockSessions.length}</div>
+              <div className="text-2xl font-bold">{kpi.total_sessions}</div>
               <p className="text-xs text-muted-foreground">
-                {liveSessions.length > 0 ? `${liveSessions.length} đang live` : "Không có phiên live"}
+                {kpi.live_count > 0 ? `${kpi.live_count} đang live` : "Không có phiên live"}
               </p>
             </CardContent>
           </Card>
@@ -209,12 +165,9 @@ export default function LivesIndex() {
               <RadioIcon className="size-4 text-red-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-500">{liveSessions.length}</div>
+              <div className="text-2xl font-bold text-red-500">{kpi.live_count}</div>
               <p className="text-xs text-muted-foreground">
-                {liveSessions.length > 0
-                  ? `${liveSessions.reduce((s, x) => s + x.views, 0).toLocaleString()} lượt xem`
-                  : "—"
-                }
+                {kpi.live_count > 0 ? `${kpi.live_views.toLocaleString()} lượt xem` : "—"}
               </p>
             </CardContent>
           </Card>
@@ -224,7 +177,7 @@ export default function LivesIndex() {
               <EyeIcon className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalViews.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{kpi.total_views.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">Từ tất cả phiên</p>
             </CardContent>
           </Card>
@@ -234,7 +187,7 @@ export default function LivesIndex() {
               <MessageSquareIcon className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalComments.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{kpi.total_comments.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">Từ tất cả phiên</p>
             </CardContent>
           </Card>
@@ -247,11 +200,11 @@ export default function LivesIndex() {
             <Input
               placeholder="Tìm phiên live..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => handleSearch(e.target.value)}
               className="pl-9"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={handleStatusChange}>
             <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="Trạng thái" />
             </SelectTrigger>
@@ -263,7 +216,7 @@ export default function LivesIndex() {
           </Select>
         </div>
 
-        {/* Session Cards Grid — TikTok-style portrait */}
+        {/* Session Cards Grid */}
         <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           {paginated.map((session) => (
             <Link
@@ -274,12 +227,17 @@ export default function LivesIndex() {
               <div className="relative overflow-hidden rounded-xl border bg-card transition-all hover:shadow-lg hover:border-primary/30">
                 {/* Portrait Thumbnail */}
                 <div className="relative aspect-[9/16] overflow-hidden bg-muted">
-                  <img
-                    src={session.thumbnail}
-                    alt={session.name}
-                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                  {/* Gradient overlay */}
+                  {session.thumbnail ? (
+                    <img
+                      src={session.thumbnail}
+                      alt={session.name}
+                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5">
+                      <VideoIcon className="size-8 text-muted-foreground/50" />
+                    </div>
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
                   {/* Status badge */}
@@ -342,26 +300,41 @@ export default function LivesIndex() {
           ))}
         </div>
 
+        {/* Empty state */}
+        {paginated.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <VideoIcon className="size-12 text-muted-foreground/30 mb-4" />
+            <h3 className="text-lg font-semibold">Chưa có phiên live nào</h3>
+            <p className="text-muted-foreground text-sm mt-1">Tạo phiên phân tích đầu tiên để bắt đầu</p>
+            <Button asChild className="mt-4">
+              <Link href={route("lives.create")}>
+                <PlusIcon className="mr-2 size-4" />
+                Tạo phân tích
+              </Link>
+            </Button>
+          </div>
+        )}
+
         {/* Pagination */}
-        {totalPages > 1 && (
+        {sessions.last_page > 1 && (
           <div className="flex items-center justify-center gap-2 pt-2">
             <Button
               variant="outline"
               size="sm"
-              disabled={safePage <= 1}
-              onClick={() => setPage(safePage - 1)}
+              disabled={sessions.current_page <= 1}
+              onClick={() => router.get(route("lives.index"), { page: sessions.current_page - 1 }, { preserveState: true })}
             >
               <ChevronLeftIcon className="mr-1 size-4" />
               Trước
             </Button>
             <span className="text-sm text-muted-foreground px-3">
-              Trang {safePage} / {totalPages}
+              Trang {sessions.current_page} / {sessions.last_page}
             </span>
             <Button
               variant="outline"
               size="sm"
-              disabled={safePage >= totalPages}
-              onClick={() => setPage(safePage + 1)}
+              disabled={sessions.current_page >= sessions.last_page}
+              onClick={() => router.get(route("lives.index"), { page: sessions.current_page + 1 }, { preserveState: true })}
             >
               Sau
               <ChevronRightIcon className="ml-1 size-4" />

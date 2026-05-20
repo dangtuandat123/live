@@ -1,4 +1,5 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout"
+import { Head, useForm } from "@inertiajs/react"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -15,13 +16,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Table,
   TableBody,
   TableCell,
@@ -30,53 +24,59 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Checkbox } from "@/components/ui/checkbox"
-import { XIcon, VideoIcon } from "lucide-react"
+import { XIcon, VideoIcon, LoaderIcon } from "lucide-react"
 import * as React from "react"
 import { Link } from "@inertiajs/react"
 
-const catalogProducts = [
-  { id: "1", name: "Áo thun basic cotton", sku: "AT-001", price: 189000 },
-  { id: "2", name: "Quần jean slim fit", sku: "QJ-002", price: 450000 },
-  { id: "3", name: "Váy hoa mùa hè", sku: "VH-003", price: 320000 },
-  { id: "4", name: "Túi xách da PU", sku: "TX-004", price: 280000 },
-  { id: "5", name: "Giày sneaker trắng", sku: "GS-005", price: 520000 },
-  { id: "6", name: "Kính mát thời trang", sku: "KM-006", price: 150000 },
-]
+interface Product {
+  id: number
+  name: string
+  sku: string
+  price: number
+}
 
-export default function LivesSetup() {
-  const [selectedProducts, setSelectedProducts] = React.useState<string[]>([
-    "1",
-    "3",
-  ])
-  const [keywords, setKeywords] = React.useState<string[]>([
-    "mua",
-    "chốt",
-    "ship",
-    "giá",
-    "size",
-  ])
+interface Props {
+  products: Product[]
+}
+
+export default function LivesSetup({ products }: Props) {
+  const form = useForm({
+    name: "",
+    tiktok_username: "",
+    product_ids: [] as number[],
+    keywords: ["mua", "chốt", "ship", "giá", "size"] as string[],
+  })
+
   const [keywordInput, setKeywordInput] = React.useState("")
 
-  function toggleProduct(id: string) {
-    setSelectedProducts((prev) =>
-      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
+  function toggleProduct(id: number) {
+    const current = form.data.product_ids
+    form.setData(
+      "product_ids",
+      current.includes(id) ? current.filter((p) => p !== id) : [...current, id]
     )
   }
 
   function addKeyword() {
     const trimmed = keywordInput.trim()
-    if (trimmed && !keywords.includes(trimmed)) {
-      setKeywords([...keywords, trimmed])
+    if (trimmed && !form.data.keywords.includes(trimmed)) {
+      form.setData("keywords", [...form.data.keywords, trimmed])
       setKeywordInput("")
     }
   }
 
   function removeKeyword(kw: string) {
-    setKeywords(keywords.filter((k) => k !== kw))
+    form.setData("keywords", form.data.keywords.filter((k) => k !== kw))
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    form.post(route("lives.store"))
   }
 
   return (
     <AuthenticatedLayout>
+      <Head title="Tạo phân tích phiên live" />
       <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 border-b border-border/40 bg-background/95 backdrop-blur-md sticky top-0 z-40">
         <div className="flex items-center gap-2 px-4">
           <SidebarTrigger className="-ml-1" />
@@ -106,7 +106,7 @@ export default function LivesSetup() {
         </div>
       </header>
 
-      <div className="mx-auto w-full max-w-4xl flex flex-1 flex-col gap-6 p-4 pt-0">
+      <form onSubmit={handleSubmit} className="mx-auto w-full max-w-4xl flex flex-1 flex-col gap-6 p-4 pt-0">
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
@@ -131,7 +131,10 @@ export default function LivesSetup() {
               <Input
                 id="session-name"
                 placeholder="VD: Flash Sale Mùa Hè - 20/05"
+                value={form.data.name}
+                onChange={(e) => form.setData("name", e.target.value)}
               />
+              {form.errors.name && <p className="text-sm text-destructive">{form.errors.name}</p>}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
@@ -139,11 +142,14 @@ export default function LivesSetup() {
                 <Input value="TikTok" disabled className="bg-muted" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="live-url">URL / ID livestream</Label>
+                <Label htmlFor="live-url">Username TikTok</Label>
                 <Input
                   id="live-url"
-                  placeholder="Paste link hoặc ID livestream"
+                  placeholder="VD: username (không cần @)"
+                  value={form.data.tiktok_username}
+                  onChange={(e) => form.setData("tiktok_username", e.target.value)}
                 />
+                {form.errors.tiktok_username && <p className="text-sm text-destructive">{form.errors.tiktok_username}</p>}
               </div>
             </div>
           </CardContent>
@@ -156,46 +162,50 @@ export default function LivesSetup() {
             <CardDescription>
               AI sẽ dùng danh sách sản phẩm này để nhận diện khi phân tích bình
               luận. Đã chọn{" "}
-              <Badge variant="secondary">{selectedProducts.length}</Badge> sản
+              <Badge variant="secondary">{form.data.product_ids.length}</Badge> sản
               phẩm.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12"></TableHead>
-                  <TableHead>Sản phẩm</TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead className="text-right">Giá</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {catalogProducts.map((product) => (
-                  <TableRow
-                    key={product.id}
-                    className="cursor-pointer"
-                    onClick={() => toggleProduct(product.id)}
-                  >
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedProducts.includes(product.id)}
-                        onCheckedChange={() => toggleProduct(product.id)}
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {product.name}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {product.sku}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {product.price.toLocaleString("vi-VN")}đ
-                    </TableCell>
+            {products.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12"></TableHead>
+                    <TableHead>Sản phẩm</TableHead>
+                    <TableHead>SKU</TableHead>
+                    <TableHead className="text-right">Giá</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {products.map((product) => (
+                    <TableRow
+                      key={product.id}
+                      className="cursor-pointer"
+                      onClick={() => toggleProduct(product.id)}
+                    >
+                      <TableCell>
+                        <Checkbox
+                          checked={form.data.product_ids.includes(product.id)}
+                          onCheckedChange={() => toggleProduct(product.id)}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {product.name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {product.sku}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {product.price.toLocaleString("vi-VN")}đ
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground">Chưa có sản phẩm nào. <Link href={route("products.index")} className="text-primary underline">Thêm sản phẩm</Link> trước.</p>
+            )}
           </CardContent>
         </Card>
 
@@ -220,12 +230,12 @@ export default function LivesSetup() {
                   }
                 }}
               />
-              <Button variant="secondary" onClick={addKeyword}>
+              <Button type="button" variant="secondary" onClick={addKeyword}>
                 Thêm
               </Button>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {keywords.map((kw) => (
+              {form.data.keywords.map((kw) => (
                 <Badge key={kw} variant="secondary" className="gap-1">
                   {kw}
                   <button
@@ -243,15 +253,19 @@ export default function LivesSetup() {
 
         {/* Submit */}
         <div className="flex items-center gap-3">
-          <Button size="lg">
-            <VideoIcon className="mr-2 size-4" />
+          <Button type="submit" size="lg" disabled={form.processing}>
+            {form.processing ? (
+              <LoaderIcon className="mr-2 size-4 animate-spin" />
+            ) : (
+              <VideoIcon className="mr-2 size-4" />
+            )}
             Bắt đầu phân tích
           </Button>
           <Button variant="outline" size="lg" asChild>
             <Link href={route("lives.index")}>Hủy</Link>
           </Button>
         </div>
-      </div>
+      </form>
     </AuthenticatedLayout>
   )
 }

@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'tiktok' => [
+        'url' => env('TIKTOK_SERVICE_URL', 'http://127.0.0.1:50000'),
+        'api_key' => env('TIKTOK_SERVICE_KEY', ''),
+        'timeout' => env('TIKTOK_SERVICE_TIMEOUT', 15),
+    ],
+
 ];

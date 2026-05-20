@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\LiveSessionController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
@@ -24,23 +26,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('Dashboard');
     })->name('dashboard');
 
-    // Products
-    Route::get('/products', function () {
-        return Inertia::render('Products/Index');
-    })->name('products.index');
+    // Products (CRUD)
+    Route::get('/products', [ProductController::class, 'index'])->name('products.index');
+    Route::post('/products', [ProductController::class, 'store'])->name('products.store');
+    Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
+    Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
 
-    // Lives
-    Route::get('/lives', function () {
-        return Inertia::render('Lives/Index');
-    })->name('lives.index');
-
-    Route::get('/lives/create', function () {
-        return Inertia::render('Lives/Setup');
-    })->name('lives.create');
-
-    Route::get('/lives/{id}', function (string $id) {
-        return Inertia::render('Lives/Show', ['id' => $id]);
-    })->name('lives.show');
+    // Lives (Sessions)
+    Route::get('/lives', [LiveSessionController::class, 'index'])->name('lives.index');
+    Route::get('/lives/create', [LiveSessionController::class, 'create'])->name('lives.create');
+    Route::post('/lives', [LiveSessionController::class, 'store'])->name('lives.store');
+    Route::get('/lives/{liveSession}', [LiveSessionController::class, 'show'])->name('lives.show');
+    Route::post('/lives/{liveSession}/stop', [LiveSessionController::class, 'stop'])->name('lives.stop');
+    Route::post('/lives/{liveSession}/fetch-events', [LiveSessionController::class, 'fetchEvents'])->name('lives.fetch-events');
 
     // Reports
     Route::get('/reports', function () {
