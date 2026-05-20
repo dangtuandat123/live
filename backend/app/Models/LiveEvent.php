@@ -14,6 +14,7 @@ class LiveEvent extends Model
         'tiktok_unique_id',
         'tiktok_nickname',
         'data',
+        'data_hash',
         'event_at',
         'sentiment',
         'intent_tag',

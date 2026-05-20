@@ -1198,7 +1198,7 @@ export default function LivesShow({ session: initialSession, stats: initialStats
           if (data.status) setSession(prev => ({ ...prev, status: data.status, duration: data.duration ?? prev.duration }))
         }
       } catch { /* network error — skip */ }
-    }, 8000)
+    }, 3000)
 
     return () => clearInterval(interval)
   }, [session.id, session.status, session.tiktok_session_id])

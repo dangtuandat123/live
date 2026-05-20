@@ -64,7 +64,7 @@ load_dotenv(BASE_DIR / ".env")
 # --- Config ---
 SERVICE_API_KEY = os.getenv("SERVICE_API_KEY", "change-me")
 SERVICE_PORT = int(os.getenv("SERVICE_PORT", "50000"))
-MAX_EVENTS_PER_SESSION = 5000  # giữ tối đa N events gần nhất trong memory
+MAX_EVENTS_PER_SESSION = 50000  # giữ tối đa N events gần nhất trong memory (~50MB/session)
 
 # --- Logging (cả console + file) ---
 log_file = BASE_DIR / "service.log"

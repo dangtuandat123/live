@@ -307,7 +307,7 @@ class LiveSessionController extends Controller
         $latestComments = $liveSession->events()
             ->where('event_type', 'comment')
             ->orderByDesc('event_at')
-            ->limit(50)
+            ->limit(200)
             ->get()
             ->map(fn (LiveEvent $e) => [
                 'id' => $e->id,
@@ -345,45 +345,70 @@ class LiveSessionController extends Controller
             return 0;
         }
 
-        // Lấy timestamp event cuối cùng đã lưu để chỉ fetch events mới
+        // Lấy timestamp event cuối cùng đã lưu để chỉ fetch events mới (giữ ms precision)
         $lastEvent = $session->events()->orderByDesc('event_at')->first();
-        $since = $lastEvent?->event_at?->timestamp ?? 0;
+        $since = $lastEvent?->event_at ? $lastEvent->event_at->getPreciseTimestamp(3) / 1000 : 0;
 
-        $data = $this->tiktokService->getSession(
-            $session->tiktok_session_id,
-            includeEvents: true,
-            limit: 500,
-            since: $since > 0 ? $since : 0,
-        );
+        $totalCount = 0;
+        $maxPages = 3; // Tối đa 3 lần fetch liên tiếp để tránh block quá lâu
+        $fetchLimit = 2000;
 
-        if (!$data || empty($data['events'])) {
-            return 0;
-        }
+        for ($page = 0; $page < $maxPages; $page++) {
+            $data = $this->fetchFromServiceWithRetry(
+                $session->tiktok_session_id,
+                $fetchLimit,
+                $since > 0 ? $since : 0,
+            );
 
-        $count = 0;
-        foreach ($data['events'] as $event) {
-            $eventAt = isset($event['timestamp'])
-                ? Carbon::parse($event['timestamp'])
-                : now();
+            if (!$data || empty($data['events'])) {
+                break;
+            }
 
-            try {
-                LiveEvent::create([
-                    'live_session_id' => $session->id,
-                    'event_type' => $event['type'] ?? 'unknown',
-                    'tiktok_user_id' => $event['user_id'] ?? null,
-                    'tiktok_unique_id' => $event['unique_id'] ?? null,
-                    'tiktok_nickname' => $event['nickname'] ?? null,
-                    'data' => $event['data'] ?? [],
-                    'event_at' => $eventAt,
-                ]);
-                $count++;
-            } catch (\Illuminate\Database\UniqueConstraintViolationException) {
-                // Duplicate event — bỏ qua (bảo vệ bởi unique index)
-                continue;
+            $pageCount = 0;
+            foreach ($data['events'] as $event) {
+                $eventAt = isset($event['timestamp'])
+                    ? Carbon::parse($event['timestamp'])
+                    : now();
+
+                try {
+                    // M1: Hash nội dung để dedup chính xác (cùng user, cùng giây, khác nội dung → khác hash)
+                    $commentText = $event['data']['comment'] ?? '';
+                    $dataHash = md5($commentText);
+
+                    LiveEvent::create([
+                        'live_session_id' => $session->id,
+                        'event_type' => $event['type'] ?? 'unknown',
+                        'tiktok_user_id' => $event['user_id'] ?? null,
+                        'tiktok_unique_id' => $event['unique_id'] ?? null,
+                        'tiktok_nickname' => $event['nickname'] ?? null,
+                        'data' => $event['data'] ?? [],
+                        'data_hash' => $dataHash,
+                        'event_at' => $eventAt,
+                    ]);
+                    $pageCount++;
+                } catch (\Illuminate\Database\UniqueConstraintViolationException) {
+                    // Duplicate event — bỏ qua (bảo vệ bởi unique index)
+                    continue;
+                }
+            }
+
+            $totalCount += $pageCount;
+
+            // Nếu nhận ít hơn limit, không còn events nào nữa
+            if (count($data['events']) < $fetchLimit) {
+                break;
+            }
+
+            // Cập nhật since cho page tiếp theo
+            $lastTimestamp = end($data['events'])['timestamp'] ?? null;
+            if ($lastTimestamp) {
+                $since = Carbon::parse($lastTimestamp)->getPreciseTimestamp(3) / 1000;
+            } else {
+                break;
             }
         }
 
-        // Update status từ service
+        // Update status từ service (dùng data từ lần fetch cuối)
         if (isset($data['status'])) {
             $newStatus = match ($data['status']) {
                 'live' => 'live',
@@ -407,7 +432,23 @@ class LiveSessionController extends Controller
             }
         }
 
-        return $count;
+        return $totalCount;
+    }
+
+    /**
+     * Gọi Python service với 1-retry khi thất bại (M2: tránh mất events do network blip).
+     */
+    private function fetchFromServiceWithRetry(string $sessionId, int $limit, float $since): ?array
+    {
+        $data = $this->tiktokService->getSession($sessionId, includeEvents: true, limit: $limit, since: $since);
+
+        if ($data === null) {
+            // Retry 1 lần sau 1 giây
+            usleep(1_000_000);
+            $data = $this->tiktokService->getSession($sessionId, includeEvents: true, limit: $limit, since: $since);
+        }
+
+        return $data;
     }
 
     private function syncStats(LiveSession $session, array $serviceData): void
