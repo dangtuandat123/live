@@ -48,6 +48,16 @@ const topProducts = [
   { name: "Quần jean slim fit", image: "https://picsum.photos/seed/jeans/80/80", mentions: 198, sentiment: 78, questions: 28 },
   { name: "Túi xách da PU", image: "https://picsum.photos/seed/bag/80/80", mentions: 156, sentiment: 88, questions: 19 },
   { name: "Giày sneaker trắng", image: "https://picsum.photos/seed/sneaker/80/80", mentions: 124, sentiment: 71, questions: 22 },
+  { name: "Kính mát thời trang", image: "https://picsum.photos/seed/glasses/80/80", mentions: 112, sentiment: 80, questions: 15 },
+  { name: "Nón bucket unisex", image: "https://picsum.photos/seed/hat/80/80", mentions: 98, sentiment: 75, questions: 12 },
+  { name: "Dây chuyền bạc", image: "https://picsum.photos/seed/necklace/80/80", mentions: 87, sentiment: 90, questions: 10 },
+  { name: "Balo du lịch", image: "https://picsum.photos/seed/backpack/80/80", mentions: 76, sentiment: 82, questions: 8 },
+  { name: "Đồng hồ thông minh", image: "https://picsum.photos/seed/watch/80/80", mentions: 65, sentiment: 88, questions: 14 },
+  { name: "Áo khoác dù", image: "https://picsum.photos/seed/jacket/80/80", mentions: 54, sentiment: 73, questions: 9 },
+  { name: "Sandal quai hậu", image: "https://picsum.photos/seed/sandal/80/80", mentions: 48, sentiment: 79, questions: 7 },
+  { name: "Ví cầm tay nam", image: "https://picsum.photos/seed/wallet/80/80", mentions: 42, sentiment: 85, questions: 5 },
+  { name: "Thắt lưng da bò", image: "https://picsum.photos/seed/belt/80/80", mentions: 38, sentiment: 77, questions: 6 },
+  { name: "Mũ lưỡi trai", image: "https://picsum.photos/seed/cap/80/80", mentions: 31, sentiment: 81, questions: 4 },
 ]
 
 const topQuestions = [
