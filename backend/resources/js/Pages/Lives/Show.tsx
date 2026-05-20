@@ -1,4 +1,5 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout"
+import { Head } from "@inertiajs/react"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -6,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -127,6 +127,43 @@ function InfiniteScrollSentinel({ onLoadMore }: { onLoadMore: () => void }) {
   )
 }
 
+function FadeScrollArea({ children, className }: { children: React.ReactNode; className?: string }) {
+  const scrollRef = React.useRef<HTMLDivElement>(null)
+  const [showTopFade, setShowTopFade] = React.useState(false)
+  const [showBottomFade, setShowBottomFade] = React.useState(false)
+
+  const updateFades = React.useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    setShowTopFade(el.scrollTop > 8)
+    setShowBottomFade(el.scrollTop + el.clientHeight < el.scrollHeight - 8)
+  }, [])
+
+  React.useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    updateFades()
+    el.addEventListener("scroll", updateFades, { passive: true })
+    const ro = new ResizeObserver(updateFades)
+    ro.observe(el)
+    return () => { el.removeEventListener("scroll", updateFades); ro.disconnect() }
+  }, [updateFades])
+
+  return (
+    <div className={`relative flex-1 min-h-0 ${className ?? ""}`}>
+      <div ref={scrollRef} className="h-full overflow-y-auto">
+        {children}
+      </div>
+      {showTopFade && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-card to-transparent z-10" />
+      )}
+      {showBottomFade && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-card to-transparent z-10" />
+      )}
+    </div>
+  )
+}
+
 function SentimentBadge({ sentiment }: { sentiment: string }) {
   const config: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
     positive: { label: "Tích cực", variant: "default" },
@@ -190,9 +227,8 @@ function CommentsPanel() {
           </Select>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 overflow-hidden relative">
-        <ScrollArea className="h-full pr-3" type="always">
-          <div className="space-y-2 py-1">
+      <FadeScrollArea>
+          <div className="space-y-2 px-4">
             {visible.map((comment) => (
               <div key={comment.id} className="flex items-start gap-2.5 rounded-lg border p-2.5">
                 <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
@@ -213,11 +249,7 @@ function CommentsPanel() {
             ))}
           </div>
           {hasMore && <InfiniteScrollSentinel onLoadMore={() => setVisibleCount((p) => p + BATCH)} />}
-        </ScrollArea>
-        {/* Fade overlays */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-card to-transparent z-10" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-card to-transparent z-10" />
-      </CardContent>
+      </FadeScrollArea>
     </Card>
   )
 }
@@ -229,8 +261,7 @@ function ProductsPanel() {
         <CardTitle>Sản phẩm được nhắc đến</CardTitle>
         <CardDescription>Xếp hạng theo số lượt nhắc trong bình luận (cập nhật realtime)</CardDescription>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 overflow-y-auto relative">
-        <div className="pointer-events-none sticky top-0 -mt-4 h-6 bg-gradient-to-b from-card to-transparent z-10" />
+      <FadeScrollArea>
         <Table>
           <TableHeader>
             <TableRow>
@@ -263,8 +294,7 @@ function ProductsPanel() {
             ))}
           </TableBody>
         </Table>
-        <div className="pointer-events-none sticky bottom-0 -mb-4 h-6 bg-gradient-to-t from-card to-transparent" />
-      </CardContent>
+      </FadeScrollArea>
     </Card>
   )
 }
@@ -276,8 +306,7 @@ function QuestionsPanel() {
         <CardTitle>Câu hỏi thường gặp</CardTitle>
         <CardDescription>Phân loại và gom nhóm câu hỏi bởi AI</CardDescription>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 overflow-y-auto relative">
-        <div className="pointer-events-none sticky top-0 -mt-4 h-6 bg-gradient-to-b from-card to-transparent z-10" />
+      <FadeScrollArea>
         <Table>
           <TableHeader>
             <TableRow>
@@ -298,8 +327,7 @@ function QuestionsPanel() {
             ))}
           </TableBody>
         </Table>
-        <div className="pointer-events-none sticky bottom-0 -mb-4 h-6 bg-gradient-to-t from-card to-transparent" />
-      </CardContent>
+      </FadeScrollArea>
     </Card>
   )
 }
@@ -323,8 +351,7 @@ function CustomersPanel() {
           <Input placeholder="Tìm theo tên, SĐT, SP..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-8 text-sm" />
         </div>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 overflow-y-auto relative">
-        <div className="pointer-events-none sticky top-0 -mt-4 h-6 bg-gradient-to-b from-card to-transparent z-10" />
+      <FadeScrollArea>
         <Table>
           <TableHeader>
             <TableRow>
@@ -349,8 +376,7 @@ function CustomersPanel() {
             ))}
           </TableBody>
         </Table>
-        <div className="pointer-events-none sticky bottom-0 -mb-4 h-6 bg-gradient-to-t from-card to-transparent" />
-      </CardContent>
+      </FadeScrollArea>
     </Card>
   )
 }
@@ -393,6 +419,7 @@ function AIInsightsPanel() {
 export default function LivesShow() {
   return (
     <AuthenticatedLayout>
+      <Head title="Flash Sale Mùa Hè — Live" />
       <div className="flex flex-1 max-h-svh flex-col overflow-hidden">
       <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
         <div className="flex items-center gap-2 px-4">
@@ -539,11 +566,11 @@ export default function LivesShow() {
                     { keyword: "giá", count: 132 },
                     { keyword: "freeship", count: 125 },
                     { keyword: "bảo hành", count: 120 },
-                    { keyword: "đổ bên", count: 112 },
+                    { keyword: "độ bền", count: 112 },
                     { keyword: "so sánh", count: 109 },
                     { keyword: "chất liệu", count: 99 },
                     { keyword: "tư vấn", count: 95 },
-                    { keyword: "giao hóa tốc", count: 92 },
+                    { keyword: "giao hỏa tốc", count: 92 },
                   ].map((item) => (
                     <div key={item.keyword} className="flex items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-xs">
                       <span>{item.keyword}</span>
