@@ -339,10 +339,17 @@ function ProductsPanel() {
         <CardDescription>Xếp hạng theo số lượt nhắc trong bình luận (cập nhật realtime)</CardDescription>
       </CardHeader>
       <div className="px-4">
-        <table className="w-full text-sm">
+        <table className="w-full table-fixed text-sm">
+          <colgroup>
+            <col className="w-[6%]" />
+            <col className="w-[40%]" />
+            <col className="w-[16%]" />
+            <col className="w-[24%]" />
+            <col className="w-[14%]" />
+          </colgroup>
           <thead className="[&_tr]:border-b">
             <tr className="border-b">
-              <th className="h-10 w-10 px-2 text-left font-medium text-foreground">#</th>
+              <th className="h-10 px-2 text-left font-medium text-foreground">#</th>
               <th className="h-10 px-2 text-left font-medium text-foreground">Sản phẩm</th>
               <th className="h-10 px-2 text-right font-medium text-foreground">Lượt nhắc</th>
               <th className="h-10 px-2 text-left font-medium text-foreground">Sentiment</th>
@@ -353,15 +360,22 @@ function ProductsPanel() {
       </div>
       <FadeScrollArea>
         <div className="px-4">
-          <table className="w-full text-sm">
+          <table className="w-full table-fixed text-sm">
+            <colgroup>
+              <col className="w-[6%]" />
+              <col className="w-[40%]" />
+              <col className="w-[16%]" />
+              <col className="w-[24%]" />
+              <col className="w-[14%]" />
+            </colgroup>
             <tbody className="[&_tr:last-child]:border-0">
               {topProducts.map((product, i) => (
                 <tr key={product.name} className="border-b transition-colors hover:bg-muted/50">
-                  <td className="w-10 p-2 font-bold text-muted-foreground">{i + 1}</td>
+                  <td className="p-2 font-bold text-muted-foreground">{i + 1}</td>
                   <td className="p-2">
                     <div className="flex items-center gap-2.5">
                       <img src={product.image} alt={product.name} className="size-9 rounded-md object-cover" />
-                      <span className="font-medium">{product.name}</span>
+                      <span className="font-medium truncate">{product.name}</span>
                     </div>
                   </td>
                   <td className="p-2 text-right">{product.mentions}</td>
@@ -390,10 +404,16 @@ function QuestionsPanel() {
         <CardDescription>Phân loại và gom nhóm câu hỏi bởi AI</CardDescription>
       </CardHeader>
       <div className="px-4">
-        <table className="w-full text-sm">
+        <table className="w-full table-fixed text-sm">
+          <colgroup>
+            <col className="w-[8%]" />
+            <col className="w-[46%]" />
+            <col className="w-[16%]" />
+            <col className="w-[30%]" />
+          </colgroup>
           <thead className="[&_tr]:border-b">
             <tr className="border-b">
-              <th className="h-10 w-10 px-2 text-left font-medium text-foreground">#</th>
+              <th className="h-10 px-2 text-left font-medium text-foreground">#</th>
               <th className="h-10 px-2 text-left font-medium text-foreground">Câu hỏi</th>
               <th className="h-10 px-2 text-right font-medium text-foreground">Số lần</th>
               <th className="h-10 px-2 text-left font-medium text-foreground">SP liên quan</th>
@@ -403,14 +423,20 @@ function QuestionsPanel() {
       </div>
       <FadeScrollArea>
         <div className="px-4">
-          <table className="w-full text-sm">
+          <table className="w-full table-fixed text-sm">
+            <colgroup>
+              <col className="w-[8%]" />
+              <col className="w-[46%]" />
+              <col className="w-[16%]" />
+              <col className="w-[30%]" />
+            </colgroup>
             <tbody className="[&_tr:last-child]:border-0">
               {topQuestions.map((q, i) => (
                 <tr key={q.question} className="border-b transition-colors hover:bg-muted/50">
-                  <td className="w-10 p-2 font-bold text-muted-foreground">{i + 1}</td>
-                  <td className="p-2 font-medium">{q.question}</td>
+                  <td className="p-2 font-bold text-muted-foreground">{i + 1}</td>
+                  <td className="p-2 font-medium truncate">{q.question}</td>
                   <td className="p-2 text-right"><Badge variant="secondary">{q.count}</Badge></td>
-                  <td className="p-2 text-muted-foreground text-sm">{q.product}</td>
+                  <td className="p-2 text-muted-foreground text-sm truncate">{q.product}</td>
                 </tr>
               ))}
             </tbody>
@@ -441,7 +467,14 @@ function CustomersPanel() {
         </div>
       </CardHeader>
       <div className="px-4">
-        <table className="w-full text-sm">
+        <table className="w-full table-fixed text-sm">
+          <colgroup>
+            <col className="w-[18%]" />
+            <col className="w-[18%]" />
+            <col className="w-[16%]" />
+            <col className="w-[22%]" />
+            <col className="w-[26%]" />
+          </colgroup>
           <thead className="[&_tr]:border-b">
             <tr className="border-b">
               <th className="h-10 px-2 text-left font-medium text-foreground">Tên</th>
@@ -455,17 +488,24 @@ function CustomersPanel() {
       </div>
       <FadeScrollArea>
         <div className="px-4">
-          <table className="w-full text-sm">
+          <table className="w-full table-fixed text-sm">
+            <colgroup>
+              <col className="w-[18%]" />
+              <col className="w-[18%]" />
+              <col className="w-[16%]" />
+              <col className="w-[22%]" />
+              <col className="w-[26%]" />
+            </colgroup>
             <tbody className="[&_tr:last-child]:border-0">
               {filtered.map((c, i) => (
                 <tr key={i} className="border-b transition-colors hover:bg-muted/50">
-                  <td className="p-2 font-medium">{c.name}</td>
+                  <td className="p-2 font-medium truncate">{c.name}</td>
                   <td className="p-2">
                     {c.phone ? <Badge variant="outline" className="gap-1"><PhoneIcon className="size-3" />{c.phone}</Badge> : <span className="text-muted-foreground">—</span>}
                   </td>
-                  <td className="p-2">{c.address || <span className="text-muted-foreground">—</span>}</td>
-                  <td className="p-2"><Badge variant="secondary">{c.product}</Badge></td>
-                  <td className="p-2 text-sm text-muted-foreground max-w-[180px] truncate">{c.comment}</td>
+                  <td className="p-2 truncate">{c.address || <span className="text-muted-foreground">—</span>}</td>
+                  <td className="p-2"><Badge variant="secondary" className="truncate max-w-full">{c.product}</Badge></td>
+                  <td className="p-2 text-sm text-muted-foreground truncate">{c.comment}</td>
                 </tr>
               ))}
             </tbody>
