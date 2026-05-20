@@ -282,42 +282,48 @@ function CommentsPanel() {
         </div>
       </CardHeader>
       <FadeScrollArea>
-          <div className="space-y-2 px-4">
-            {visible.map((comment) => (
-              <div key={comment.id} className="flex items-start gap-2.5 rounded-lg border p-2.5">
-                <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                  {comment.user.charAt(0)}
-                </div>
-                <div className="flex-1 min-w-0 space-y-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-sm font-medium">{comment.user}</span>
-                    <SentimentBadge sentiment={comment.sentiment} />
-                    {comment.hasPhone && (
-                      <Badge variant="outline" className="gap-1 text-xs"><PhoneIcon className="size-3" />SĐT</Badge>
+          <div className="divide-y px-4">
+            {visible.map((comment) => {
+              const sentimentColor = comment.sentiment === "positive" ? "border-l-emerald-500" : comment.sentiment === "negative" ? "border-l-red-500" : "border-l-muted-foreground/30"
+              return (
+                <div key={comment.id} className={`flex items-start gap-2.5 border-l-2 py-2.5 pl-3 ${sentimentColor}`}>
+                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                    {comment.user.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                        <span className="text-sm font-medium">{comment.user}</span>
+                        {comment.hasPhone && (
+                          <Badge variant="outline" className="gap-1 text-[10px] px-1.5 py-0"><PhoneIcon className="size-2.5" />SĐT</Badge>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-muted-foreground/50 whitespace-nowrap shrink-0">{comment.time}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground break-words">{comment.text}</p>
+                    {(comment.intentTag || comment.questionTag || comment.productTag) && (
+                      <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                        {comment.intentTag && (
+                          <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">
+                            <ShoppingCartIcon className="size-2.5" />{comment.intentTag}
+                          </span>
+                        )}
+                        {comment.questionTag && (
+                          <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10">
+                            <HelpCircleIcon className="size-2.5" />{comment.questionTag}
+                          </span>
+                        )}
+                        {comment.productTag && (
+                          <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10">
+                            <PackageIcon className="size-2.5" />{comment.productTag}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground break-words">{comment.text}</p>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {comment.intentTag && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                        <ShoppingCartIcon className="size-3" />{comment.intentTag}
-                      </span>
-                    )}
-                    {comment.questionTag && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
-                        <HelpCircleIcon className="size-3" />{comment.questionTag}
-                      </span>
-                    )}
-                    {comment.productTag && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:text-blue-400">
-                        <PackageIcon className="size-3" />{comment.productTag}
-                      </span>
-                    )}
-                    <span className="text-xs text-muted-foreground/60">{comment.time}</span>
-                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
           {hasMore && <InfiniteScrollSentinel onLoadMore={() => setVisibleCount((p) => p + BATCH)} />}
       </FadeScrollArea>
