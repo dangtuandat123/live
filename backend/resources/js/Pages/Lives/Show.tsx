@@ -133,7 +133,7 @@ function CommentsPanel() {
         </div>
       </CardHeader>
       <CardContent className="flex-1 min-h-0 overflow-hidden">
-        <ScrollArea className="h-full pr-3">
+        <ScrollArea className="h-full pr-3" type="always">
           <div className="space-y-2">
             {visible.map((comment) => (
               <div key={comment.id} className="flex items-start gap-2.5 rounded-lg border p-2.5">
@@ -467,12 +467,12 @@ export default function LivesShow() {
             </Card>
 
             {/* Top Keywords Card */}
-            <Card size="sm" className="flex-1">
+            <Card size="sm" className="flex-1 overflow-hidden">
               <CardHeader className="px-3 pt-0">
                 <CardTitle className="text-xs">🔍 Từ khóa được nhắc nhiều</CardTitle>
               </CardHeader>
-              <CardContent className="px-3">
-                <div className="grid grid-cols-2 gap-1.5">
+              <CardContent className="px-3 flex-1 min-h-0 overflow-hidden">
+                <div className="flex flex-wrap gap-1.5 overflow-hidden h-full relative">
                   {[
                     { keyword: "size", count: 154 },
                     { keyword: "màu sắc", count: 138 },
@@ -485,11 +485,12 @@ export default function LivesShow() {
                     { keyword: "tư vấn", count: 95 },
                     { keyword: "giao hóa tốc", count: 92 },
                   ].map((item) => (
-                    <div key={item.keyword} className="flex items-center justify-between rounded-md bg-muted/60 px-2 py-1 text-xs">
-                      <span className="text-muted-foreground">{item.keyword}</span>
+                    <div key={item.keyword} className="flex items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-xs">
+                      <span>{item.keyword}</span>
                       <span className="font-bold tabular-nums">{item.count}</span>
                     </div>
                   ))}
+                  <div className="flex items-center rounded-md bg-muted/40 px-2 py-0.5 text-xs text-muted-foreground">...</div>
                 </div>
               </CardContent>
             </Card>
