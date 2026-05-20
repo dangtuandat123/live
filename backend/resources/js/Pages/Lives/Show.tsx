@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   EyeIcon, MessageSquareIcon, SmileIcon, PhoneIcon, TrendingUpIcon,
   ClockIcon, CircleStopIcon, UsersIcon, HelpCircleIcon, PackageIcon,
@@ -261,39 +260,45 @@ function ProductsPanel() {
         <CardTitle>Sản phẩm được nhắc đến</CardTitle>
         <CardDescription>Xếp hạng theo số lượt nhắc trong bình luận (cập nhật realtime)</CardDescription>
       </CardHeader>
+      <div className="px-4">
+        <table className="w-full text-sm">
+          <thead className="[&_tr]:border-b">
+            <tr className="border-b">
+              <th className="h-10 w-10 px-2 text-left font-medium text-foreground">#</th>
+              <th className="h-10 px-2 text-left font-medium text-foreground">Sản phẩm</th>
+              <th className="h-10 px-2 text-right font-medium text-foreground">Lượt nhắc</th>
+              <th className="h-10 px-2 text-left font-medium text-foreground">Sentiment</th>
+              <th className="h-10 px-2 text-right font-medium text-foreground">Câu hỏi</th>
+            </tr>
+          </thead>
+        </table>
+      </div>
       <FadeScrollArea>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10">#</TableHead>
-              <TableHead>Sản phẩm</TableHead>
-              <TableHead className="text-right">Lượt nhắc</TableHead>
-              <TableHead>Sentiment</TableHead>
-              <TableHead className="text-right">Câu hỏi</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {topProducts.map((product, i) => (
-              <TableRow key={product.name}>
-                <TableCell className="font-bold text-muted-foreground">{i + 1}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2.5">
-                    <img src={product.image} alt={product.name} className="size-9 rounded-md object-cover" />
-                    <span className="font-medium">{product.name}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">{product.mentions}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Progress value={product.sentiment} className="h-2 w-20" />
-                    <span className="text-xs text-muted-foreground">{product.sentiment}%</span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">{product.questions}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <div className="px-4">
+          <table className="w-full text-sm">
+            <tbody className="[&_tr:last-child]:border-0">
+              {topProducts.map((product, i) => (
+                <tr key={product.name} className="border-b transition-colors hover:bg-muted/50">
+                  <td className="w-10 p-2 font-bold text-muted-foreground">{i + 1}</td>
+                  <td className="p-2">
+                    <div className="flex items-center gap-2.5">
+                      <img src={product.image} alt={product.name} className="size-9 rounded-md object-cover" />
+                      <span className="font-medium">{product.name}</span>
+                    </div>
+                  </td>
+                  <td className="p-2 text-right">{product.mentions}</td>
+                  <td className="p-2">
+                    <div className="flex items-center gap-2">
+                      <Progress value={product.sentiment} className="h-2 w-20" />
+                      <span className="text-xs text-muted-foreground">{product.sentiment}%</span>
+                    </div>
+                  </td>
+                  <td className="p-2 text-right">{product.questions}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </FadeScrollArea>
     </Card>
   )
@@ -306,27 +311,33 @@ function QuestionsPanel() {
         <CardTitle>Câu hỏi thường gặp</CardTitle>
         <CardDescription>Phân loại và gom nhóm câu hỏi bởi AI</CardDescription>
       </CardHeader>
+      <div className="px-4">
+        <table className="w-full text-sm">
+          <thead className="[&_tr]:border-b">
+            <tr className="border-b">
+              <th className="h-10 w-10 px-2 text-left font-medium text-foreground">#</th>
+              <th className="h-10 px-2 text-left font-medium text-foreground">Câu hỏi</th>
+              <th className="h-10 px-2 text-right font-medium text-foreground">Số lần</th>
+              <th className="h-10 px-2 text-left font-medium text-foreground">SP liên quan</th>
+            </tr>
+          </thead>
+        </table>
+      </div>
       <FadeScrollArea>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10">#</TableHead>
-              <TableHead>Câu hỏi</TableHead>
-              <TableHead className="text-right">Số lần</TableHead>
-              <TableHead>SP liên quan</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {topQuestions.map((q, i) => (
-              <TableRow key={q.question}>
-                <TableCell className="font-bold text-muted-foreground">{i + 1}</TableCell>
-                <TableCell className="font-medium">{q.question}</TableCell>
-                <TableCell className="text-right"><Badge variant="secondary">{q.count}</Badge></TableCell>
-                <TableCell className="text-muted-foreground text-sm">{q.product}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <div className="px-4">
+          <table className="w-full text-sm">
+            <tbody className="[&_tr:last-child]:border-0">
+              {topQuestions.map((q, i) => (
+                <tr key={q.question} className="border-b transition-colors hover:bg-muted/50">
+                  <td className="w-10 p-2 font-bold text-muted-foreground">{i + 1}</td>
+                  <td className="p-2 font-medium">{q.question}</td>
+                  <td className="p-2 text-right"><Badge variant="secondary">{q.count}</Badge></td>
+                  <td className="p-2 text-muted-foreground text-sm">{q.product}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </FadeScrollArea>
     </Card>
   )
@@ -351,31 +362,37 @@ function CustomersPanel() {
           <Input placeholder="Tìm theo tên, SĐT, SP..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-8 text-sm" />
         </div>
       </CardHeader>
+      <div className="px-4">
+        <table className="w-full text-sm">
+          <thead className="[&_tr]:border-b">
+            <tr className="border-b">
+              <th className="h-10 px-2 text-left font-medium text-foreground">Tên</th>
+              <th className="h-10 px-2 text-left font-medium text-foreground">SĐT</th>
+              <th className="h-10 px-2 text-left font-medium text-foreground">Địa chỉ</th>
+              <th className="h-10 px-2 text-left font-medium text-foreground">SP quan tâm</th>
+              <th className="h-10 px-2 text-left font-medium text-foreground">Nội dung</th>
+            </tr>
+          </thead>
+        </table>
+      </div>
       <FadeScrollArea>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Tên</TableHead>
-              <TableHead>SĐT</TableHead>
-              <TableHead>Địa chỉ</TableHead>
-              <TableHead>SP quan tâm</TableHead>
-              <TableHead>Nội dung</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map((c, i) => (
-              <TableRow key={i}>
-                <TableCell className="font-medium">{c.name}</TableCell>
-                <TableCell>
-                  {c.phone ? <Badge variant="outline" className="gap-1"><PhoneIcon className="size-3" />{c.phone}</Badge> : <span className="text-muted-foreground">—</span>}
-                </TableCell>
-                <TableCell>{c.address || <span className="text-muted-foreground">—</span>}</TableCell>
-                <TableCell><Badge variant="secondary">{c.product}</Badge></TableCell>
-                <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">{c.comment}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <div className="px-4">
+          <table className="w-full text-sm">
+            <tbody className="[&_tr:last-child]:border-0">
+              {filtered.map((c, i) => (
+                <tr key={i} className="border-b transition-colors hover:bg-muted/50">
+                  <td className="p-2 font-medium">{c.name}</td>
+                  <td className="p-2">
+                    {c.phone ? <Badge variant="outline" className="gap-1"><PhoneIcon className="size-3" />{c.phone}</Badge> : <span className="text-muted-foreground">—</span>}
+                  </td>
+                  <td className="p-2">{c.address || <span className="text-muted-foreground">—</span>}</td>
+                  <td className="p-2"><Badge variant="secondary">{c.product}</Badge></td>
+                  <td className="p-2 text-sm text-muted-foreground max-w-[180px] truncate">{c.comment}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </FadeScrollArea>
     </Card>
   )
