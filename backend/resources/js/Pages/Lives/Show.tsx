@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   EyeIcon, MessageSquareIcon, SmileIcon, PhoneIcon, TrendingUpIcon, ArrowUpIcon,
   ClockIcon, CircleStopIcon, UsersIcon, HelpCircleIcon, PackageIcon,
@@ -195,7 +194,8 @@ function CommentsPanel() {
   const [visibleCount, setVisibleCount] = React.useState(BATCH)
 
   const filtered = allComments.filter((c) => {
-    if (filter !== "all" && c.sentiment !== filter) return false
+    if (filter === "question" && !c.text.includes("?")) return false
+    if ((filter === "positive" || filter === "negative") && c.sentiment !== filter) return false
     if (search && !c.text.toLowerCase().includes(search.toLowerCase()) && !c.user.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
@@ -226,17 +226,31 @@ function CommentsPanel() {
             <SearchIcon className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input placeholder="Tìm trong bình luận..." value={search} onChange={(e) => { setSearch(e.target.value); setVisibleCount(BATCH) }} className="pl-9 h-8 text-sm" />
           </div>
-          <Select value={filter} onValueChange={(v) => { setFilter(v); setVisibleCount(BATCH) }}>
-            <SelectTrigger className="w-[130px] h-8 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tất cả</SelectItem>
-              <SelectItem value="positive">Tích cực</SelectItem>
-              <SelectItem value="neutral">Trung lập</SelectItem>
-              <SelectItem value="negative">Tiêu cực</SelectItem>
-            </SelectContent>
-          </Select>
+        </div>
+        <div className="flex flex-wrap gap-1.5 pt-2">
+          {([
+            { key: "all", label: "Tất cả", count: allComments.length },
+            { key: "question", label: "Hỏi", count: allComments.filter(c => c.text.includes("?")).length },
+            { key: "positive", label: "Tích cực", count: allComments.filter(c => c.sentiment === "positive").length },
+            { key: "negative", label: "Tiêu cực", count: allComments.filter(c => c.sentiment === "negative").length },
+          ] as const).map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => { setFilter(tab.key); setVisibleCount(BATCH) }}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                filter === tab.key
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-transparent bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+              <span className={`tabular-nums rounded-full px-1.5 py-0.5 text-[10px] leading-none font-semibold ${
+                filter === tab.key ? "bg-primary/20" : "bg-muted"
+              }`}>
+                {tab.count}
+              </span>
+            </button>
+          ))}
         </div>
       </CardHeader>
       <FadeScrollArea>
