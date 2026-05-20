@@ -51,6 +51,7 @@ from TikTokLive.events import (
     LiveEndEvent,
     LivePauseEvent,
     LiveUnpauseEvent,
+    RoomUserSeqEvent,
 )
 
 # --- Resolve base dir (PyInstaller exe hoặc script) ---
@@ -293,6 +294,13 @@ def setup_tiktok_client(session: SessionInfo) -> TikTokLiveClient:
             session.ended_at = datetime.now(timezone.utc).isoformat()
             session.add_event("disconnected")
             logger.info(f"[{session.session_id}] Disconnected")
+
+    @client.on(RoomUserSeqEvent)
+    async def on_viewer_update(event):
+        total = getattr(event, 'total_user', None)
+        if total is not None:
+            session.stats["viewer_count"] = total
+            session.stats["total_views"] = max(session.stats["total_views"], total)
 
     return client
 
