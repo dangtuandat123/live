@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
-  EyeIcon, MessageSquareIcon, SmileIcon, PhoneIcon, TrendingUpIcon,
+  EyeIcon, MessageSquareIcon, SmileIcon, PhoneIcon, TrendingUpIcon, ArrowUpIcon,
   ClockIcon, CircleStopIcon, UsersIcon, HelpCircleIcon, PackageIcon,
   SparklesIcon, SearchIcon, LoaderIcon,
 } from "lucide-react"
@@ -148,6 +148,10 @@ function FadeScrollArea({ children, className }: { children: React.ReactNode; cl
     return () => { el.removeEventListener("scroll", updateFades); ro.disconnect() }
   }, [updateFades])
 
+  const scrollToTop = () => {
+    scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
   return (
     <div className={`relative flex-1 min-h-0 ${className ?? ""}`}>
       <div ref={scrollRef} className="h-full overflow-y-auto">
@@ -158,6 +162,15 @@ function FadeScrollArea({ children, className }: { children: React.ReactNode; cl
       )}
       {showBottomFade && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-card to-transparent z-10" />
+      )}
+      {showTopFade && (
+        <button
+          onClick={scrollToTop}
+          className="absolute bottom-3 right-3 z-20 flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all hover:bg-primary/90 hover:scale-110 active:scale-95"
+          title="Cuộn lên đầu"
+        >
+          <ArrowUpIcon className="size-4" />
+        </button>
       )}
     </div>
   )
