@@ -565,55 +565,65 @@ function CustomersPanel() {
 
 function AIInsightsPanel() {
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><SparklesIcon className="size-5" />Phân tích AI</CardTitle>
-        <CardDescription>Tóm tắt, cảnh báo và gợi ý từ AI realtime</CardDescription>
-      </CardHeader>
-      <FadeScrollArea>
-        <div className="space-y-3 px-4">
-          {/* Summary section */}
-          <div className="rounded-lg border bg-card p-3 space-y-2 text-sm text-muted-foreground">
+    <div className="grid gap-4 md:grid-cols-2 h-full min-h-0">
+      {/* Tổng kết */}
+      <Card className="flex flex-col min-h-0">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><SparklesIcon className="size-5" />Tổng kết AI</CardTitle>
+        </CardHeader>
+        <FadeScrollArea>
+          <div className="space-y-3 px-4 text-sm text-muted-foreground">
             <p><strong className="text-foreground">Phiên live đang diễn ra tốt</strong> với tỷ lệ tương tác cao. Sản phẩm "Áo thun basic cotton" được quan tâm nhiều nhất với 342 lượt nhắc.</p>
             <p><strong className="text-foreground">Cảm xúc tích cực chiếm 78%</strong>, chủ yếu liên quan đến chất lượng sản phẩm và giá cả hợp lý.</p>
             <p><strong className="text-foreground">Gợi ý:</strong> Nên trả lời câu hỏi về "size" và "ship". Có thể đưa ra combo giảm giá vì nhiều khách hỏi về mua nhiều.</p>
+            <p><strong className="text-foreground">Sản phẩm nổi bật:</strong> "Váy hoa mùa hè" có sentiment 92%, "Áo thun basic cotton" dẫn đầu lượt nhắc. Nên push thêm combo 2 sản phẩm này.</p>
+            <p><strong className="text-foreground">Khách hàng:</strong> 45 khách để lại SĐT/ĐC, tỷ lệ chuyển đổi 8.6% từ bình luận. Top lead: Nguyễn Thị Lan (SĐT + địa chỉ đầy đủ).</p>
+            <p><strong className="text-foreground">So sánh:</strong> Phiên này tốt hơn 23% so với phiên trước về lượt tương tác, nhưng tỷ lệ chốt đơn giảm 5% — cần push mạnh hơn CTA.</p>
           </div>
-          {/* Alerts */}
-          <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3">
-            <p className="text-sm font-medium text-yellow-600">⚠️ Câu hỏi chưa trả lời</p>
-            <p className="text-xs text-muted-foreground mt-1">28 câu hỏi về "chất liệu" chưa được trả lời trong 5 phút qua.</p>
+        </FadeScrollArea>
+      </Card>
+
+      {/* Cảnh báo */}
+      <Card className="flex flex-col min-h-0">
+        <CardHeader><CardTitle>🔔 Cảnh báo AI</CardTitle></CardHeader>
+        <FadeScrollArea>
+          <div className="space-y-2 px-4">
+            <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3">
+              <p className="text-sm font-medium text-yellow-600">⚠️ Câu hỏi chưa trả lời</p>
+              <p className="text-xs text-muted-foreground mt-1">28 câu hỏi về "chất liệu" chưa được trả lời trong 5 phút qua.</p>
+            </div>
+            <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3">
+              <p className="text-sm font-medium text-green-600">✅ Sản phẩm hot</p>
+              <p className="text-xs text-muted-foreground mt-1">"Váy hoa mùa hè" có sentiment 92% — bán chạy nhất phiên này.</p>
+            </div>
+            <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
+              <p className="text-sm font-medium text-blue-600">💡 Cơ hội upsell</p>
+              <p className="text-xs text-muted-foreground mt-1">31 khách hỏi "mua 2 giảm giá không" — nên tạo combo giảm giá ngay.</p>
+            </div>
+            <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+              <p className="text-sm font-medium text-red-600">🔴 Sentiment giảm</p>
+              <p className="text-xs text-muted-foreground mt-1">Tỷ lệ tiêu cực tăng từ 5% lên 12% trong 10 phút qua. Chủ đề: "giá đắt", "ship chậm".</p>
+            </div>
+            <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-3">
+              <p className="text-sm font-medium text-purple-600">🎯 Khách VIP</p>
+              <p className="text-xs text-muted-foreground mt-1">Khách "Trần Văn Minh" đã mua 5 lần trước — đang hỏi về "Túi xách da PU".</p>
+            </div>
+            <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-3">
+              <p className="text-sm font-medium text-orange-600">📦 Hết hàng sắp tới</p>
+              <p className="text-xs text-muted-foreground mt-1">"Giày sneaker trắng" chỉ còn 3 đôi size 42 — có 8 người đang hỏi size này.</p>
+            </div>
+            <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
+              <p className="text-sm font-medium text-cyan-600">🔄 Khách quay lại</p>
+              <p className="text-xs text-muted-foreground mt-1">15 khách đã xem live trước quay lại hôm nay — tỷ lệ retention 12%.</p>
+            </div>
+            <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3">
+              <p className="text-sm font-medium text-yellow-600">⏰ Peak engagement</p>
+              <p className="text-xs text-muted-foreground mt-1">Đỉnh tương tác đạt ở phút 40-45, nên giới thiệu SP mới ngay bây giờ.</p>
+            </div>
           </div>
-          <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3">
-            <p className="text-sm font-medium text-green-600">✅ Sản phẩm hot</p>
-            <p className="text-xs text-muted-foreground mt-1">"Váy hoa mùa hè" có sentiment 92% — bán chạy nhất phiên này.</p>
-          </div>
-          <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
-            <p className="text-sm font-medium text-blue-600">💡 Cơ hội upsell</p>
-            <p className="text-xs text-muted-foreground mt-1">31 khách hỏi "mua 2 giảm giá không" — nên tạo combo giảm giá ngay.</p>
-          </div>
-          <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
-            <p className="text-sm font-medium text-red-600">🔴 Sentiment giảm</p>
-            <p className="text-xs text-muted-foreground mt-1">Tỷ lệ tiêu cực tăng từ 5% lên 12% trong 10 phút qua. Chủ đề: "giá đắt", "ship chậm".</p>
-          </div>
-          <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-3">
-            <p className="text-sm font-medium text-purple-600">🎯 Khách VIP</p>
-            <p className="text-xs text-muted-foreground mt-1">Khách "Trần Văn Minh" đã mua 5 lần trước — đang hỏi về "Túi xách da PU".</p>
-          </div>
-          <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-3">
-            <p className="text-sm font-medium text-orange-600">📦 Hết hàng sắp tới</p>
-            <p className="text-xs text-muted-foreground mt-1">"Giày sneaker trắng" chỉ còn 3 đôi size 42 — có 8 người đang hỏi size này.</p>
-          </div>
-          <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
-            <p className="text-sm font-medium text-cyan-600">🔄 Khách quay lại</p>
-            <p className="text-xs text-muted-foreground mt-1">15 khách đã xem live trước quay lại hôm nay — tỷ lệ retention 12%.</p>
-          </div>
-          <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3">
-            <p className="text-sm font-medium text-yellow-600">⏰ Peak engagement</p>
-            <p className="text-xs text-muted-foreground mt-1">Đỉnh tương tác đạt ở phút 40-45, nên giới thiệu SP mới ngay bây giờ.</p>
-          </div>
-        </div>
-      </FadeScrollArea>
-    </Card>
+        </FadeScrollArea>
+      </Card>
+    </div>
   )
 }
 
