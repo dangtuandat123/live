@@ -183,12 +183,13 @@ function CommentsPanel() {
 
 function ProductsPanel() {
   return (
-    <Card className="min-h-full">
+    <Card className="h-full flex flex-col">
       <CardHeader>
         <CardTitle>Sản phẩm được nhắc đến</CardTitle>
         <CardDescription>Xếp hạng theo số lượt nhắc trong bình luận (cập nhật realtime)</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1 min-h-0 overflow-y-auto relative">
+        <div className="pointer-events-none sticky top-0 -mt-4 h-6 bg-gradient-to-b from-card to-transparent z-10" />
         <Table>
           <TableHeader>
             <TableRow>
@@ -221,6 +222,7 @@ function ProductsPanel() {
             ))}
           </TableBody>
         </Table>
+        <div className="pointer-events-none sticky bottom-0 -mb-4 h-6 bg-gradient-to-t from-card to-transparent" />
       </CardContent>
     </Card>
   )
@@ -228,12 +230,13 @@ function ProductsPanel() {
 
 function QuestionsPanel() {
   return (
-    <Card className="min-h-full">
+    <Card className="h-full flex flex-col">
       <CardHeader>
         <CardTitle>Câu hỏi thường gặp</CardTitle>
         <CardDescription>Phân loại và gom nhóm câu hỏi bởi AI</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1 min-h-0 overflow-y-auto relative">
+        <div className="pointer-events-none sticky top-0 -mt-4 h-6 bg-gradient-to-b from-card to-transparent z-10" />
         <Table>
           <TableHeader>
             <TableRow>
@@ -254,6 +257,7 @@ function QuestionsPanel() {
             ))}
           </TableBody>
         </Table>
+        <div className="pointer-events-none sticky bottom-0 -mb-4 h-6 bg-gradient-to-t from-card to-transparent" />
       </CardContent>
     </Card>
   )
@@ -265,7 +269,7 @@ function CustomersPanel() {
     !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search) || c.product.toLowerCase().includes(search.toLowerCase())
   )
   return (
-    <Card className="min-h-full">
+    <Card className="h-full flex flex-col">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div>
@@ -278,7 +282,8 @@ function CustomersPanel() {
           <Input placeholder="Tìm theo tên, SĐT, SP..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-8 text-sm" />
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1 min-h-0 overflow-y-auto relative">
+        <div className="pointer-events-none sticky top-0 -mt-4 h-6 bg-gradient-to-b from-card to-transparent z-10" />
         <Table>
           <TableHeader>
             <TableRow>
@@ -303,6 +308,7 @@ function CustomersPanel() {
             ))}
           </TableBody>
         </Table>
+        <div className="pointer-events-none sticky bottom-0 -mb-4 h-6 bg-gradient-to-t from-card to-transparent" />
       </CardContent>
     </Card>
   )
