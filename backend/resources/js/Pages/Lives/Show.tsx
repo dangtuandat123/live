@@ -678,16 +678,10 @@ function StatsPanel() {
     questions: { label: "Câu hỏi", color: "var(--chart-4)" },
   } satisfies ChartConfig
 
-  const funnelConfig = {
-    value: { label: "Số lượng", color: "var(--chart-1)" },
-  } satisfies ChartConfig
+  // funnelConfig not needed — funnel uses custom bars
 
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><BarChart3Icon className="size-5" />Thống kê phiên live</CardTitle>
-        <CardDescription>Biểu đồ phân tích hoạt động, cảm xúc, sản phẩm và chuyển đổi</CardDescription>
-      </CardHeader>
+    <div className="h-full flex flex-col min-h-0">
       <FadeScrollArea>
         <div className="grid gap-4 md:grid-cols-2 px-4 pb-4">
       {/* Activity Timeline */}
@@ -799,7 +793,7 @@ function StatsPanel() {
       </Card>
         </div>
       </FadeScrollArea>
-    </Card>
+    </div>
   )
 }
 
@@ -903,7 +897,7 @@ export default function LivesShow() {
             </Card>
 
             {/* Sentiment AI Card */}
-            <Card size="sm">
+            <Card>
               <CardHeader className="px-3 pt-0">
                 <CardTitle className="flex items-center gap-2 text-xs">
                   <SmileIcon className="size-3.5" />
@@ -942,7 +936,7 @@ export default function LivesShow() {
             </Card>
 
             {/* Top Keywords Card */}
-            <Card size="sm" className="flex-1 overflow-hidden">
+            <Card className="flex-1 overflow-hidden">
               <CardHeader className="px-3 pt-0">
                 <CardTitle className="text-xs">🔍 Từ khóa được nhắc nhiều</CardTitle>
               </CardHeader>
