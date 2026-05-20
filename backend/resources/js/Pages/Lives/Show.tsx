@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   EyeIcon, MessageSquareIcon, SmileIcon, PhoneIcon, TrendingUpIcon,
   ClockIcon, CircleStopIcon, UsersIcon, HelpCircleIcon, PackageIcon,
-  SparklesIcon, SearchIcon, ChevronDownIcon, ArrowDownIcon,
+  SparklesIcon, SearchIcon, ChevronDownIcon,
 } from "lucide-react"
 import * as React from "react"
 
@@ -97,7 +97,7 @@ function CommentsPanel() {
   const hasMore = visibleCount < filtered.length
 
   return (
-    <Card>
+    <Card className="h-full flex flex-col">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div>
@@ -132,8 +132,8 @@ function CommentsPanel() {
           </Select>
         </div>
       </CardHeader>
-      <CardContent>
-        <ScrollArea className="h-[480px] pr-3">
+      <CardContent className="flex-1 min-h-0 overflow-hidden">
+        <ScrollArea className="h-full pr-3">
           <div className="space-y-2">
             {visible.map((comment) => (
               <div key={comment.id} className="flex items-start gap-2.5 rounded-lg border p-2.5">
@@ -170,7 +170,7 @@ function CommentsPanel() {
 
 function ProductsPanel() {
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader>
         <CardTitle>Sản phẩm được nhắc đến</CardTitle>
         <CardDescription>Xếp hạng theo số lượt nhắc trong bình luận (cập nhật realtime)</CardDescription>
@@ -215,7 +215,7 @@ function ProductsPanel() {
 
 function QuestionsPanel() {
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader>
         <CardTitle>Câu hỏi thường gặp</CardTitle>
         <CardDescription>Phân loại và gom nhóm câu hỏi bởi AI</CardDescription>
@@ -252,7 +252,7 @@ function CustomersPanel() {
     !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search) || c.product.toLowerCase().includes(search.toLowerCase())
   )
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div>
@@ -261,7 +261,7 @@ function CustomersPanel() {
           </div>
         </div>
         <div className="relative max-w-xs pt-2">
-          <SearchIcon className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground mt-1" />
+          <SearchIcon className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Tìm theo tên, SĐT, SP..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-8 text-sm" />
         </div>
       </CardHeader>
@@ -333,7 +333,8 @@ function AIInsightsPanel() {
 export default function LivesShow() {
   return (
     <AuthenticatedLayout>
-      <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+      <div className="flex h-[100svh] flex-col overflow-hidden">
+      <header className="flex h-12 shrink-0 items-center gap-2">
         <div className="flex items-center gap-2 px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
@@ -355,11 +356,11 @@ export default function LivesShow() {
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+      <div className="flex flex-1 flex-col gap-2 px-4 pb-4 overflow-hidden">
         {/* Session Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Flash Sale Mùa Hè</h1>
+            <h1 className="text-lg font-bold tracking-tight">Flash Sale Mùa Hè</h1>
             <div className="flex items-center gap-2 mt-1">
               <Badge variant="default">Facebook</Badge>
               <Badge variant="destructive" className="gap-1">
@@ -378,9 +379,9 @@ export default function LivesShow() {
         </div>
 
         {/* 2-Column Layout: Video + KPI (left) | Tabs (right) — stacks on mobile */}
-        <div className="grid gap-4 xl:grid-cols-[380px_1fr]">
+        <div className="grid gap-4 xl:grid-cols-[360px_1fr] flex-1 min-h-0">
           {/* Left Column: Video + KPIs */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 overflow-y-auto">
             {/* Video Embed */}
             <Card className="overflow-hidden py-0 gap-0">
               <CardContent className="p-0">
@@ -466,7 +467,7 @@ export default function LivesShow() {
             </Card>
 
             {/* Top Keywords Card */}
-            <Card size="sm">
+            <Card size="sm" className="flex-1">
               <CardHeader className="px-3 pt-0">
                 <CardTitle className="text-xs">🔍 Từ khóa được nhắc nhiều</CardTitle>
               </CardHeader>
@@ -495,7 +496,7 @@ export default function LivesShow() {
           </div>
 
           {/* Right Column: Tabs */}
-          <Tabs defaultValue="comments" className="min-w-0">
+          <Tabs defaultValue="comments" className="min-w-0 flex flex-col min-h-0">
             <TabsList className="flex-wrap">
               <TabsTrigger value="comments" className="gap-1.5"><MessageSquareIcon className="size-3.5" />Bình luận</TabsTrigger>
               <TabsTrigger value="products" className="gap-1.5"><PackageIcon className="size-3.5" />Sản phẩm</TabsTrigger>
@@ -503,13 +504,14 @@ export default function LivesShow() {
               <TabsTrigger value="customers" className="gap-1.5"><UsersIcon className="size-3.5" />KH tiềm năng</TabsTrigger>
               <TabsTrigger value="ai" className="gap-1.5"><SparklesIcon className="size-3.5" />AI</TabsTrigger>
             </TabsList>
-            <TabsContent value="comments"><CommentsPanel /></TabsContent>
-            <TabsContent value="products"><ProductsPanel /></TabsContent>
-            <TabsContent value="questions"><QuestionsPanel /></TabsContent>
-            <TabsContent value="customers"><CustomersPanel /></TabsContent>
-            <TabsContent value="ai"><AIInsightsPanel /></TabsContent>
+            <TabsContent value="comments" className="flex-1 min-h-0 overflow-y-auto"><CommentsPanel /></TabsContent>
+            <TabsContent value="products" className="flex-1 min-h-0 overflow-y-auto"><ProductsPanel /></TabsContent>
+            <TabsContent value="questions" className="flex-1 min-h-0 overflow-y-auto"><QuestionsPanel /></TabsContent>
+            <TabsContent value="customers" className="flex-1 min-h-0 overflow-y-auto"><CustomersPanel /></TabsContent>
+            <TabsContent value="ai" className="flex-1 min-h-0 overflow-y-auto"><AIInsightsPanel /></TabsContent>
           </Tabs>
         </div>
+      </div>
       </div>
     </AuthenticatedLayout>
   )
