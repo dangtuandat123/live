@@ -1283,7 +1283,7 @@ export default function LivesShow() {
               <CardHeader className="px-3 pt-0">
                 <CardTitle className="flex items-center gap-2 text-xs">
                   <SmileIcon className="size-3.5" />
-                  Cảm xúc AI
+                  Phân tích cảm xúc
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-3">
