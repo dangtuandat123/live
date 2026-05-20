@@ -142,9 +142,9 @@ function CommentsPanel() {
           </Select>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 overflow-hidden">
+      <CardContent className="flex-1 min-h-0 overflow-hidden relative">
         <ScrollArea className="h-full pr-3" type="always">
-          <div className="space-y-2">
+          <div className="space-y-2 py-1">
             {visible.map((comment) => (
               <div key={comment.id} className="flex items-start gap-2.5 rounded-lg border p-2.5">
                 <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
@@ -173,6 +173,9 @@ function CommentsPanel() {
             </div>
           )}
         </ScrollArea>
+        {/* Fade overlays */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-card to-transparent z-10" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-card to-transparent z-10" />
       </CardContent>
     </Card>
   )
