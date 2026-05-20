@@ -1077,32 +1077,48 @@ function StatsPanel() {
         </CardContent>
       </Card>
 
-      {/* Sentiment Donut */}
       <Card className="flex flex-col">
         <CardHeader>
           <CardTitle>Phân bổ cảm xúc</CardTitle>
           <CardDescription>Tỷ lệ tích cực / trung lập / tiêu cực</CardDescription>
         </CardHeader>
-        <CardContent className="flex-1">
-          <ChartContainer config={sentimentConfig} className="aspect-auto h-full min-h-[200px] w-full">
+        <CardContent className="flex-1 flex flex-col">
+          <ChartContainer config={sentimentConfig} className="aspect-auto flex-1 min-h-[160px] w-full">
             <PieChart accessibilityLayer>
-              <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+              <ChartTooltip content={<ChartTooltipContent />} />
               <Pie data={sentimentData} dataKey="value" nameKey="name" innerRadius={50} strokeWidth={2}>
                 <RechartsLabel content={({ viewBox }) => {
                   if (viewBox && "cx" in viewBox && "cy" in viewBox) {
                     const total = sentimentData.reduce((s, d) => s + d.value, 0)
                     return (
                       <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
-                        <tspan x={viewBox.cx} y={viewBox.cy} className="fill-foreground text-2xl font-bold">{total}</tspan>
-                        <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 20} className="fill-muted-foreground text-xs">bình luận</tspan>
+                        <tspan x={viewBox.cx} y={(viewBox.cy || 0) - 6} className="fill-foreground text-2xl font-bold">{total}</tspan>
+                        <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 14} className="fill-muted-foreground text-xs">bình luận</tspan>
                       </text>
                     )
                   }
                 }} />
               </Pie>
-              <ChartLegend content={<ChartLegendContent nameKey="name" />} />
             </PieChart>
           </ChartContainer>
+          {/* Breakdown visible without hover */}
+          <div className="grid grid-cols-3 gap-2 pt-2 border-t mt-2">
+            {sentimentData.map((d) => {
+              const total = sentimentData.reduce((s, item) => s + item.value, 0)
+              const pct = ((d.value / total) * 100).toFixed(0)
+              const colorMap: Record<string, string> = { positive: "bg-[#22c55e]", neutral: "bg-[#6b7280]", negative: "bg-[#ef4444]" }
+              const labelMap: Record<string, string> = { positive: "Tích cực", neutral: "Trung lập", negative: "Tiêu cực" }
+              return (
+                <div key={d.name} className="text-center">
+                  <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                    <span className={`size-2 rounded-full ${colorMap[d.name]}`} />
+                    {labelMap[d.name]}
+                  </div>
+                  <div className="text-sm font-bold tabular-nums">{d.value} <span className="text-xs font-normal text-muted-foreground">({pct}%)</span></div>
+                </div>
+              )
+            })}
+          </div>
         </CardContent>
       </Card>
 
@@ -1225,7 +1241,9 @@ export default function LivesShow() {
               {soundEnabled ? <BellRingIcon className="size-4" /> : <BellOffIcon className="size-4" />}
               {soundEnabled ? "Thông báo" : "Tắt tiếng"}
             </Button>
-            <Button variant="destructive"><CircleStopIcon className="mr-2 size-4" />Kết thúc phiên</Button>
+            <Button variant="destructive" size="sm" asChild>
+              <a href={route("lives.index")}><CircleStopIcon className="mr-2 size-4" />Kết thúc phiên phân tích</a>
+            </Button>
           </div>
         </div>
 
