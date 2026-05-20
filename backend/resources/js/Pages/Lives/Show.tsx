@@ -16,6 +16,7 @@ import {
   ClockIcon, CircleStopIcon, UsersIcon, HelpCircleIcon, PackageIcon, BarChart3Icon,
   SparklesIcon, SearchIcon, LoaderIcon, MinusIcon, CopyIcon, CheckIcon,
   BellRingIcon, BellOffIcon, DownloadIcon, ClipboardListIcon, XIcon,
+  AlertTriangleIcon, FlameIcon, LightbulbIcon, HeartCrackIcon, CrownIcon, PackageXIcon, RefreshCwIcon, ZapIcon,
 } from "lucide-react"
 import * as React from "react"
 
@@ -50,24 +51,40 @@ type OrderAlert = {
   time: number
 }
 
-function OrderAlertToast({ alert, onDismiss }: { alert: OrderAlert; onDismiss: () => void }) {
+function InlineOrderAlert({ alerts, dismiss }: { alerts: OrderAlert[]; dismiss: (id: number) => void }) {
+  const latest = alerts[0]
+  const DURATION = 5000 // auto-dismiss after 5s
+
   React.useEffect(() => {
-    const timer = setTimeout(onDismiss, 6000)
+    const timer = setTimeout(() => dismiss(latest.id), DURATION)
     return () => clearTimeout(timer)
-  }, [onDismiss])
+  }, [latest.id, dismiss])
 
   return (
-    <div className="animate-in slide-in-from-right-full fade-in duration-300 flex items-start gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 backdrop-blur-sm p-3 shadow-lg max-w-sm">
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/20">
-        <ShoppingCartIcon className="size-4 text-emerald-500" />
+    <div key={latest.id} className="animate-in slide-in-from-top-2 fade-in duration-300 flex items-center gap-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 backdrop-blur-sm px-3 py-1.5 max-w-md w-full relative overflow-hidden">
+      {/* Progress bar — synced to DURATION */}
+      <div
+        key={`progress-${latest.id}`}
+        className="absolute bottom-0 left-0 h-[2px] bg-emerald-500/50"
+        style={{ animation: `shrink ${DURATION}ms linear forwards` }}
+      />
+
+      <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/20">
+        <ShoppingCartIcon className="size-3.5 text-emerald-500" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-emerald-400">🛒 Chốt đơn mới!</p>
-        <p className="text-xs text-foreground mt-0.5 font-medium">{alert.user}</p>
-        <p className="text-xs text-muted-foreground truncate">{alert.product} — {alert.comment}</p>
+        <p className="text-xs font-semibold text-emerald-400">🛒 Chốt đơn mới!</p>
+        <p className="text-[11px] text-muted-foreground truncate">
+          <span className="font-medium text-foreground">{latest.user}</span> — {latest.product}
+        </p>
       </div>
-      <button onClick={onDismiss} className="shrink-0 rounded p-0.5 hover:bg-muted transition-colors">
-        <XIcon className="size-3.5 text-muted-foreground" />
+      {alerts.length > 1 && (
+        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-400 tabular-nums">
+          +{alerts.length - 1}
+        </span>
+      )}
+      <button onClick={() => dismiss(latest.id)} className="shrink-0 rounded p-0.5 hover:bg-muted transition-colors">
+        <XIcon className="size-3 text-muted-foreground" />
       </button>
     </div>
   )
@@ -717,41 +734,105 @@ function AIInsightsPanel() {
 
       {/* Cảnh báo */}
       <Card className="flex flex-col min-h-0">
-        <CardHeader><CardTitle>🔔 Cảnh báo AI</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><BellRingIcon className="size-4" />Cảnh báo AI</CardTitle></CardHeader>
         <FadeScrollArea>
           <div className="space-y-2 px-4">
-            <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3">
-              <p className="text-sm font-medium text-yellow-600">⚠️ Câu hỏi chưa trả lời</p>
-              <p className="text-xs text-muted-foreground mt-1">28 câu hỏi về "chất liệu" chưa được trả lời trong 5 phút qua.</p>
-            </div>
-            <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3">
-              <p className="text-sm font-medium text-green-600">✅ Sản phẩm hot</p>
-              <p className="text-xs text-muted-foreground mt-1">"Váy hoa mùa hè" có sentiment 92% — bán chạy nhất phiên này.</p>
-            </div>
-            <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
-              <p className="text-sm font-medium text-blue-600">💡 Cơ hội upsell</p>
-              <p className="text-xs text-muted-foreground mt-1">31 khách hỏi "mua 2 giảm giá không" — nên tạo combo giảm giá ngay.</p>
-            </div>
-            <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
-              <p className="text-sm font-medium text-red-600">🔴 Sentiment giảm</p>
-              <p className="text-xs text-muted-foreground mt-1">Tỷ lệ tiêu cực tăng từ 5% lên 12% trong 10 phút qua. Chủ đề: "giá đắt", "ship chậm".</p>
-            </div>
-            <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-3">
-              <p className="text-sm font-medium text-purple-600">🎯 Khách VIP</p>
-              <p className="text-xs text-muted-foreground mt-1">Khách "Trần Văn Minh" đã mua 5 lần trước — đang hỏi về "Túi xách da PU".</p>
-            </div>
-            <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-3">
-              <p className="text-sm font-medium text-orange-600">📦 Hết hàng sắp tới</p>
-              <p className="text-xs text-muted-foreground mt-1">"Giày sneaker trắng" chỉ còn 3 đôi size 42 — có 8 người đang hỏi size này.</p>
-            </div>
-            <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
-              <p className="text-sm font-medium text-cyan-600">🔄 Khách quay lại</p>
-              <p className="text-xs text-muted-foreground mt-1">15 khách đã xem live trước quay lại hôm nay — tỷ lệ retention 12%.</p>
-            </div>
-            <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3">
-              <p className="text-sm font-medium text-yellow-600">⏰ Peak engagement</p>
-              <p className="text-xs text-muted-foreground mt-1">Đỉnh tương tác đạt ở phút 40-45, nên giới thiệu SP mới ngay bây giờ.</p>
-            </div>
+            {[
+              {
+                icon: AlertTriangleIcon,
+                title: "Câu hỏi chưa trả lời",
+                desc: '28 câu hỏi về "chất liệu" chưa được trả lời trong 5 phút qua.',
+                color: "amber",
+                severity: "Cao",
+                time: "2 phút trước",
+              },
+              {
+                icon: FlameIcon,
+                title: "Sản phẩm đang hot",
+                desc: '"Váy hoa mùa hè" có sentiment 92% — bán chạy nhất phiên này.',
+                color: "emerald",
+                severity: "Thông tin",
+                time: "5 phút trước",
+              },
+              {
+                icon: LightbulbIcon,
+                title: "Cơ hội upsell",
+                desc: '31 khách hỏi "mua 2 giảm giá không" — nên tạo combo giảm giá ngay.',
+                color: "blue",
+                severity: "Trung bình",
+                time: "8 phút trước",
+              },
+              {
+                icon: HeartCrackIcon,
+                title: "Sentiment giảm",
+                desc: 'Tỷ lệ tiêu cực tăng từ 5% lên 12% trong 10 phút qua. Chủ đề: "giá đắt", "ship chậm".',
+                color: "red",
+                severity: "Cao",
+                time: "3 phút trước",
+              },
+              {
+                icon: CrownIcon,
+                title: "Khách VIP online",
+                desc: 'Khách "Trần Văn Minh" đã mua 5 lần trước — đang hỏi về "Túi xách da PU".',
+                color: "violet",
+                severity: "Trung bình",
+                time: "6 phút trước",
+              },
+              {
+                icon: PackageXIcon,
+                title: "Sắp hết hàng",
+                desc: '"Giày sneaker trắng" chỉ còn 3 đôi size 42 — có 8 người đang hỏi size này.',
+                color: "orange",
+                severity: "Cao",
+                time: "1 phút trước",
+              },
+              {
+                icon: RefreshCwIcon,
+                title: "Khách quay lại",
+                desc: '15 khách đã xem live trước quay lại hôm nay — tỷ lệ retention 12%.',
+                color: "cyan",
+                severity: "Thông tin",
+                time: "10 phút trước",
+              },
+              {
+                icon: ZapIcon,
+                title: "Đỉnh tương tác",
+                desc: 'Peak engagement ở phút 40-45, nên giới thiệu SP mới ngay bây giờ.',
+                color: "yellow",
+                severity: "Trung bình",
+                time: "4 phút trước",
+              },
+            ].map((alert) => {
+              const colorMap: Record<string, { icon: string; border: string; bg: string; badge: string; badgeBg: string }> = {
+                amber:   { icon: "text-amber-500",   border: "border-l-amber-500",   bg: "hover:bg-amber-500/5",   badge: "text-amber-600",   badgeBg: "bg-amber-500/10" },
+                emerald: { icon: "text-emerald-500", border: "border-l-emerald-500", bg: "hover:bg-emerald-500/5", badge: "text-emerald-600", badgeBg: "bg-emerald-500/10" },
+                blue:    { icon: "text-blue-500",    border: "border-l-blue-500",    bg: "hover:bg-blue-500/5",    badge: "text-blue-600",    badgeBg: "bg-blue-500/10" },
+                red:     { icon: "text-red-500",     border: "border-l-red-500",     bg: "hover:bg-red-500/5",     badge: "text-red-600",     badgeBg: "bg-red-500/10" },
+                violet:  { icon: "text-violet-500",  border: "border-l-violet-500",  bg: "hover:bg-violet-500/5",  badge: "text-violet-600",  badgeBg: "bg-violet-500/10" },
+                orange:  { icon: "text-orange-500",  border: "border-l-orange-500",  bg: "hover:bg-orange-500/5",  badge: "text-orange-600",  badgeBg: "bg-orange-500/10" },
+                cyan:    { icon: "text-cyan-500",    border: "border-l-cyan-500",    bg: "hover:bg-cyan-500/5",    badge: "text-cyan-600",    badgeBg: "bg-cyan-500/10" },
+                yellow:  { icon: "text-yellow-500",  border: "border-l-yellow-500",  bg: "hover:bg-yellow-500/5",  badge: "text-yellow-600",  badgeBg: "bg-yellow-500/10" },
+              }
+              const c = colorMap[alert.color] ?? colorMap.amber
+              const Icon = alert.icon
+              return (
+                <div key={alert.title} className={`flex items-start gap-3 rounded-lg border-l-[3px] ${c.border} p-3 transition-colors ${c.bg}`}>
+                  <div className={`flex size-8 shrink-0 items-center justify-center rounded-md bg-muted/50 ${c.icon}`}>
+                    <Icon className="size-4" />
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold">{alert.title}</span>
+                      <span className="text-[10px] text-muted-foreground/60 whitespace-nowrap">{alert.time}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{alert.desc}</p>
+                    <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${c.badge} ${c.badgeBg}`}>
+                      {alert.severity}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </FadeScrollArea>
       </Card>
@@ -982,25 +1063,7 @@ export default function LivesShow() {
 
           {/* Center: Latest Order Alert */}
           <div className="flex-1 flex justify-center px-4 min-w-0">
-            {alerts.length > 0 && (() => {
-              const latest = alerts[0]
-              return (
-                <div className="animate-in slide-in-from-top-2 fade-in duration-300 flex items-center gap-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 backdrop-blur-sm px-3 py-1.5 max-w-md w-full">
-                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/20">
-                    <ShoppingCartIcon className="size-3.5 text-emerald-500" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-emerald-400">🛒 Chốt đơn mới!</p>
-                    <p className="text-[11px] text-muted-foreground truncate">
-                      <span className="font-medium text-foreground">{latest.user}</span> — {latest.product}
-                    </p>
-                  </div>
-                  <button onClick={() => dismiss(latest.id)} className="shrink-0 rounded p-0.5 hover:bg-muted transition-colors">
-                    <XIcon className="size-3 text-muted-foreground" />
-                  </button>
-                </div>
-              )
-            })()}
+            {alerts.length > 0 && <InlineOrderAlert alerts={alerts} dismiss={dismiss} />}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">

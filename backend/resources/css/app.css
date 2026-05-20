@@ -203,3 +203,9 @@
 .dark ::-webkit-scrollbar-thumb:hover {
   background: oklch(0.7 0 0 / 45%);
 }
+
+/* ─── Alert Progress Bar ─── */
+@keyframes shrink {
+  from { width: 100%; }
+  to { width: 0%; }
+}
