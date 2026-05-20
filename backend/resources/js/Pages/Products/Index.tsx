@@ -67,6 +67,7 @@ const mockProducts = [
     mentions: 342,
     prevMentions: 280,
     isLive: true,
+    image: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=80&h=80&fit=crop&auto=format",
   },
   {
     id: "2",
@@ -78,6 +79,7 @@ const mockProducts = [
     mentions: 195,
     prevMentions: 210,
     isLive: false,
+    image: "https://images.unsplash.com/photo-1542272604-787c3835535d?w=80&h=80&fit=crop&auto=format",
   },
   {
     id: "3",
@@ -89,6 +91,7 @@ const mockProducts = [
     mentions: 278,
     prevMentions: 195,
     isLive: true,
+    image: "https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=80&h=80&fit=crop&auto=format",
   },
   {
     id: "4",
@@ -100,6 +103,7 @@ const mockProducts = [
     mentions: 156,
     prevMentions: 160,
     isLive: false,
+    image: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=80&h=80&fit=crop&auto=format",
   },
   {
     id: "5",
@@ -111,6 +115,7 @@ const mockProducts = [
     mentions: 98,
     prevMentions: 65,
     isLive: false,
+    image: "https://images.unsplash.com/photo-1549298916-b41d501d3772?w=80&h=80&fit=crop&auto=format",
   },
   {
     id: "6",
@@ -122,6 +127,7 @@ const mockProducts = [
     mentions: 43,
     prevMentions: 50,
     isLive: false,
+    image: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=80&h=80&fit=crop&auto=format",
   },
 ]
 
@@ -374,17 +380,26 @@ export default function ProductsIndex() {
                 {filtered.map((product) => (
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        {product.name}
-                        {product.isLive && (
-                          <Badge variant="destructive" className="gap-1 text-[10px] px-1.5 py-0">
-                            <span className="relative flex size-1.5">
-                              <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-75" />
-                              <span className="relative inline-flex size-1.5 rounded-full bg-current" />
-                            </span>
-                            Live
-                          </Badge>
-                        )}
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          className="h-10 w-10 rounded-md object-cover bg-muted border"
+                        />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span>{product.name}</span>
+                            {product.isLive && (
+                              <Badge variant="destructive" className="gap-1 text-[10px] px-1.5 py-0">
+                                <span className="relative flex size-1.5">
+                                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-75" />
+                                  <span className="relative inline-flex size-1.5 rounded-full bg-current" />
+                                </span>
+                                Live
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
