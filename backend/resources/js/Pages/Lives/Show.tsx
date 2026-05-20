@@ -565,20 +565,20 @@ function CustomersPanel() {
 
 function AIInsightsPanel() {
   return (
-    <div className="grid gap-4 md:grid-cols-2 h-full overflow-y-auto px-1 pb-1">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><SparklesIcon className="size-5" />Tóm tắt AI</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p><strong className="text-foreground">Phiên live đang diễn ra tốt</strong> với tỷ lệ tương tác cao. Sản phẩm "Áo thun basic cotton" được quan tâm nhiều nhất với 342 lượt nhắc.</p>
-          <p><strong className="text-foreground">Cảm xúc tích cực chiếm 78%</strong>, chủ yếu liên quan đến chất lượng sản phẩm và giá cả hợp lý.</p>
-          <p><strong className="text-foreground">Gợi ý:</strong> Nên trả lời câu hỏi về "size" và "ship". Có thể đưa ra combo giảm giá vì nhiều khách hỏi về mua nhiều.</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader><CardTitle>Cảnh báo AI</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
+    <Card className="h-full flex flex-col">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><SparklesIcon className="size-5" />Phân tích AI</CardTitle>
+        <CardDescription>Tóm tắt, cảnh báo và gợi ý từ AI realtime</CardDescription>
+      </CardHeader>
+      <FadeScrollArea>
+        <div className="space-y-3 px-4">
+          {/* Summary section */}
+          <div className="rounded-lg border bg-card p-3 space-y-2 text-sm text-muted-foreground">
+            <p><strong className="text-foreground">Phiên live đang diễn ra tốt</strong> với tỷ lệ tương tác cao. Sản phẩm "Áo thun basic cotton" được quan tâm nhiều nhất với 342 lượt nhắc.</p>
+            <p><strong className="text-foreground">Cảm xúc tích cực chiếm 78%</strong>, chủ yếu liên quan đến chất lượng sản phẩm và giá cả hợp lý.</p>
+            <p><strong className="text-foreground">Gợi ý:</strong> Nên trả lời câu hỏi về "size" và "ship". Có thể đưa ra combo giảm giá vì nhiều khách hỏi về mua nhiều.</p>
+          </div>
+          {/* Alerts */}
           <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3">
             <p className="text-sm font-medium text-yellow-600">⚠️ Câu hỏi chưa trả lời</p>
             <p className="text-xs text-muted-foreground mt-1">28 câu hỏi về "chất liệu" chưa được trả lời trong 5 phút qua.</p>
@@ -591,9 +591,29 @@ function AIInsightsPanel() {
             <p className="text-sm font-medium text-blue-600">💡 Cơ hội upsell</p>
             <p className="text-xs text-muted-foreground mt-1">31 khách hỏi "mua 2 giảm giá không" — nên tạo combo giảm giá ngay.</p>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+          <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+            <p className="text-sm font-medium text-red-600">🔴 Sentiment giảm</p>
+            <p className="text-xs text-muted-foreground mt-1">Tỷ lệ tiêu cực tăng từ 5% lên 12% trong 10 phút qua. Chủ đề: "giá đắt", "ship chậm".</p>
+          </div>
+          <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-3">
+            <p className="text-sm font-medium text-purple-600">🎯 Khách VIP</p>
+            <p className="text-xs text-muted-foreground mt-1">Khách "Trần Văn Minh" đã mua 5 lần trước — đang hỏi về "Túi xách da PU".</p>
+          </div>
+          <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-3">
+            <p className="text-sm font-medium text-orange-600">📦 Hết hàng sắp tới</p>
+            <p className="text-xs text-muted-foreground mt-1">"Giày sneaker trắng" chỉ còn 3 đôi size 42 — có 8 người đang hỏi size này.</p>
+          </div>
+          <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
+            <p className="text-sm font-medium text-cyan-600">🔄 Khách quay lại</p>
+            <p className="text-xs text-muted-foreground mt-1">15 khách đã xem live trước quay lại hôm nay — tỷ lệ retention 12%.</p>
+          </div>
+          <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3">
+            <p className="text-sm font-medium text-yellow-600">⏰ Peak engagement</p>
+            <p className="text-xs text-muted-foreground mt-1">Đỉnh tương tác đạt ở phút 40-45, nên giới thiệu SP mới ngay bây giờ.</p>
+          </div>
+        </div>
+      </FadeScrollArea>
+    </Card>
   )
 }
 
@@ -653,7 +673,13 @@ function StatsPanel() {
   } satisfies ChartConfig
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 h-full overflow-y-auto px-1 pb-1">
+    <Card className="h-full flex flex-col">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><BarChart3Icon className="size-5" />Thống kê phiên live</CardTitle>
+        <CardDescription>Biểu đồ phân tích hoạt động, cảm xúc, sản phẩm và chuyển đổi</CardDescription>
+      </CardHeader>
+      <FadeScrollArea>
+        <div className="grid gap-4 md:grid-cols-2 px-4 pb-4">
       {/* Activity Timeline */}
       <Card className="md:col-span-2">
         <CardHeader>
@@ -761,7 +787,9 @@ function StatsPanel() {
           </div>
         </CardContent>
       </Card>
-    </div>
+        </div>
+      </FadeScrollArea>
+    </Card>
   )
 }
 
