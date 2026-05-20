@@ -471,27 +471,27 @@ function CommentsPanel() {
                       {/* Time + Quick Actions — stacked to prevent layout shift */}
                       <div className="relative shrink-0 flex items-center">
                         <span className="text-[11px] text-muted-foreground/50 whitespace-nowrap group-hover:invisible">{comment.time}</span>
-                        <div className="absolute inset-0 flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute inset-0 flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => togglePin(comment.id)}
-                            className={`rounded p-1 transition-colors ${isPinned ? "text-yellow-500 bg-yellow-500/10" : "text-muted-foreground hover:bg-muted"}`}
+                            className={`rounded-md p-1.5 transition-colors ${isPinned ? "text-yellow-500 bg-yellow-500/10" : "text-muted-foreground hover:bg-muted"}`}
                             title={isPinned ? "Bỏ ghim" : "Ghim"}
                           >
-                            {isPinned ? <PinOffIcon className="size-3" /> : <PinIcon className="size-3" />}
+                            {isPinned ? <PinOffIcon className="size-[15px]" /> : <PinIcon className="size-[15px]" />}
                           </button>
                           <button
                             onClick={() => toggleOrder(comment.id)}
-                            className={`rounded p-1 transition-colors ${isOrder ? "text-emerald-500 bg-emerald-500/10" : "text-muted-foreground hover:bg-muted"}`}
+                            className={`rounded-md p-1.5 transition-colors ${isOrder ? "text-emerald-500 bg-emerald-500/10" : "text-muted-foreground hover:bg-muted"}`}
                             title={isOrder ? "Bỏ đánh dấu" : "Đánh dấu chốt đơn"}
                           >
-                            <ShoppingCartIcon className="size-3" />
+                            <ShoppingCartIcon className="size-[15px]" />
                           </button>
                           <button
                             onClick={() => copyComment(comment.text, comment.id)}
-                            className="rounded p-1 text-muted-foreground hover:bg-muted transition-colors"
+                            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted transition-colors"
                             title="Copy bình luận"
                           >
-                            {copiedId === comment.id ? <CheckIcon className="size-3 text-emerald-500" /> : <ClipboardCopyIcon className="size-3" />}
+                            {copiedId === comment.id ? <CheckIcon className="size-[15px] text-emerald-500" /> : <ClipboardCopyIcon className="size-[15px]" />}
                           </button>
                         </div>
                       </div>
