@@ -256,3 +256,116 @@ Integrity mode: development
 ### Kiểm thử và biên dịch
 - [ ] 100% các bài test của Laravel (`php artisan test`) đều PASS.
 - [ ] Lệnh `npm run build` chạy thành công không có lỗi compile.
+
+## Follow-up — 2026-05-21T16:03:00Z
+
+Thiết kế và hoàn thiện hệ thống gói dịch vụ đăng ký (Subscription Packages) và trang mua gói (Pricing & Checkout) chuẩn nhất cho SaaS LiveStream AI, phân chia chi tiết các giới hạn sử dụng (Active Streams, Max Duration, AI Credits, Audio, Export) ở cả Frontend và Backend để đảm bảo hiệu năng và chống lạm dụng tài nguyên.
+
+Working directory: d:\Workspace\livestream\backend
+Integrity mode: development
+
+## Requirements
+
+### R1. Pricing Page & Checkout Flow (User Panel)
+- Nâng cấp giao diện trang `Subscription/Index.tsx` thành giao diện cao cấp:
+  - Hiển thị bảng so sánh tính năng (Feature Comparison Table) chi tiết giữa các gói (Free, Pro, Enterprise).
+  - Tích hợp thêm phần hiển thị số dư **Tín dụng AI (AI Credits)** còn lại và thời gian hết hạn của gói hiện tại của user.
+  - Hiển thị danh sách Lịch sử giao dịch (Transaction History) dạng bảng ngay dưới bảng giá, bao gồm các trường: Mã giao dịch, Gói đăng ký, Số tiền, Trạng thái (Thành công, Chờ thanh toán), Ngày tạo.
+- Thiết kế Modal checkout VietQR sang xịn, có đếm ngược thời gian thanh toán (10 phút), hiển thị trạng thái xử lý thời gian thực bằng hiệu ứng động (Micro-animations). Tự động gọi API kiểm tra trạng thái kích hoạt mỗi 5 giây.
+
+### R2. Feature Limits & Resource Gates (Backend & Frontend Enforcement)
+- **Giới hạn Active Streams (`limit_streams`)**: Khi người dùng tạo phiên live mới (`LiveSessionController@store`), đếm số phiên đang chạy (`connecting`, `live`). Nếu vượt quá `limit_streams` của gói đăng ký hiện tại (Free: 1, Pro: 5, Enterprise: không giới hạn -1), chặn tạo mới và trả về thông báo lỗi.
+- **Giới hạn thời lượng phiên (`max_duration_hours`)**: Khi đồng bộ trạng thái live (`LiveSessionController@fetchEvents` hoặc qua cron/job), nếu thời lượng livestream (tính từ `started_at`) vượt quá `max_duration_hours` của gói hiện tại (Free: 1 giờ, Pro: 4 giờ, Enterprise: 24 giờ), tự động dừng phiên live (`status = ended`, cập nhật `ended_at` và ghi chú lỗi thích hợp).
+- **Giới hạn Tín dụng AI (`ai_credits`)**: Thêm cột `used_ai_credits` vào bảng `user_subscriptions` (mặc định 0). Trong `AnalyzeCommentsJob`, trước khi gửi bình luận tới AI, kiểm tra xem số bình luận đã phân tích của gói hiện tại (`used_ai_credits`) có vượt quá giới hạn gói (`ai_credits` - Free: 1,000, Pro: 50,000, Enterprise: 500,000) hay không. Nếu hết, chặn phân tích và cập nhật trạng thái lỗi: "Đã hết tín dụng AI của gói dịch vụ". Khi phân tích thành công, cộng dồn số lượng bình luận vào `used_ai_credits`.
+- **Giới hạn Audio Analysis (`audio_analysis`)**: Trong `AnalyzeCommentsJob@handle`, nếu gói đăng ký hiện tại có `audio_analysis` = false, bỏ qua việc trích xuất file âm thanh từ livestream TikTok để tiết kiệm tài nguyên hệ thống (gán `$audioB64 = null`).
+- **Giới hạn Export Leads (`export_leads`)**: Trên giao diện chi tiết phiên live (`Lives/Show.tsx`), nếu gói đăng ký hiện tại có `export_leads` = false, nút "Xuất leads CSV" và "Sao chép Leads" sẽ bị khóa (hoặc hiển thị modal yêu cầu nâng cấp gói khi bấm vào).
+
+### R3. Admin Package Management Upgrade
+- Nâng cấp trang quản lý gói của Admin (`Admin/Packages/Index.tsx`) để hỗ trợ cấu hình có cấu trúc cho các tính năng giới hạn (thay vì chỉ nhập text list đơn giản):
+  - Số lượng streams tối đa (input number, -1 là vô hạn).
+  - Thời lượng tối đa của một phiên live (input number, tính bằng giờ).
+  - Số lượng bình luận phân tích AI tối đa (input number, -1 là vô hạn).
+  - Phân tích âm thanh (toggle/switch hoặc checkbox).
+  - Xuất leads CSV (toggle/switch hoặc checkbox).
+- Lưu các tính năng này chuẩn hóa dưới dạng JSON trong cột `features` của model `SubscriptionPackage`.
+
+### R4. Performance & Validation
+- Tạo một migration bổ sung cột `used_ai_credits` (mặc định 0) vào bảng `user_subscriptions`.
+- Chia sẻ thông tin gói đăng ký hiện tại, hạn mức sử dụng (used vs max) thông qua Middleware `HandleInertiaRequests` để toàn bộ frontend React đều dễ dàng truy cập và kiểm tra quyền.
+- Đảm bảo tất cả các test suite của Laravel (`php artisan test`) đều pass 100%, không bị ảnh hưởng bởi logic phân quyền mới.
+- Biên dịch thành công assets (`npm run build`) không phát sinh lỗi TypeScript.
+
+## Acceptance Criteria
+
+### Frontend Pricing & Checkout
+- [ ] Giao diện `Subscription/Index.tsx` hiển thị bảng so sánh chi tiết tính năng, trạng thái tín dụng AI, và danh sách lịch sử giao dịch rõ ràng.
+- [ ] Modal thanh toán hiển thị VietQR với MB Bank, đúng nội dung chuyển khoản, hỗ trợ copy clipboard nhanh, đếm ngược thời gian thanh toán và tự động cập nhật trạng thái khi nhận được tiền.
+- [ ] Chia sẻ thông tin subscription qua Inertia Share để hiển thị trạng thái và giới hạn quyền lợi ở Dashboard, Lives Setup và Lives Show.
+
+### Backend Enforcement (Feature Gates)
+- [ ] Chặn tạo live session nếu vượt quá số lượng active streams cho phép.
+- [ ] Tự động kết thúc phiên live và cập nhật trạng thái nếu thời lượng live vượt quá `max_duration_hours`.
+- [ ] Tích lũy số comment phân tích vào `used_ai_credits` và chặn phân tích AI tiếp tục nếu vượt quá `ai_credits` của gói.
+- [ ] `AnalyzeCommentsJob` tự động bỏ qua trích xuất audio nếu gói hiện tại không cho phép `audio_analysis`.
+- [ ] Admin có thể cập nhật các cấu hình `limit_streams`, `max_duration_hours`, `ai_credits`, `audio_analysis`, `export_leads` một cách trực quan trong trang quản lý gói.
+- [ ] Các unit/feature test chạy thành công 100%.
+
+## Follow-up — 2026-05-21T23:35:20+07:00
+
+Thiết kế và hoàn thiện tối ưu hệ thống gói dịch vụ đăng ký (Subscription Packages), trang mua gói (Pricing & Checkout), quản lý giao dịch và cấu hình phân chia tính năng giới hạn nâng cao (Active Streams, Max Duration, AI Credits, Audio, Export) ở cả Frontend và Backend cho nền tảng SaaS LiveStream AI.
+
+Working directory: d:\Workspace\livestream\backend
+Integrity mode: development
+
+## Requirements
+
+### R1. Pricing Page, Live Usage Indicators & Checkout Flow (User Panel)
+- **Giao diện bảng giá cao cấp (`Subscription/Index.tsx`)**:
+  - Thiết kế UI hiện đại, responsive, sử dụng gradient đẹp mắt và các hover micro-animations sinh động.
+  - Hiển thị bảng so sánh tính năng (Feature Comparison Table) chi tiết giữa các gói (Free, Pro, Enterprise).
+  - Tích hợp khu vực hiển thị trực quan mức độ sử dụng tài nguyên hiện tại: **AI Credits** (thanh progress bar phần trăm sử dụng kèm số cụ thể), số lượng **Active Streams** đang chạy / tối đa, thời gian hết hạn của gói hiện tại.
+  - Bảng lịch sử giao dịch (Transaction History) hiển thị đầy đủ, phân trang rõ ràng, định dạng tiền tệ VND và Badge màu sắc tương ứng trạng thái (Thành công, Đang xử lý, Thất bại).
+- **Trải nghiệm Checkout VietQR nâng cao**:
+  - Modal thanh toán hiển thị VietQR với logo ngân hàng và thông tin tài khoản chuyên nghiệp.
+  - Hỗ trợ nút Copy nhanh cho số tài khoản và nội dung chuyển khoản chuyển màu xanh khi copy thành công.
+  - Cơ chế đếm ngược 10 phút. Khi hết hạn, QR code tự động chuyển grayscale, khóa nút xác nhận, và hiển thị thông báo giao dịch đã hết hạn.
+  - Polling trạng thái thanh toán tự động mỗi 5 giây khi modal mở. Nếu backend kích hoạt thành công, đóng modal và bắn toast thông báo chúc mừng kèm theo reload page.
+
+### R2. Feature Limits & Resource Gates (Backend Gating & Graceful Stop)
+- **Chặn Active Streams (`limit_streams`)**:
+  - Khi tạo livestream mới (`LiveSessionController@store`), đếm các luồng có status `connecting` hoặc `live`. Nếu vượt quá giới hạn gói (ví dụ Free: 1, Pro: 5), chặn và trả về lỗi `403 Forbidden` kèm thông điệp rõ ràng yêu cầu nâng cấp gói.
+- **Tự động đóng Live quá thời lượng (`max_duration_hours`)**:
+  - Định kỳ (trong Job đồng bộ hoặc khi fetch events của session), tính toán thời gian chạy thực tế của livestream. Nếu vượt quá `max_duration_hours` của gói, tự động stop livestream, ghi nhận `ended_at`, chuyển status sang `ended`, và lưu message lỗi chi tiết: "Livestream bị dừng tự động do vượt quá giới hạn thời lượng của gói dịch vụ".
+- **Kiểm soát Tín dụng AI (`ai_credits` & `used_ai_credits`)**:
+  - Trong `AnalyzeCommentsJob`, kiểm tra số credits khả dụng trước khi gọi AI. Nếu số credits đã sử dụng (`used_ai_credits`) vượt quá hoặc bằng `ai_credits` cho phép, hủy bỏ phân tích, gán log lỗi: "Đã hết tín dụng AI của gói dịch vụ" để bảo vệ tài nguyên hệ thống. Tích lũy số credit thực tế đã tiêu hao sau mỗi lần phân tích thành công vào DB.
+- **Bảo vệ tính năng nâng cao (`audio_analysis`, `export_leads`)**:
+  - Nếu gói không hỗ trợ `audio_analysis` (false), bỏ qua việc gọi API trích xuất âm thanh TikTok, gán null để tiết kiệm tài nguyên mạng/băng thông.
+  - Nếu gói không hỗ trợ `export_leads` (false), ẩn/khóa nút "Xuất leads CSV" và "Sao chép Leads" trên trang `Lives/Show.tsx`, hiển thị popup gợi ý nâng cấp gói dịch vụ khi click.
+
+### R3. Admin Package & Payment Configurations CRUD
+- **Quản lý gói đăng ký trực quan (`Admin/Packages/Index.tsx`)**:
+  - Thiết kế form thêm/sửa gói dịch vụ cho phép cấu hình trực tiếp các tham số giới hạn dưới dạng input số và checkbox (limit_streams, max_duration_hours, ai_credits, audio_analysis, export_leads) thay vì nhập text thô.
+  - Đảm bảo dữ liệu được lưu chuẩn hóa dưới dạng JSON trong trường `features` ở database.
+  - Cung cấp cơ chế Backward Compatibility tự động convert dữ liệu cũ từ dạng mảng text sang JSON object khi cập nhật hoặc truy xuất.
+- **Thiết lập Cổng Thanh toán VietQR**:
+  - Trang Admin cấu hình tài khoản nhận tiền, thiết lập prefix/suffix chuyển khoản và link webhook callback bảo mật.
+
+### R4. Database Seeders & E2E Verification
+- Cập nhật database seeders (`DatabaseSeeder`, `SubscriptionPackageSeeder`) để tự động tạo đầy đủ các gói Free, Pro, Enterprise với cấu hình feature chuẩn.
+- Viết/Cập nhật các test suite bảo đảm độ bao phủ (coverage) 100% cho:
+  - Chặn stream quá hạn mức, tự động ngắt livestream chạy quá giờ.
+  - Chặn phân tích AI khi hết credits.
+  - Kiểm thử xử lý concurrency trong checkout & webhook callback để chống double-activation.
+
+## Acceptance Criteria
+
+### User Interface & Checkout Experience
+- [ ] Trang `Subscription/Index.tsx` hiển thị thông tin gói hiện tại, thanh tiến trình sử dụng AI credits chi tiết, bảng so sánh tính năng và lịch sử giao dịch.
+- [ ] Modal thanh toán VietQR hiển thị mã QR nét, nút Copy hoạt động đúng, đếm ngược 10 phút, tự động chuyển màu grayscale khi hết giờ, tự động đóng và reload khi kích hoạt thành công qua polling.
+- [ ] Giao diện chi tiết livestream (`Lives/Show.tsx`) khóa tính năng xuất lead nếu gói hiện tại không hỗ trợ và hiển thị Upgrade Dialog.
+
+### System Enforcement & Admin Control
+- [ ] Backend chặn tạo stream vượt quá giới hạn và tự động kết thúc stream quá thời lượng tối đa.
+- [ ] Job phân tích bình luận kiểm tra tín dụng AI còn lại, cập nhật đúng số credits đã dùng và tắt phân tích audio nếu gói không hỗ trợ.
+- [ ] Admin CRUD Packages lưu cấu trúc JSON `features` thành công, có cơ chế xử lý tương thích ngược dữ liệu cũ.
+- [ ] Chạy `php artisan test` pass 100% và `npm run build` không có lỗi TypeScript.

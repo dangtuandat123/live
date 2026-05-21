@@ -33,24 +33,53 @@ import {
 import * as React from "react"
 import { toast } from "sonner"
 import axios from "axios"
+import { Progress } from "@/components/ui/progress"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+
+interface PackageFeatures {
+  limit_streams: number
+  max_duration_hours: number
+  ai_credits: number
+  audio_analysis: boolean
+  export_leads: boolean
+}
 
 interface SubscriptionPackage {
   id: number
   name: string
   price: number
   duration_days: number
-  features: string[] | null
+  features: PackageFeatures | null
 }
 
 interface ActiveSubscription {
   package_id: number
   package_name: string
   expires_at: string
+  used_ai_credits: number
+  features: PackageFeatures
+}
+
+interface Transaction {
+  id: number
+  transaction_id: string
+  package_name: string
+  amount: number
+  status: string
+  created_at: string
 }
 
 interface Props {
   packages: SubscriptionPackage[]
   activeSubscription: ActiveSubscription | null
+  transactions: Transaction[]
   auth: {
     user: {
       id: number
@@ -60,7 +89,7 @@ interface Props {
   }
 }
 
-export default function SubscriptionIndex({ packages = [], activeSubscription, auth }: Props) {
+export default function SubscriptionIndex({ packages = [], activeSubscription, transactions = [], auth }: Props) {
   const [selectedPkg, setSelectedPkg] = React.useState<SubscriptionPackage | null>(null)
   const [isCheckoutOpen, setIsCheckoutOpen] = React.useState(false)
   const [loadingCheckout, setLoadingCheckout] = React.useState(false)
@@ -71,11 +100,30 @@ export default function SubscriptionIndex({ packages = [], activeSubscription, a
 
   const [copied, setCopied] = React.useState(false)
   const [isCheckingPayment, setIsCheckingPayment] = React.useState(false)
+  const [timeLeft, setTimeLeft] = React.useState<number>(600)
+
+  React.useEffect(() => {
+    if (isCheckoutOpen) {
+      setTimeLeft(600)
+    }
+  }, [isCheckoutOpen])
+
+  React.useEffect(() => {
+    let timerId: any;
+    if (isCheckoutOpen && timeLeft > 0) {
+      timerId = setInterval(() => {
+        setTimeLeft((prev) => prev - 1)
+      }, 1000)
+    }
+    return () => {
+      if (timerId) clearInterval(timerId)
+    }
+  }, [isCheckoutOpen, timeLeft])
 
   React.useEffect(() => {
     let intervalId: any;
 
-    if (isCheckoutOpen && selectedPkg && checkoutData?.vietqr_url) {
+    if (isCheckoutOpen && selectedPkg && checkoutData?.vietqr_url && timeLeft > 0) {
       intervalId = setInterval(async () => {
         try {
           const response = await axios.get("/api/subscription/status")
@@ -97,7 +145,7 @@ export default function SubscriptionIndex({ packages = [], activeSubscription, a
         clearInterval(intervalId)
       }
     }
-  }, [isCheckoutOpen, selectedPkg, checkoutData])
+  }, [isCheckoutOpen, selectedPkg, checkoutData, timeLeft > 0])
 
   // Định dạng số tiền
   function formatMoney(amount: number) {
@@ -212,8 +260,8 @@ export default function SubscriptionIndex({ packages = [], activeSubscription, a
           <div className="absolute top-0 right-0 p-4 opacity-10">
             <SparklesIcon className="size-24 text-primary" />
           </div>
-          <CardContent className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-1">
+          <CardContent className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-1 flex-1">
               <span className="text-xs font-semibold text-primary uppercase tracking-wider">Gói đăng ký hiện tại</span>
               <div className="flex items-center gap-2">
                 <h3 className="text-2xl font-bold text-foreground">
@@ -231,9 +279,29 @@ export default function SubscriptionIndex({ packages = [], activeSubscription, a
                 )}
               </p>
             </div>
+
+            {/* AI Credits Usage progress */}
+            <div className="w-full md:w-80 space-y-2 bg-background/50 p-4 rounded-xl border border-border/40">
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-medium text-muted-foreground">AI Credits:</span>
+                <span className="font-bold text-foreground">
+                  {(activeSubscription?.used_ai_credits ?? 0).toLocaleString()} / {activeSubscription?.features?.ai_credits === -1 ? "Vô hạn" : (activeSubscription?.features?.ai_credits ?? 1000).toLocaleString()}
+                </span>
+              </div>
+              {activeSubscription?.features?.ai_credits === -1 ? (
+                <div className="h-2 w-full rounded-full bg-primary/20 overflow-hidden">
+                  <div className="h-full bg-primary w-full" />
+                </div>
+              ) : (
+                <Progress
+                  value={Math.min(100, Math.max(0, ((activeSubscription?.used_ai_credits ?? 0) / (activeSubscription?.features?.ai_credits ?? 1000)) * 100))}
+                  className="h-2"
+                />
+              )}
+            </div>
             
             {activeSubscription && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground bg-background/50 px-3 py-2 rounded-lg border border-border/40">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground bg-background/50 px-3 py-2 rounded-lg border border-border/40 w-full md:w-auto max-w-xs">
                 <InfoIcon className="size-4 text-primary shrink-0" />
                 <span>Gói dịch vụ sẽ tự động hết hạn, bạn có thể gia hạn bất cứ lúc nào bằng cách mua thêm gói.</span>
               </div>
@@ -281,13 +349,37 @@ export default function SubscriptionIndex({ packages = [], activeSubscription, a
                   <div className="space-y-2.5 flex-1">
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tính năng đi kèm:</span>
                     <ul className="space-y-2 text-sm text-muted-foreground">
-                      {pkg.features && pkg.features.length > 0 ? (
-                        pkg.features.map((feat, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
+                      {pkg.features ? (
+                        <>
+                          <li className="flex items-start gap-2">
                             <CheckIcon className="size-4 text-emerald-500 shrink-0 mt-0.5" />
-                            <span>{feat}</span>
+                            <span>{pkg.features.limit_streams === -1 ? "Vô hạn phiên livestream" : `Tối đa ${pkg.features.limit_streams} phiên livestream`}</span>
                           </li>
-                        ))
+                          <li className="flex items-start gap-2">
+                            <CheckIcon className="size-4 text-emerald-500 shrink-0 mt-0.5" />
+                            <span>Thời lượng tối đa {pkg.features.max_duration_hours} giờ / phiên</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <CheckIcon className="size-4 text-emerald-500 shrink-0 mt-0.5" />
+                            <span>{pkg.features.ai_credits.toLocaleString()} AI Credits</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            {pkg.features.audio_analysis ? (
+                              <CheckIcon className="size-4 text-emerald-500 shrink-0 mt-0.5" />
+                            ) : (
+                              <span className="size-4 text-red-500 shrink-0 mt-0.5 font-bold flex items-center justify-center">×</span>
+                            )}
+                            <span className={pkg.features.audio_analysis ? "" : "line-through text-muted-foreground/60"}>Phân tích âm thanh nâng cao</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            {pkg.features.export_leads ? (
+                              <CheckIcon className="size-4 text-emerald-500 shrink-0 mt-0.5" />
+                            ) : (
+                              <span className="size-4 text-red-500 shrink-0 mt-0.5 font-bold flex items-center justify-center">×</span>
+                            )}
+                            <span className={pkg.features.export_leads ? "" : "line-through text-muted-foreground/60"}>Xuất danh sách lead (CSV)</span>
+                          </li>
+                        </>
                       ) : (
                         <li className="flex items-start gap-2 italic">
                           <span>Đầy đủ tính năng phân tích live cơ bản</span>
@@ -317,6 +409,123 @@ export default function SubscriptionIndex({ packages = [], activeSubscription, a
             )
           })}
         </div>
+
+        {/* Bảng so sánh tính năng */}
+        <div className="space-y-4 pt-4">
+          <h2 className="text-xl font-bold text-foreground">So sánh tính năng</h2>
+          <Card className="border border-border/60 shadow-sm overflow-hidden bg-background/60">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-1/3">Tính năng</TableHead>
+                  {packages.map((pkg) => (
+                    <TableHead key={pkg.id} className="text-center font-bold">
+                      {pkg.name}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow>
+                  <TableCell className="font-medium text-foreground">Số livestream đồng thời</TableCell>
+                  {packages.map((pkg) => (
+                    <TableCell key={pkg.id} className="text-center">
+                      {pkg.features?.limit_streams === -1 ? "Vô hạn" : `${pkg.features?.limit_streams ?? 0} luồng`}
+                    </TableCell>
+                  ))}
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium text-foreground">Thời lượng tối đa / phiên</TableCell>
+                  {packages.map((pkg) => (
+                    <TableCell key={pkg.id} className="text-center">
+                      {pkg.features?.max_duration_hours ?? 0} giờ
+                    </TableCell>
+                  ))}
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium text-foreground">AI Credits</TableCell>
+                  {packages.map((pkg) => (
+                    <TableCell key={pkg.id} className="text-center">
+                      {pkg.features?.ai_credits?.toLocaleString() ?? 0}
+                    </TableCell>
+                  ))}
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium text-foreground">Phân tích âm thanh nâng cao</TableCell>
+                  {packages.map((pkg) => (
+                    <TableCell key={pkg.id} className="text-center">
+                      {pkg.features?.audio_analysis ? (
+                        <CheckIcon className="size-5 text-emerald-500 mx-auto" />
+                      ) : (
+                        <span className="text-red-500 text-lg">×</span>
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium text-foreground">Xuất danh sách lead (CSV)</TableCell>
+                  {packages.map((pkg) => (
+                    <TableCell key={pkg.id} className="text-center">
+                      {pkg.features?.export_leads ? (
+                        <CheckIcon className="size-5 text-emerald-500 mx-auto" />
+                      ) : (
+                        <span className="text-red-500 text-lg">×</span>
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableBody>
+            </Table>
+          </Card>
+        </div>
+
+        {/* Lịch sử giao dịch */}
+        <div className="space-y-4 pt-4">
+          <h2 className="text-xl font-bold text-foreground">Lịch sử giao dịch</h2>
+          <Card className="border border-border/60 shadow-sm overflow-hidden bg-background/60">
+            {transactions.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Mã giao dịch</TableHead>
+                    <TableHead>Tên gói</TableHead>
+                    <TableHead>Số tiền</TableHead>
+                    <TableHead>Trạng thái</TableHead>
+                    <TableHead>Ngày tạo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {transactions.map((tx) => (
+                    <TableRow key={tx.id}>
+                      <TableCell className="font-mono font-medium text-foreground">{tx.transaction_id}</TableCell>
+                      <TableCell>{tx.package_name}</TableCell>
+                      <TableCell className="tabular-nums font-semibold">{formatMoney(tx.amount)}</TableCell>
+                      <TableCell>
+                        {tx.status === "success" && (
+                          <Badge className="bg-emerald-500 text-white hover:bg-emerald-600">Thành công</Badge>
+                        )}
+                        {tx.status === "pending" && (
+                          <Badge variant="outline" className="text-amber-600 border-amber-500 bg-amber-50/50 hover:bg-amber-100/50">Chờ xử lý</Badge>
+                        )}
+                        {tx.status === "failed" && (
+                          <Badge variant="destructive">Thất bại</Badge>
+                        )}
+                        {tx.status !== "success" && tx.status !== "pending" && tx.status !== "failed" && (
+                          <Badge variant="secondary">{tx.status}</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{tx.created_at}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground text-sm">
+                Không có lịch sử giao dịch nào.
+              </div>
+            )}
+          </Card>
+        </div>
       </div>
 
       {/* CHECKOUT MODAL CHO GÓI TRẢ PHÍ */}
@@ -338,9 +547,21 @@ export default function SubscriptionIndex({ packages = [], activeSubscription, a
                 <img
                   src={checkoutData.vietqr_url}
                   alt="VietQR Code"
-                  className="w-full h-full object-contain"
+                  className={`w-full h-full object-contain ${timeLeft === 0 ? "filter grayscale opacity-30" : ""}`}
                 />
               </div>
+
+              {timeLeft > 0 ? (
+                <div className="flex items-center gap-2 text-sm font-semibold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200 animate-pulse">
+                  <Loader2Icon className="size-4 animate-spin text-amber-500" />
+                  <span>Đang chờ chuyển khoản... ({Math.floor(timeLeft / 60).toString().padStart(2, "0")}:{(timeLeft % 60).toString().padStart(2, "0")})</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-sm font-semibold text-red-600 bg-red-50 px-3 py-1.5 rounded-full border border-red-200">
+                  <AlertCircleIcon className="size-4 shrink-0" />
+                  <span>Mã thanh toán đã hết hạn (10 phút). Vui lòng đóng và thực hiện lại giao dịch.</span>
+                </div>
+              )}
 
               {/* Thông tin chuyển khoản */}
               <div className="w-full space-y-3 bg-muted/50 p-4 rounded-xl border border-border/40 text-sm">
@@ -367,6 +588,7 @@ export default function SubscriptionIndex({ packages = [], activeSubscription, a
                       variant="ghost"
                       className="size-7 hover:bg-background/80"
                       onClick={handleCopyContent}
+                      disabled={timeLeft === 0}
                     >
                       {copied ? (
                         <CheckCircle2Icon className="size-3.5 text-emerald-500" />
@@ -400,7 +622,7 @@ export default function SubscriptionIndex({ packages = [], activeSubscription, a
             <Button
               type="button"
               onClick={handleConfirmPaid}
-              disabled={isCheckingPayment}
+              disabled={isCheckingPayment || timeLeft === 0}
               className="w-full sm:w-auto bg-primary text-primary-foreground"
             >
               {isCheckingPayment ? (

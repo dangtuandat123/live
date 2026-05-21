@@ -862,6 +862,18 @@ function QuestionsPanel() {
 
 function CustomersPanel() {
   const { potentialCustomers } = useLiveData()
+  const { auth } = usePage().props as unknown as {
+    auth: {
+      subscription: {
+        features?: {
+          export_leads?: boolean
+        }
+      } | null
+    }
+  }
+  const [showUpgradeDialog, setShowUpgradeDialog] = React.useState(false)
+  const canExportLeads = auth?.subscription?.features?.export_leads ?? false
+
   const [search, setSearch] = React.useState("")
   const [copiedPhone, setCopiedPhone] = React.useState<number | null>(null)
   const [copiedAll, setCopiedAll] = React.useState(false)
@@ -877,6 +889,10 @@ function CustomersPanel() {
     setTimeout(() => setCopiedPhone(null), 1500)
   }
   const handleCopyAll = () => {
+    if (!canExportLeads) {
+      setShowUpgradeDialog(true)
+      return
+    }
     copyLeadsToClipboard(filtered)
     setCopiedAll(true)
     setTimeout(() => setCopiedAll(false), 2000)
@@ -905,7 +921,18 @@ function CustomersPanel() {
               {copiedAll ? <CheckIcon className="size-3 text-emerald-500" /> : <ClipboardListIcon className="size-3" />}
               {copiedAll ? "Đã copy" : "Copy tất cả"}
             </Button>
-            <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => exportLeadsCSV(filtered)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => {
+                if (!canExportLeads) {
+                  setShowUpgradeDialog(true)
+                } else {
+                  exportLeadsCSV(filtered)
+                }
+              }}
+            >
               <DownloadIcon className="size-3" />
               Xuất CSV
             </Button>
@@ -1056,6 +1083,34 @@ function CustomersPanel() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setOrderDialog({ open: false, customerIdx: null })}>Hủy</Button>
             <Button onClick={saveOrder} className="gap-1.5"><CheckIcon className="size-4" />Lưu đơn</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Upgrade Dialog */}
+      <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <SparklesIcon className="size-5 text-primary" /> Yêu cầu nâng cấp gói dịch vụ
+            </DialogTitle>
+            <DialogDescription>
+              Tính năng xuất danh sách khách hàng tiềm năng (CSV & Copy) chỉ dành cho thành viên sử dụng gói Pro hoặc Enterprise. Vui lòng nâng cấp gói dịch vụ để mở khóa tính năng này.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setShowUpgradeDialog(false)}>
+              Đóng
+            </Button>
+            <Button
+              onClick={() => {
+                setShowUpgradeDialog(false)
+                router.visit('/subscription')
+              }}
+              className="bg-primary text-primary-foreground"
+            >
+              Nâng cấp ngay
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

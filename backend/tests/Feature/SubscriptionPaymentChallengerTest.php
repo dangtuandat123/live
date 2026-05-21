@@ -8,7 +8,7 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Models\UserSubscription;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class SubscriptionPaymentChallengerTest extends TestCase
@@ -21,7 +21,7 @@ class SubscriptionPaymentChallengerTest extends TestCase
      */
     public function test_callback_same_price_different_package_bug()
     {
-        \Illuminate\Support\Facades\Queue::fake();
+        Queue::fake();
 
         $user = User::factory()->create();
         $config = PaymentConfig::factory()->create(['is_active' => true]);
@@ -70,7 +70,7 @@ class SubscriptionPaymentChallengerTest extends TestCase
         $activeSub = $user->activeSubscription;
 
         $this->assertNotNull($activeSub, 'An active subscription should have been created');
-        
+
         // Assert that the active subscription is indeed for Package B (the one they checked out)
         // This will FAIL if the system resolved to Package A by price instead of using the pending transaction's package.
         $this->assertEquals(
@@ -82,7 +82,7 @@ class SubscriptionPaymentChallengerTest extends TestCase
         $this->assertEquals(
             60,
             $activeSub->starts_at->diffInDays($activeSub->expires_at),
-            "Expected subscription duration to be 60 days, but got: " . $activeSub->starts_at->diffInDays($activeSub->expires_at)
+            'Expected subscription duration to be 60 days, but got: '.$activeSub->starts_at->diffInDays($activeSub->expires_at)
         );
     }
 
@@ -92,7 +92,7 @@ class SubscriptionPaymentChallengerTest extends TestCase
      */
     public function test_callback_duplicate_requests_cause_double_crediting()
     {
-        \Illuminate\Support\Facades\Queue::fake();
+        Queue::fake();
 
         $user = User::factory()->create();
         $config = PaymentConfig::factory()->create(['is_active' => true]);
@@ -127,15 +127,15 @@ class SubscriptionPaymentChallengerTest extends TestCase
             'id_user' => $user->id,
             'sotien' => 200000,
         ]);
-        
+
         $callback2->assertStatus(200);
 
         $user->unsetRelation('activeSubscription');
         $activeSub2 = $user->activeSubscription;
-        
+
         // If it was double-credited, the expires_at will have been extended to 60 days
         $duration = $activeSub2->starts_at->diffInDays($activeSub2->expires_at);
-        
+
         $this->assertEquals(
             30,
             $duration,
@@ -146,7 +146,7 @@ class SubscriptionPaymentChallengerTest extends TestCase
         $successTransactionCount = Transaction::where('user_id', $user->id)
             ->where('status', 'success')
             ->count();
-            
+
         $this->assertEquals(
             1,
             $successTransactionCount,
@@ -198,7 +198,7 @@ class SubscriptionPaymentChallengerTest extends TestCase
     public function test_package_delete_association_prevention(): void
     {
         $admin = User::factory()->create(['role' => 'admin', 'email_verified_at' => now()]);
-        
+
         // 1. Package with subscription
         $packageWithSub = SubscriptionPackage::create([
             'name' => 'Package with Sub',

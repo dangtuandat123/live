@@ -19,6 +19,8 @@ class SubscriptionPackageSeeder extends Seeder
                 'duration_days' => 30,
                 'features' => [
                     'limit_streams' => 1,
+                    'max_duration_hours' => 1,
+                    'ai_credits' => 1000,
                     'audio_analysis' => false,
                     'export_leads' => false,
                 ],
@@ -29,6 +31,8 @@ class SubscriptionPackageSeeder extends Seeder
                 'duration_days' => 30,
                 'features' => [
                     'limit_streams' => 5,
+                    'max_duration_hours' => 4,
+                    'ai_credits' => 50000,
                     'audio_analysis' => true,
                     'export_leads' => true,
                 ],
@@ -39,6 +43,8 @@ class SubscriptionPackageSeeder extends Seeder
                 'duration_days' => 90,
                 'features' => [
                     'limit_streams' => -1,
+                    'max_duration_hours' => 24,
+                    'ai_credits' => 500000,
                     'audio_analysis' => true,
                     'export_leads' => true,
                 ],

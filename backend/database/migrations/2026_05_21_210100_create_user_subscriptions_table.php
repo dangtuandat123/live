@@ -18,6 +18,7 @@ return new class extends Migration
             $table->timestamp('starts_at')->nullable();
             $table->timestamp('expires_at')->nullable();
             $table->string('status')->default('active')->index();
+            $table->unsignedInteger('used_ai_credits')->default(0);
             $table->timestamps();
         });
     }

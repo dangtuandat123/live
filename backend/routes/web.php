@@ -7,7 +7,11 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingsController;
 use App\Models\LiveSession;
+use App\Models\PaymentConfig;
+use App\Models\SubscriptionPackage;
+use App\Models\Transaction;
 use App\Models\User;
+use App\Models\UserSubscription;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -206,11 +210,12 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
 
     // Gói dịch vụ (CRUD packages)
     Route::get('/packages', function () {
-        $packages = \App\Models\SubscriptionPackage::orderBy('price')->get();
+        $packages = SubscriptionPackage::orderBy('price')->get();
+
         return Inertia::render('Admin/Packages/Index', ['packages' => $packages]);
     })->name('admin.packages.index');
 
-    Route::post('/packages', function (\Illuminate\Http\Request $request) {
+    Route::post('/packages', function (Request $request) {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'price' => ['required', 'integer', 'min:0'],
@@ -218,11 +223,12 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
             'features' => ['nullable', 'array'],
         ]);
 
-        \App\Models\SubscriptionPackage::create($validated);
+        SubscriptionPackage::create($validated);
+
         return back()->with('success', 'Đã tạo gói dịch vụ mới thành công.');
     })->name('admin.packages.store');
 
-    Route::put('/packages/{package}', function (\Illuminate\Http\Request $request, \App\Models\SubscriptionPackage $package) {
+    Route::put('/packages/{package}', function (Request $request, SubscriptionPackage $package) {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'price' => ['required', 'integer', 'min:0'],
@@ -231,32 +237,35 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
         ]);
 
         $package->update($validated);
+
         return back()->with('success', 'Đã cập nhật gói dịch vụ thành công.');
     })->name('admin.packages.update');
 
-    Route::delete('/packages/{package}', function (\App\Models\SubscriptionPackage $package) {
-        $hasAssociations = \App\Models\UserSubscription::where('subscription_package_id', $package->id)->exists()
-            || \App\Models\Transaction::where('subscription_package_id', $package->id)->exists();
+    Route::delete('/packages/{package}', function (SubscriptionPackage $package) {
+        $hasAssociations = UserSubscription::where('subscription_package_id', $package->id)->exists()
+            || Transaction::where('subscription_package_id', $package->id)->exists();
         if ($hasAssociations) {
             return back()->withErrors(['error' => 'Không thể xóa gói dịch vụ đã có lịch sử đăng ký hoặc giao dịch.']);
         }
         try {
             $package->delete();
-        } catch (\Exception $e) {
-            return back()->withErrors(['error' => 'Lỗi khi xóa gói dịch vụ: ' . $e->getMessage()]);
+        } catch (Exception $e) {
+            return back()->withErrors(['error' => 'Lỗi khi xóa gói dịch vụ: '.$e->getMessage()]);
         }
+
         return back()->with('success', 'Đã xóa gói dịch vụ thành công.');
     })->name('admin.packages.destroy');
 
     // Cấu hình thanh toán & webhook
     Route::get('/payments', function () {
-        $config = \App\Models\PaymentConfig::where('is_active', true)->first() 
-            ?? \App\Models\PaymentConfig::first() 
-            ?? new \App\Models\PaymentConfig();
+        $config = PaymentConfig::where('is_active', true)->first()
+            ?? PaymentConfig::first()
+            ?? new PaymentConfig;
+
         return Inertia::render('Admin/Payments/Index', ['config' => $config]);
     })->name('admin.payments.index');
 
-    Route::put('/payments', function (\Illuminate\Http\Request $request) {
+    Route::put('/payments', function (Request $request) {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'prefix' => ['nullable', 'string', 'max:50'],
@@ -267,12 +276,12 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
             'headers_template' => ['nullable', 'array'],
         ]);
 
-        $config = \App\Models\PaymentConfig::where('is_active', true)->first() ?? \App\Models\PaymentConfig::first();
+        $config = PaymentConfig::where('is_active', true)->first() ?? PaymentConfig::first();
         if ($config) {
             $config->update($validated);
         } else {
             $validated['is_active'] = true;
-            \App\Models\PaymentConfig::create($validated);
+            PaymentConfig::create($validated);
         }
 
         return back()->with('success', 'Đã cập nhật cấu hình thanh toán thành công.');
@@ -282,15 +291,35 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
 Route::middleware(['auth', 'verified'])->group(function () {
     // Giao diện mua gói đăng ký và thanh toán của User
     Route::get('/subscription', function () {
-        $packages = \App\Models\SubscriptionPackage::orderBy('price')->get();
-        $activeSub = auth()->user()->activeSubscription;
+        $packages = SubscriptionPackage::orderBy('price')->get();
+        $user = auth()->user();
+        $activeSub = $user->resolveActiveSubscription();
+
+        $transactions = $user->transactions()
+            ->with('package')
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function ($t) {
+                return [
+                    'id' => $t->id,
+                    'transaction_id' => $t->transaction_id,
+                    'package_name' => $t->package?->name ?? 'Free',
+                    'amount' => $t->amount,
+                    'status' => $t->status,
+                    'created_at' => $t->created_at?->format('d/m/Y H:i'),
+                ];
+            });
+
         return Inertia::render('Subscription/Index', [
             'packages' => $packages,
             'activeSubscription' => $activeSub ? [
                 'package_id' => $activeSub->subscription_package_id,
                 'expires_at' => $activeSub->expires_at?->format('d/m/Y H:i') ?? 'Vĩnh viễn',
                 'package_name' => $activeSub->package?->name ?? 'Free',
+                'used_ai_credits' => $activeSub->used_ai_credits ?? 0,
+                'features' => $user->getSubscriptionFeatures(),
             ] : null,
+            'transactions' => $transactions,
         ]);
     })->name('subscription.index');
 });

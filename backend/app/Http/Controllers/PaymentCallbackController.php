@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\UserSubscription;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class PaymentCallbackController extends Controller
@@ -51,19 +52,20 @@ class PaymentCallbackController extends Controller
             if ($transaction) {
                 $package = SubscriptionPackage::find($transaction->subscription_package_id);
             }
-            if (!$package) {
+            if (! $package) {
                 $package = SubscriptionPackage::where('price', $amount)->first();
             }
 
-            if (!$package) {
+            if (! $package) {
                 DB::rollBack();
+
                 return response()->json([
                     'error' => 'Unprocessable Content',
                     'message' => "No subscription package found for price {$amount}.",
                 ], 422);
             }
 
-            if (!$transaction) {
+            if (! $transaction) {
                 $recentSuccess = Transaction::where('user_id', $userId)
                     ->where('amount', $amount)
                     ->where('status', 'success')
@@ -74,6 +76,7 @@ class PaymentCallbackController extends Controller
 
                 if ($recentSuccess) {
                     DB::rollBack();
+
                     return response()->json([
                         'success' => true,
                         'message' => 'Subscription upgraded successfully (duplicate callback ignored)',
@@ -133,7 +136,7 @@ class PaymentCallbackController extends Controller
                 try {
                     SendOutboundPaymentWebhookJob::dispatch($transaction->id);
                 } catch (\Exception $webhookEx) {
-                    \Illuminate\Support\Facades\Log::error('Outbound webhook failed: ' . $webhookEx->getMessage());
+                    Log::error('Outbound webhook failed: '.$webhookEx->getMessage());
                 }
             }
 

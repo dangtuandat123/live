@@ -29,10 +29,28 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $user = $request->user();
+        $subscription = null;
+
+        if ($user) {
+            $user->resolveActiveSubscription();
+            $activeSub = $user->activeSubscription;
+
+            $subscription = [
+                'active' => (bool) $activeSub?->isActive(),
+                'package_id' => $activeSub?->subscription_package_id,
+                'package_name' => $activeSub?->package?->name ?? 'Free',
+                'expires_at' => $activeSub?->expires_at?->toISOString(),
+                'used_ai_credits' => $activeSub?->used_ai_credits ?? 0,
+                'features' => $user->getSubscriptionFeatures(),
+            ];
+        }
+
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $request->user(),
+                'user' => $user,
+                'subscription' => $subscription,
             ],
         ];
     }

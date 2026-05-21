@@ -6,6 +6,7 @@ use App\Ai\Agents\CommentAnalyzer;
 use App\Jobs\AnalyzeCommentsJob;
 use App\Models\LiveEvent;
 use App\Models\LiveSession;
+use App\Models\SubscriptionPackage;
 use App\Models\User;
 use App\Services\RunwareAiService;
 use App\Services\TikTokService;
@@ -171,6 +172,24 @@ class AnalyzeCommentsJobTest extends TestCase
     {
         // When TikTokService::getSnapshot throws exception, job should still work (text-only fallback)
         $user = User::factory()->create();
+        $package = SubscriptionPackage::create([
+            'name' => 'Premium',
+            'price' => 299000,
+            'duration_days' => 30,
+            'features' => [
+                'audio_analysis' => true,
+                'limit_streams' => -1,
+                'max_duration_hours' => 24,
+                'ai_credits' => -1,
+            ],
+        ]);
+        $user->subscriptions()->create([
+            'subscription_package_id' => $package->id,
+            'starts_at' => now(),
+            'expires_at' => now()->addDays(30),
+            'status' => 'active',
+            'used_ai_credits' => 0,
+        ]);
 
         $session = LiveSession::create([
             'user_id' => $user->id,
@@ -335,6 +354,24 @@ class AnalyzeCommentsJobTest extends TestCase
     public function test_audio_present_adds_audio_section_and_part(): void
     {
         $user = User::factory()->create();
+        $package = SubscriptionPackage::create([
+            'name' => 'Premium',
+            'price' => 299000,
+            'duration_days' => 30,
+            'features' => [
+                'audio_analysis' => true,
+                'limit_streams' => -1,
+                'max_duration_hours' => 24,
+                'ai_credits' => -1,
+            ],
+        ]);
+        $user->subscriptions()->create([
+            'subscription_package_id' => $package->id,
+            'starts_at' => now(),
+            'expires_at' => now()->addDays(30),
+            'status' => 'active',
+            'used_ai_credits' => 0,
+        ]);
 
         $session = LiveSession::create([
             'user_id' => $user->id,

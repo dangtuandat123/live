@@ -57,7 +57,7 @@ class AnalyzeCommentsJob implements ShouldQueue
         $dispatchedNext = false;
 
         try {
-            $session = LiveSession::with(['products', 'keywords', 'stats'])->find($this->liveSessionId);
+            $session = LiveSession::with(['products', 'keywords', 'stats', 'user'])->find($this->liveSessionId);
             if (! $session) {
                 return;
             }
@@ -65,6 +65,26 @@ class AnalyzeCommentsJob implements ShouldQueue
             // Chỉ xử lý AI cho phiên live đang hoạt động
             if (! in_array($session->status, ['live', 'connecting'])) {
                 return;
+            }
+
+            $user = $session->user;
+            if (! $user) {
+                return;
+            }
+
+            $activeSub = $user->resolveActiveSubscription();
+            $features = $user->getSubscriptionFeatures();
+            $aiCreditsLimit = $features['ai_credits'] ?? 1000;
+
+            if ($aiCreditsLimit !== -1 && $activeSub) {
+                if ($activeSub->used_ai_credits >= $aiCreditsLimit) {
+                    $session->update([
+                        'status' => 'error',
+                        'error_message' => 'Đã hết tín dụng AI của gói dịch vụ.',
+                    ]);
+
+                    return;
+                }
             }
 
             // Batch 50 comments — giảm từ 100 để tăng accuracy
@@ -124,7 +144,8 @@ class AnalyzeCommentsJob implements ShouldQueue
 
                 // === Audio Capture: Lấy audio 3s từ livestream qua Python FFmpeg ===
                 $audioB64 = null;
-                if ($session->tiktok_session_id) {
+                $audioAnalysisEnabled = $features['audio_analysis'] ?? false;
+                if ($audioAnalysisEnabled && $session->tiktok_session_id) {
                     try {
                         $snapshot = $tiktokService->getSnapshot($session->tiktok_session_id);
                         $audioB64 = $snapshot ? ($snapshot['audio_b64'] ?? null) : null;
@@ -214,7 +235,7 @@ class AnalyzeCommentsJob implements ShouldQueue
                 ];
 
                 // Validate + save trong transaction
-                DB::transaction(function () use ($results, $unprocessed, $productNames, $session, &$batchStats) {
+                DB::transaction(function () use ($results, $unprocessed, $productNames, $session, &$batchStats, $activeSub, $commentsText) {
                     $processedIds = [];
                     $positive = 0;
                     $neutral = 0;
@@ -308,6 +329,10 @@ class AnalyzeCommentsJob implements ShouldQueue
 
                     // Cập nhật aggregate stats inside transaction
                     $this->updateAggregateStats($session, $batchStats);
+
+                    if ($activeSub) {
+                        $activeSub->increment('used_ai_credits', $commentsText->count());
+                    }
                 });
 
                 // === Memory: Lưu session_note từ AI cho batch tiếp theo ===

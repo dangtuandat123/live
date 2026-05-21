@@ -102,4 +102,50 @@ class User extends Authenticatable
             })
             ->latestOfMany();
     }
+
+    /**
+     * Resolve the active subscription or auto-subscribe to Free package if none exists.
+     */
+    public function resolveActiveSubscription(): ?UserSubscription
+    {
+        if (! $this->subscriptions()->exists()) {
+            $freePackage = SubscriptionPackage::where('price', 0)->first()
+                ?? SubscriptionPackage::where('name', 'Free')->first();
+
+            if ($freePackage) {
+                $subscription = $this->subscriptions()->create([
+                    'subscription_package_id' => $freePackage->id,
+                    'starts_at' => now(),
+                    'expires_at' => now()->addDays($freePackage->duration_days ?? 30),
+                    'status' => 'active',
+                    'used_ai_credits' => 0,
+                ]);
+                $this->unsetRelation('subscriptions');
+                $this->unsetRelation('activeSubscription');
+
+                return $subscription;
+            }
+        }
+
+        return $this->activeSubscription;
+    }
+
+    /**
+     * Get subscription features merged with defaults.
+     */
+    public function getSubscriptionFeatures(): array
+    {
+        $defaults = [
+            'limit_streams' => 1,
+            'max_duration_hours' => 1,
+            'ai_credits' => 1000,
+            'audio_analysis' => false,
+            'export_leads' => false,
+        ];
+
+        $activeSub = $this->resolveActiveSubscription();
+        $features = $activeSub && $activeSub->package ? ($activeSub->package->features ?? []) : [];
+
+        return array_merge($defaults, $features);
+    }
 }

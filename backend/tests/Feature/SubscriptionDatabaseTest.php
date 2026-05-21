@@ -211,4 +211,43 @@ class SubscriptionDatabaseTest extends TestCase
         $this->expectException(QueryException::class);
         $config->delete();
     }
+
+    /**
+     * Test used_ai_credits is cast and defaults correctly.
+     */
+    public function test_user_subscription_used_ai_credits(): void
+    {
+        $user = User::factory()->create();
+        $package = SubscriptionPackage::factory()->create();
+
+        $subscription = UserSubscription::create([
+            'user_id' => $user->id,
+            'subscription_package_id' => $package->id,
+            'starts_at' => now(),
+            'expires_at' => now()->addDays(30),
+            'status' => 'active',
+            'used_ai_credits' => 15,
+        ]);
+
+        $this->assertSame(15, $subscription->used_ai_credits);
+
+        $this->assertDatabaseHas('user_subscriptions', [
+            'id' => $subscription->id,
+            'used_ai_credits' => 15,
+        ]);
+
+        $retrieved = UserSubscription::find($subscription->id);
+        $this->assertSame(15, $retrieved->used_ai_credits);
+        $this->assertIsInt($retrieved->used_ai_credits);
+
+        $subscriptionDefault = UserSubscription::create([
+            'user_id' => $user->id,
+            'subscription_package_id' => $package->id,
+            'starts_at' => now(),
+            'expires_at' => now()->addDays(30),
+            'status' => 'active',
+        ]);
+        $this->assertSame(0, $subscriptionDefault->used_ai_credits);
+        $this->assertSame(0, UserSubscription::find($subscriptionDefault->id)->used_ai_credits);
+    }
 }

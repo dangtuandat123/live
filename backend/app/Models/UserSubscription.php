@@ -16,10 +16,12 @@ class UserSubscription extends Model
         'starts_at',
         'expires_at',
         'status',
+        'used_ai_credits',
     ];
 
     protected $attributes = [
         'status' => 'active',
+        'used_ai_credits' => 0,
     ];
 
     /**
@@ -34,6 +36,7 @@ class UserSubscription extends Model
             'subscription_package_id' => 'integer',
             'starts_at' => 'datetime',
             'expires_at' => 'datetime',
+            'used_ai_credits' => 'integer',
         ];
     }
 

@@ -27,6 +27,7 @@ class UserSubscriptionFactory extends Factory
             'starts_at' => now(),
             'expires_at' => now()->addDays(30),
             'status' => 'active',
+            'used_ai_credits' => 0,
         ];
     }
 

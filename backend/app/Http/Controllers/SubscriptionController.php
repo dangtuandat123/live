@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PaymentConfig;
 use App\Models\SubscriptionPackage;
 use App\Models\Transaction;
+use App\Models\User;
 use App\Models\UserSubscription;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -72,22 +73,36 @@ class SubscriptionController extends Controller
         }
 
         if ($package->price === 0) {
-            if (UserSubscription::where('user_id', $user->id)->where('subscription_package_id', $package->id)->exists()) {
-                return response()->json([
-                    'error' => 'Bad Request',
-                    'message' => 'You have already subscribed to this free package.'
-                ], 400);
-            }
-
-            if ($user->activeSubscription) {
-                return response()->json([
-                    'error' => 'Bad Request',
-                    'message' => 'You already have an active subscription.'
-                ], 400);
-            }
-            // Free package: activate instantly
             DB::beginTransaction();
             try {
+                // Lock the user record to prevent concurrent checkout race conditions
+                User::where('id', $user->id)->lockForUpdate()->first();
+
+                // Lock UserSubscriptions for the user
+                $existingFreeSub = UserSubscription::where('user_id', $user->id)
+                    ->where('subscription_package_id', $package->id)
+                    ->lockForUpdate()
+                    ->exists();
+
+                if ($existingFreeSub) {
+                    DB::rollBack();
+
+                    return response()->json([
+                        'error' => 'Bad Request',
+                        'message' => 'You have already subscribed to this free package.',
+                    ], 400);
+                }
+
+                $activeSub = $user->activeSubscription()->lockForUpdate()->first();
+                if ($activeSub) {
+                    DB::rollBack();
+
+                    return response()->json([
+                        'error' => 'Bad Request',
+                        'message' => 'You already have an active subscription.',
+                    ], 400);
+                }
+
                 $transactionId = ($paymentConfig->prefix ?? 'TX_').strtoupper(Str::random(10));
 
                 $transaction = Transaction::create([
@@ -100,24 +115,13 @@ class SubscriptionController extends Controller
                     'status' => 'success',
                 ]);
 
-                // Upgrade / activate subscription logic
-                $activeSub = $user->activeSubscription;
-                if ($activeSub && $activeSub->subscription_package_id === $package->id) {
-                    $activeSub->update([
-                        'expires_at' => $activeSub->expires_at->addDays($package->duration_days),
-                    ]);
-                } else {
-                    if ($activeSub) {
-                        $activeSub->update(['status' => 'inactive']);
-                    }
-                    UserSubscription::create([
-                        'user_id' => $user->id,
-                        'subscription_package_id' => $package->id,
-                        'starts_at' => now(),
-                        'expires_at' => now()->addDays($package->duration_days),
-                        'status' => 'active',
-                    ]);
-                }
+                UserSubscription::create([
+                    'user_id' => $user->id,
+                    'subscription_package_id' => $package->id,
+                    'starts_at' => now(),
+                    'expires_at' => now()->addDays($package->duration_days),
+                    'status' => 'active',
+                ]);
 
                 DB::commit();
 

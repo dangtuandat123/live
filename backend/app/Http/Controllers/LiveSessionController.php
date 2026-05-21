@@ -17,6 +17,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class LiveSessionController extends Controller
@@ -119,6 +120,23 @@ class LiveSessionController extends Controller
             'keywords.*' => ['string', 'max:100'],
         ]);
 
+        $user = $request->user();
+        $user->resolveActiveSubscription();
+        $features = $user->getSubscriptionFeatures();
+        $limitStreams = $features['limit_streams'] ?? 1;
+
+        if ($limitStreams !== -1) {
+            $activeSessionsCount = LiveSession::forUser($user->id)
+                ->whereIn('status', ['connecting', 'live'])
+                ->count();
+
+            if ($activeSessionsCount >= $limitStreams) {
+                throw ValidationException::withMessages([
+                    'tiktok_username' => ['Bạn đã đạt giới hạn số lượng livestream active tối đa của gói dịch vụ ('.$limitStreams.').'],
+                ]);
+            }
+        }
+
         // Tạo session DB
         $session = LiveSession::create([
             'user_id' => $request->user()->id,
@@ -173,6 +191,8 @@ class LiveSessionController extends Controller
         if ($liveSession->user_id !== $request->user()->id) {
             abort(403);
         }
+
+        $this->checkAndStopIfDurationExceeded($request, $liveSession);
 
         $liveSession->load(['products', 'stats', 'keywords']);
 
@@ -354,6 +374,8 @@ class LiveSessionController extends Controller
         if ($liveSession->user_id !== $request->user()->id) {
             abort(403);
         }
+
+        $this->checkAndStopIfDurationExceeded($request, $liveSession);
 
         if (! $liveSession->tiktok_session_id) {
             return response()->json(['message' => 'No TikTok session linked'], 400);
@@ -963,5 +985,37 @@ class LiveSessionController extends Controller
         }
 
         return '';
+    }
+
+    /**
+     * Check if the livestream duration has exceeded package maximum allowed duration and stop it.
+     */
+    private function checkAndStopIfDurationExceeded(Request $request, LiveSession $liveSession): void
+    {
+        if (in_array($liveSession->status, ['connecting', 'live']) && $liveSession->started_at) {
+            $user = $request->user();
+            $features = $user->getSubscriptionFeatures();
+            $maxDurationHours = $features['max_duration_hours'] ?? 1;
+
+            $elapsedSeconds = $liveSession->started_at->diffInSeconds(now());
+            $durationHours = $elapsedSeconds / 3600;
+
+            if ($durationHours >= $maxDurationHours) {
+                if ($liveSession->tiktok_session_id) {
+                    try {
+                        $this->tiktokService->stopSession($liveSession->tiktok_session_id);
+                    } catch (\Exception $e) {
+                        Log::error('Failed to stop TikTok session: '.$e->getMessage());
+                    }
+                }
+
+                $liveSession->update([
+                    'status' => 'ended',
+                    'ended_at' => now(),
+                    'duration_seconds' => (int) $elapsedSeconds,
+                    'error_message' => 'Phiên livestream đã tự động kết thúc do vượt quá thời lượng tối đa cho phép của gói dịch vụ ('.$maxDurationHours.' giờ).',
+                ]);
+            }
+        }
     }
 }

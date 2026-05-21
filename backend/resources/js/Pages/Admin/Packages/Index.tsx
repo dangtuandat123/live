@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Table,
   TableBody,
@@ -36,20 +37,25 @@ import {
   PlusIcon,
   PencilIcon,
   TrashIcon,
-  CheckCircle2Icon,
   LoaderIcon,
-  PlusCircleIcon,
-  XIcon,
 } from "lucide-react"
 import * as React from "react"
 import { toast } from "sonner"
+
+interface PackageFeatures {
+  limit_streams?: number
+  max_duration_hours?: number
+  ai_credits?: number
+  audio_analysis?: boolean
+  export_leads?: boolean
+}
 
 interface SubscriptionPackage {
   id: number
   name: string
   price: number
   duration_days: number
-  features: string[] | null
+  features: PackageFeatures | string[] | null
   created_at?: string
   updated_at?: string
 }
@@ -64,16 +70,19 @@ export default function AdminPackages({ packages = [] }: Props) {
   const [isEditOpen, setIsEditOpen] = React.useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = React.useState(false)
   const [selectedPackage, setSelectedPackage] = React.useState<SubscriptionPackage | null>(null)
-  
-  // Tính năng động cho form thêm/sửa
-  const [featuresList, setFeaturesList] = React.useState<string[]>([])
 
   // Form tạo mới
   const createForm = useForm({
     name: "",
     price: 0,
     duration_days: 30,
-    features: [] as string[],
+    features: {
+      limit_streams: 1,
+      max_duration_hours: 1,
+      ai_credits: 1000,
+      audio_analysis: false,
+      export_leads: false,
+    } as PackageFeatures,
   })
 
   // Form chỉnh sửa
@@ -81,7 +90,13 @@ export default function AdminPackages({ packages = [] }: Props) {
     name: "",
     price: 0,
     duration_days: 30,
-    features: [] as string[],
+    features: {
+      limit_streams: 1,
+      max_duration_hours: 1,
+      ai_credits: 1000,
+      audio_analysis: false,
+      export_leads: false,
+    } as PackageFeatures,
   })
 
   // Form xóa
@@ -90,20 +105,44 @@ export default function AdminPackages({ packages = [] }: Props) {
   // Mở Dialog thêm mới
   function handleOpenCreate() {
     createForm.reset()
-    setFeaturesList([""])
+    createForm.setData("features", {
+      limit_streams: 1,
+      max_duration_hours: 1,
+      ai_credits: 1000,
+      audio_analysis: false,
+      export_leads: false,
+    })
     setIsCreateOpen(true)
   }
 
   // Mở Dialog sửa
   function handleOpenEdit(pkg: SubscriptionPackage) {
     setSelectedPackage(pkg)
+    
+    let parsedFeatures: PackageFeatures = {
+      limit_streams: 1,
+      max_duration_hours: 1,
+      ai_credits: 1000,
+      audio_analysis: false,
+      export_leads: false,
+    }
+    
+    if (pkg.features && !Array.isArray(pkg.features)) {
+      parsedFeatures = {
+        limit_streams: (pkg.features as PackageFeatures).limit_streams ?? 1,
+        max_duration_hours: (pkg.features as PackageFeatures).max_duration_hours ?? 1,
+        ai_credits: (pkg.features as PackageFeatures).ai_credits ?? 1000,
+        audio_analysis: !!(pkg.features as PackageFeatures).audio_analysis,
+        export_leads: !!(pkg.features as PackageFeatures).export_leads,
+      }
+    }
+    
     editForm.setData({
       name: pkg.name,
       price: pkg.price,
       duration_days: pkg.duration_days,
-      features: pkg.features || [],
+      features: parsedFeatures,
     })
-    setFeaturesList(pkg.features && pkg.features.length > 0 ? [...pkg.features] : [""])
     setIsEditOpen(true)
   }
 
@@ -113,31 +152,9 @@ export default function AdminPackages({ packages = [] }: Props) {
     setIsDeleteOpen(true)
   }
 
-  // Quản lý tính năng động
-  function handleAddFeatureInput() {
-    setFeaturesList([...featuresList, ""])
-  }
-
-  function handleRemoveFeatureInput(index: number) {
-    const list = [...featuresList]
-    list.splice(index, 1)
-    setFeaturesList(list.length === 0 ? [""] : list)
-  }
-
-  function handleFeatureChange(index: number, value: string) {
-    const list = [...featuresList]
-    list[index] = value
-    setFeaturesList(list)
-  }
-
   // Submit thêm mới
   function handleCreateSubmit(e: React.FormEvent) {
     e.preventDefault()
-    // Lọc bỏ tính năng rỗng
-    const cleanedFeatures = featuresList.filter(f => f.trim() !== "")
-    createForm.setData("features", cleanedFeatures)
-
-    // Gọi Inertia post
     createForm.post(route("admin.packages.store"), {
       onSuccess: () => {
         setIsCreateOpen(false)
@@ -154,15 +171,7 @@ export default function AdminPackages({ packages = [] }: Props) {
   function handleEditSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!selectedPackage) return
-    const cleanedFeatures = featuresList.filter(f => f.trim() !== "")
     
-    // Gọi Inertia put
-    // Inertia useForm put() không hỗ trợ truyền data trực tiếp qua option dễ dàng như post(),
-    // do đó chúng ta cần gán dữ liệu vào form trước khi put
-    editForm.setData("features", cleanedFeatures)
-
-    // Cách an toàn để submit với setData động: sử dụng callback submit hoặc submit thẳng
-    // sau khi setData ở step trước
     editForm.put(route("admin.packages.update", { package: selectedPackage.id }), {
       onSuccess: () => {
         setIsEditOpen(false)
@@ -173,19 +182,6 @@ export default function AdminPackages({ packages = [] }: Props) {
       }
     })
   }
-
-  // Cập nhật features của editForm khi featuresList thay đổi
-  React.useEffect(() => {
-    if (isEditOpen) {
-      editForm.setData("features", featuresList.filter(f => f.trim() !== ""))
-    }
-  }, [featuresList, isEditOpen])
-
-  React.useEffect(() => {
-    if (isCreateOpen) {
-      createForm.setData("features", featuresList.filter(f => f.trim() !== ""))
-    }
-  }, [featuresList, isCreateOpen])
 
   // Submit xóa
   function handleDeleteSubmit(e: React.FormEvent) {
@@ -198,8 +194,7 @@ export default function AdminPackages({ packages = [] }: Props) {
         toast.success("Đã xóa gói dịch vụ thành công!")
       },
       onError: (err) => {
-        // Lấy thông báo lỗi được trả về từ Session Flash errors
-        const errMsg = err.error || "Không thể xóa gói dịch vụ này."
+        const errMsg = (err as any).error || "Không thể xóa gói dịch vụ này."
         toast.error(errMsg)
       }
     })
@@ -288,12 +283,42 @@ export default function AdminPackages({ packages = [] }: Props) {
                         <TableCell className="text-muted-foreground">{pkg.duration_days} ngày</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1.5 max-w-[400px]">
-                            {pkg.features && pkg.features.length > 0 ? (
-                              pkg.features.map((feat, idx) => (
-                                <Badge key={idx} variant="secondary" className="text-[11px] font-normal py-0.5">
-                                  {feat}
-                                </Badge>
-                              ))
+                            {pkg.features ? (
+                              Array.isArray(pkg.features) ? (
+                                pkg.features.map((feat, idx) => (
+                                  <Badge key={idx} variant="secondary" className="text-[11px] font-normal py-0.5">
+                                    {feat}
+                                  </Badge>
+                                ))
+                              ) : (
+                                <>
+                                  {(pkg.features as PackageFeatures).limit_streams !== undefined && (
+                                    <Badge variant="secondary" className="text-[11px] font-normal py-0.5">
+                                      Stream: {(pkg.features as PackageFeatures).limit_streams} luồng
+                                    </Badge>
+                                  )}
+                                  {(pkg.features as PackageFeatures).max_duration_hours !== undefined && (
+                                    <Badge variant="secondary" className="text-[11px] font-normal py-0.5">
+                                      Thời lượng: {(pkg.features as PackageFeatures).max_duration_hours}h
+                                    </Badge>
+                                  )}
+                                  {(pkg.features as PackageFeatures).ai_credits !== undefined && (
+                                    <Badge variant="secondary" className="text-[11px] font-normal py-0.5">
+                                      Credits: {(pkg.features as PackageFeatures).ai_credits?.toLocaleString()}
+                                    </Badge>
+                                  )}
+                                  {(pkg.features as PackageFeatures).audio_analysis !== undefined && (
+                                    <Badge variant={(pkg.features as PackageFeatures).audio_analysis ? "default" : "outline"} className={`text-[11px] font-normal py-0.5 ${(pkg.features as PackageFeatures).audio_analysis ? 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-transparent' : 'text-muted-foreground'}`}>
+                                      Âm thanh: {(pkg.features as PackageFeatures).audio_analysis ? "Có" : "Không"}
+                                    </Badge>
+                                  )}
+                                  {(pkg.features as PackageFeatures).export_leads !== undefined && (
+                                    <Badge variant={(pkg.features as PackageFeatures).export_leads ? "default" : "outline"} className={`text-[11px] font-normal py-0.5 ${(pkg.features as PackageFeatures).export_leads ? 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-transparent' : 'text-muted-foreground'}`}>
+                                      Xuất leads: {(pkg.features as PackageFeatures).export_leads ? "Có" : "Không"}
+                                    </Badge>
+                                  )}
+                                </>
+                              )
                             ) : (
                               <span className="text-xs text-muted-foreground italic">Không có tính năng ghi nhận</span>
                             )}
@@ -381,39 +406,84 @@ export default function AdminPackages({ packages = [] }: Props) {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Tính năng đi kèm</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleAddFeatureInput}
-                    className="h-7 text-xs text-primary gap-1"
-                  >
-                    <PlusCircleIcon className="size-3.5" /> Thêm dòng
-                  </Button>
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="font-medium text-sm text-foreground">Cấu hình giới hạn & tính năng</h4>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="create-limit-streams">Số luồng stream đồng thời</Label>
+                    <Input
+                      id="create-limit-streams"
+                      type="number"
+                      min="1"
+                      value={createForm.data.features?.limit_streams ?? 1}
+                      onChange={(e) => createForm.setData("features", {
+                        ...createForm.data.features,
+                        limit_streams: parseInt(e.target.value) || 1
+                      })}
+                      required
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="create-max-duration">Thời lượng live tối đa (giờ)</Label>
+                    <Input
+                      id="create-max-duration"
+                      type="number"
+                      min="1"
+                      value={createForm.data.features?.max_duration_hours ?? 1}
+                      onChange={(e) => createForm.setData("features", {
+                        ...createForm.data.features,
+                        max_duration_hours: parseInt(e.target.value) || 1
+                      })}
+                      required
+                    />
+                  </div>
                 </div>
 
-                <div className="max-h-[160px] overflow-y-auto space-y-2 pr-1">
-                  {featuresList.map((feature, idx) => (
-                    <div key={idx} className="flex gap-2">
-                      <Input
-                        value={feature}
-                        onChange={(e) => handleFeatureChange(idx, e.target.value)}
-                        placeholder={`Tính năng ${idx + 1}`}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveFeatureInput(idx)}
-                        className="size-9 shrink-0 text-muted-foreground hover:text-foreground"
-                      >
-                        <XIcon className="size-4" />
-                      </Button>
-                    </div>
-                  ))}
+                <div className="grid gap-2">
+                  <Label htmlFor="create-ai-credits">Số AI credits</Label>
+                  <Input
+                    id="create-ai-credits"
+                    type="number"
+                    min="0"
+                    value={createForm.data.features?.ai_credits ?? 0}
+                    onChange={(e) => createForm.setData("features", {
+                      ...createForm.data.features,
+                      ai_credits: parseInt(e.target.value) || 0
+                    })}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="create-audio-analysis"
+                      checked={!!createForm.data.features?.audio_analysis}
+                      onCheckedChange={(checked) => createForm.setData("features", {
+                        ...createForm.data.features,
+                        audio_analysis: !!checked
+                      })}
+                    />
+                    <Label htmlFor="create-audio-analysis" className="font-normal cursor-pointer select-none">
+                      Phân tích âm thanh AI (audio_analysis)
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="create-export-leads"
+                      checked={!!createForm.data.features?.export_leads}
+                      onCheckedChange={(checked) => createForm.setData("features", {
+                        ...createForm.data.features,
+                        export_leads: !!checked
+                      })}
+                    />
+                    <Label htmlFor="create-export-leads" className="font-normal cursor-pointer select-none">
+                      Xuất file danh sách SĐT (export_leads)
+                    </Label>
+                  </div>
                 </div>
               </div>
             </div>
@@ -481,39 +551,84 @@ export default function AdminPackages({ packages = [] }: Props) {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Tính năng đi kèm</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleAddFeatureInput}
-                    className="h-7 text-xs text-primary gap-1"
-                  >
-                    <PlusCircleIcon className="size-3.5" /> Thêm dòng
-                  </Button>
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="font-medium text-sm text-foreground">Cấu hình giới hạn & tính năng</h4>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-limit-streams">Số luồng stream đồng thời</Label>
+                    <Input
+                      id="edit-limit-streams"
+                      type="number"
+                      min="1"
+                      value={editForm.data.features?.limit_streams ?? 1}
+                      onChange={(e) => editForm.setData("features", {
+                        ...editForm.data.features,
+                        limit_streams: parseInt(e.target.value) || 1
+                      })}
+                      required
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-max-duration">Thời lượng live tối đa (giờ)</Label>
+                    <Input
+                      id="edit-max-duration"
+                      type="number"
+                      min="1"
+                      value={editForm.data.features?.max_duration_hours ?? 1}
+                      onChange={(e) => editForm.setData("features", {
+                        ...editForm.data.features,
+                        max_duration_hours: parseInt(e.target.value) || 1
+                      })}
+                      required
+                    />
+                  </div>
                 </div>
 
-                <div className="max-h-[160px] overflow-y-auto space-y-2 pr-1">
-                  {featuresList.map((feature, idx) => (
-                    <div key={idx} className="flex gap-2">
-                      <Input
-                        value={feature}
-                        onChange={(e) => handleFeatureChange(idx, e.target.value)}
-                        placeholder={`Tính năng ${idx + 1}`}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveFeatureInput(idx)}
-                        className="size-9 shrink-0 text-muted-foreground hover:text-foreground"
-                      >
-                        <XIcon className="size-4" />
-                      </Button>
-                    </div>
-                  ))}
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-ai-credits">Số AI credits</Label>
+                  <Input
+                    id="edit-ai-credits"
+                    type="number"
+                    min="0"
+                    value={editForm.data.features?.ai_credits ?? 0}
+                    onChange={(e) => editForm.setData("features", {
+                      ...editForm.data.features,
+                      ai_credits: parseInt(e.target.value) || 0
+                    })}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="edit-audio-analysis"
+                      checked={!!editForm.data.features?.audio_analysis}
+                      onCheckedChange={(checked) => editForm.setData("features", {
+                        ...editForm.data.features,
+                        audio_analysis: !!checked
+                      })}
+                    />
+                    <Label htmlFor="edit-audio-analysis" className="font-normal cursor-pointer select-none">
+                      Phân tích âm thanh AI (audio_analysis)
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="edit-export-leads"
+                      checked={!!editForm.data.features?.export_leads}
+                      onCheckedChange={(checked) => editForm.setData("features", {
+                        ...editForm.data.features,
+                        export_leads: !!checked
+                      })}
+                    />
+                    <Label htmlFor="edit-export-leads" className="font-normal cursor-pointer select-none">
+                      Xuất file danh sách SĐT (export_leads)
+                    </Label>
+                  </div>
                 </div>
               </div>
             </div>
