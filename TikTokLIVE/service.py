@@ -16,12 +16,31 @@ API:
     GET  /health                → Health check
 """
 
+import sys
+
+# Monkey patch asyncio to fix benign ConnectionResetError [WinError 10054] on Windows
+if sys.platform == "win32":
+    import asyncio
+    try:
+        from asyncio.proactor_events import _ProactorBasePipeTransport
+        _original_call_connection_lost = _ProactorBasePipeTransport._call_connection_lost
+        def _patched_call_connection_lost(self, exc):
+            try:
+                _original_call_connection_lost(self, exc)
+            except (ConnectionResetError, OSError):
+                pass  # Bỏ qua lỗi ngắt kết nối cưỡng bức vô hại trên Windows
+        _ProactorBasePipeTransport._call_connection_lost = _patched_call_connection_lost
+    except Exception as e:
+        import logging
+        logging.getLogger("tiktok-live-service").warning(f"Failed to patch asyncio connection lost handler: {e}")
+
 # Fix SSL cho Windows Server cũ (thiếu root CA certificates)
 import ssl
 import certifi
 ssl._create_default_https_context = lambda: ssl.create_default_context(cafile=certifi.where())
 import os
 os.environ["SSL_CERT_FILE"] = certifi.where()
+
 
 # Monkey patch websockets to disable default ping/pong which causes constant disconnects on TikTok Webcast WSS.
 # TikTok webcast server does not respond to standard WebSocket Ping frames, causing keepalive timeout.
