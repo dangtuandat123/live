@@ -388,7 +388,7 @@ export default function SubscriptionIndex({ packages = [], activeSubscription, t
                     </ul>
                   </div>
                 </CardContent>
-                <CardFooter className="p-6 pt-0">
+                <CardFooter className="p-6">
                   <Button
                     onClick={() => handleSelectPackage(pkg)}
                     disabled={loadingCheckout || (isCurrent && isFree)}
