@@ -46,38 +46,38 @@ class CaptureThumbnailJob implements ShouldQueue, ShouldBeUnique
             return;
         }
 
-        // Cách 1: Tải trực tiếp từ coverUrl nhận từ TikTok API
-        if ($this->coverUrl) {
-            try {
-                Log::info("Downloading cover image for session {$this->liveSessionId} from: {$this->coverUrl}");
-                $response = Http::timeout(15)->get($this->coverUrl);
-                if ($response->successful() && $response->header('Content-Type') !== 'text/html') {
-                    $this->updateThumbnail($session, $response->body());
-                    Log::info("Successfully saved cover image thumbnail for session {$this->liveSessionId}");
-                    return;
-                }
-            } catch (\Exception $e) {
-                Log::warning("Failed to download cover image from URL: " . $e->getMessage());
-            }
-        }
-
-        // Cách 2: Fallback - Gọi Python service snapshot (FFmpeg capture frame)
+        // Cách 1: Ưu tiên hàng đầu - Gọi Python service snapshot (FFmpeg capture frame từ video live trực tiếp)
         if ($session->tiktok_session_id) {
             try {
-                Log::info("Falling back to FFmpeg snapshot for session {$this->liveSessionId}");
+                Log::info("Capturing snapshot from live stream for session {$this->liveSessionId}");
                 $snapshot = $tiktokService->getSnapshot($session->tiktok_session_id);
                 if ($snapshot && !empty($snapshot['image_b64'])) {
                     $imageData = base64_decode($snapshot['image_b64']);
                     $this->updateThumbnail($session, $imageData);
-                    Log::info("Successfully captured FFmpeg thumbnail for session {$this->liveSessionId}");
+                    Log::info("Successfully captured live stream thumbnail for session {$this->liveSessionId}");
                     return;
                 }
             } catch (\Exception $e) {
-                Log::error("Failed to capture FFmpeg thumbnail: " . $e->getMessage());
+                Log::error("Failed to capture live stream thumbnail: " . $e->getMessage());
             }
         }
 
-        // Cách 3: Fallback cuối cùng - Dùng avatar của streamer nếu có thông tin từ Python service stats
+        // Cách 2: Fallback 1 - Tải trực tiếp từ coverUrl nhận từ TikTok API
+        if ($this->coverUrl) {
+            try {
+                Log::info("Downloading cover image fallback for session {$this->liveSessionId} from: {$this->coverUrl}");
+                $response = Http::timeout(15)->get($this->coverUrl);
+                if ($response->successful() && $response->header('Content-Type') !== 'text/html') {
+                    $this->updateThumbnail($session, $response->body());
+                    Log::info("Successfully saved cover image thumbnail fallback for session {$this->liveSessionId}");
+                    return;
+                }
+            } catch (\Exception $e) {
+                Log::warning("Failed to download cover image fallback from URL: " . $e->getMessage());
+            }
+        }
+
+        // Cách 3: Fallback 2 - Dùng avatar của streamer nếu có thông tin từ Python service stats
         if ($session->tiktok_session_id) {
             try {
                 $serviceData = $tiktokService->getStats($session->tiktok_session_id);
@@ -87,7 +87,7 @@ class CaptureThumbnailJob implements ShouldQueue, ShouldBeUnique
                     $response = Http::timeout(15)->get($avatarUrl);
                     if ($response->successful()) {
                         $this->updateThumbnail($session, $response->body());
-                        Log::info("Successfully saved avatar thumbnail for session {$this->liveSessionId}");
+                        Log::info("Successfully saved avatar thumbnail fallback for session {$this->liveSessionId}");
                         return;
                     }
                 }
@@ -126,7 +126,7 @@ class CaptureThumbnailJob implements ShouldQueue, ShouldBeUnique
             'thumbnail' => '/storage/' . $filename,
         ]);
 
-        // Cập nhật Cache Lock dài hạn: 10 phút (600 giây)
-        Cache::put("live_session_{$this->liveSessionId}_thumbnail_lock", true, 600);
+        // Cập nhật Cache Lock: 1 phút (60 giây) để cập nhật ảnh chụp màn hình từ video live thường xuyên
+        Cache::put("live_session_{$this->liveSessionId}_thumbnail_lock", true, 60);
     }
 }

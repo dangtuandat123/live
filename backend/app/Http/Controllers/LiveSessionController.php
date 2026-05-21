@@ -665,8 +665,8 @@ class LiveSessionController extends Controller
         if ($session->status === 'live' || ($session->status === 'connecting' && !empty($coverUrl))) {
             $cacheKey = "live_session_{$session->id}_thumbnail_lock";
             if (!\Illuminate\Support\Facades\Cache::has($cacheKey)) {
-                // Đặt lock tạm thời trong 2 phút để tránh spam gửi Job liên tục khi đang xử lý
-                \Illuminate\Support\Facades\Cache::put($cacheKey, true, 120);
+                // Đặt lock tạm thời trong 1 phút (60 giây) để tránh spam gửi Job liên tục khi đang xử lý
+                \Illuminate\Support\Facades\Cache::put($cacheKey, true, 60);
 
                 CaptureThumbnailJob::dispatch($session->id, $coverUrl);
             }
