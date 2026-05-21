@@ -23,6 +23,28 @@ ssl._create_default_https_context = lambda: ssl.create_default_context(cafile=ce
 import os
 os.environ["SSL_CERT_FILE"] = certifi.where()
 
+# Monkey patch websockets to disable default ping/pong which causes constant disconnects on TikTok Webcast WSS.
+# TikTok webcast server does not respond to standard WebSocket Ping frames, causing keepalive timeout.
+# We set ping_interval=None to disable it, since piratetok_live has its own custom heartbeat loop.
+try:
+    import websockets
+    import websockets.asyncio.client
+    
+    _original_asyncio_connect = websockets.asyncio.client.connect
+    def patched_asyncio_connect(*args, **kwargs):
+        kwargs["ping_interval"] = None
+        return _original_asyncio_connect(*args, **kwargs)
+    websockets.asyncio.client.connect = patched_asyncio_connect
+
+    _original_legacy_connect = websockets.connect
+    def patched_legacy_connect(*args, **kwargs):
+        kwargs["ping_interval"] = None
+        return _original_legacy_connect(*args, **kwargs)
+    websockets.connect = patched_legacy_connect
+except Exception as e:
+    import logging
+    logging.getLogger("tiktok-live-service").warning(f"Failed to monkey patch websockets: {e}")
+
 import asyncio
 import base64
 import subprocess
