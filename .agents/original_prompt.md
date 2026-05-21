@@ -213,3 +213,48 @@ Integrity mode: development
 ## 2026-05-21T14:55:38Z
 
 [Message] sender=9e05c9cd-c52d-4900-bfb1-3c02aa45407d priority=MESSAGE_PRIORITY_HIGH content=Hãy báo cáo tiến độ hiện tại của quá trình triển khai hệ thống thanh toán và đăng ký. Hiện tại các subagent của bạn đã thực hiện đến bước nào rồi?
+
+## 2026-05-21T15:34:23Z
+
+Thực hiện rà soát chuyên sâu toàn bộ dự án livestream phân tích bình luận SaaS (cả Frontend và Backend), hoàn thiện 100% tất cả các tính năng, giao diện, các nút bấm, tối ưu hóa logic backend, bảo mật, và đảm bảo chất lượng chuẩn production.
+
+Working directory: d:\Workspace\livestream\backend
+Integrity mode: development
+
+## Requirements
+
+### R1. Deep Audit & Bug Fixing (Backend & Frontend)
+- Thực hiện rà soát toàn bộ mã nguồn của dự án (các controller, routes, models, jobs, views).
+- Tìm kiếm và sửa lỗi logic, đặc biệt chú ý 3 lỗi được cảnh báo trước đó (Package Price Resolution, Lack of Callback Idempotency, Free Package Checkout Abuse) và các lỗi tiềm ẩn khác.
+- Kiểm tra tính đồng bộ dữ liệu giữa Client và Server: xử lý đầy đủ các state (Loading, Empty, Error, Success).
+
+### R2. UI/UX Polishing
+- Rà soát các trang giao diện của người dùng (Dashboard, Lives, Products, Reports, Settings, Subscription) and Admin (Dashboard, Users, Settings, Packages, Payments).
+- Sửa đổi các copy text bị trùng lặp, nhãn/placeholder không rõ ràng, các hành động chết hoặc các nút bấm chưa được gắn handler hoặc hoạt động không đúng logic.
+- Đảm bảo thiết kế cao cấp, đồng bộ, responsive, không bị vỡ layout trên bất kỳ trang nào.
+
+### R3. Security & Robustness
+- Sanitize các input đầu vào tại API Controllers.
+- Đảm bảo phân quyền truy cập (Role/Permission) tại route và controller chính xác (chỉ Admin mới được cấu hình payment và gói dịch vụ; user chỉ xem được subscription của chính mình).
+- Đảm bảo kiểm tra các điều kiện biên của dữ liệu (ví dụ: giá trị âm, null, hoặc sai kiểu dữ liệu).
+
+### R4. Test Coverage & Compilation
+- Chạy toàn bộ test suite hiện có của Laravel và đảm bảo không có bài test nào bị lỗi.
+- Đảm bảo biên dịch (assets build) thành công 100% không có cảnh báo hoặc lỗi TypeScript.
+
+## Acceptance Criteria
+
+### Hệ thống hoạt động chuẩn logic
+- [ ] Không còn lỗi logic trùng lặp giao dịch (Idempotency) khi xử lý callback từ ngân hàng.
+- [ ] Việc chọn gói dịch vụ tại checkout phân giải chính xác theo đúng ID gói, không bị nhầm lẫn giữa các gói trùng giá tiền.
+- [ ] Người dùng không thể spam đăng ký gói Free để được gia hạn vô hạn ngày sử dụng.
+- [ ] Quyền Admin và User được phân tách rõ ràng ở cả route và controller backend.
+
+### Giao diện hoàn thiện 100%
+- [ ] Tất cả các nút bấm trên giao diện đều có hoạt động (không có nút bấm chết).
+- [ ] Trạng thái Loading và Error hiển thị rõ ràng và tinh tế khi gọi API bất đồng bộ.
+- [ ] Toàn bộ UI tuân thủ thiết kế hiện đại, responsive, không có placeholders.
+
+### Kiểm thử và biên dịch
+- [ ] 100% các bài test của Laravel (`php artisan test`) đều PASS.
+- [ ] Lệnh `npm run build` chạy thành công không có lỗi compile.

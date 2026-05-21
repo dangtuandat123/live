@@ -70,6 +70,34 @@ export default function SubscriptionIndex({ packages = [], activeSubscription, a
   } | null>(null)
 
   const [copied, setCopied] = React.useState(false)
+  const [isCheckingPayment, setIsCheckingPayment] = React.useState(false)
+
+  React.useEffect(() => {
+    let intervalId: any;
+
+    if (isCheckoutOpen && selectedPkg && checkoutData?.vietqr_url) {
+      intervalId = setInterval(async () => {
+        try {
+          const response = await axios.get("/api/subscription/status")
+          const { active, package_id } = response.data
+
+          if (active && package_id === selectedPkg.id) {
+            setIsCheckoutOpen(false)
+            toast.success(`Đã kích hoạt gói ${selectedPkg.name} thành công!`)
+            router.reload({ only: ["activeSubscription"] })
+          }
+        } catch (error) {
+          console.error("Error polling subscription status:", error)
+        }
+      }, 5000)
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId)
+      }
+    }
+  }, [isCheckoutOpen, selectedPkg, checkoutData])
 
   // Định dạng số tiền
   function formatMoney(amount: number) {
@@ -133,15 +161,26 @@ export default function SubscriptionIndex({ packages = [], activeSubscription, a
   }
 
   // Tải lại trang sau khi thanh toán xong
-  function handleConfirmPaid() {
-    setIsCheckoutOpen(false)
-    toast.info("Đang kiểm tra giao dịch của bạn...")
-    router.reload({
-      only: ["activeSubscription"],
-      onSuccess: () => {
-        toast.success("Thông tin gói đăng ký đã được cập nhật!")
+  async function handleConfirmPaid() {
+    if (!selectedPkg) return
+    setIsCheckingPayment(true)
+    try {
+      const response = await axios.get("/api/subscription/status")
+      const { active, package_id } = response.data
+
+      if (active && package_id === selectedPkg.id) {
+        setIsCheckoutOpen(false)
+        toast.success(`Đã kích hoạt gói ${selectedPkg.name} thành công!`)
+        router.reload({ only: ["activeSubscription"] })
+      } else {
+        toast.warning("Hệ thống chưa nhận được thanh toán. Vui lòng đợi trong giây lát hoặc kiểm tra lại thông tin chuyển khoản.")
       }
-    })
+    } catch (err: any) {
+      console.error(err)
+      toast.error("Không thể kết nối đến hệ thống kiểm tra thanh toán.")
+    } finally {
+      setIsCheckingPayment(false)
+    }
   }
 
   return (
@@ -361,9 +400,17 @@ export default function SubscriptionIndex({ packages = [], activeSubscription, a
             <Button
               type="button"
               onClick={handleConfirmPaid}
+              disabled={isCheckingPayment}
               className="w-full sm:w-auto bg-primary text-primary-foreground"
             >
-              Tôi đã chuyển tiền
+              {isCheckingPayment ? (
+                <>
+                  <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                  Đang kiểm tra...
+                </>
+              ) : (
+                "Tôi đã chuyển tiền"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

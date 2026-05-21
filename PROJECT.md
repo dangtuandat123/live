@@ -38,10 +38,10 @@
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
 | 1 | DB Schema & Models | Create migrations, models, relations, seeders | none | DONE |
-| 2 | Backend APIs & Callback | API routes, Controllers, Webhook triggering, placeholder parsing | M1 | IN_PROGRESS |
-| 3 | User Frontend UI | Pricing page, Checkout modal, dynamic VietQR rendering | M2 | PLANNED |
-| 4 | Admin Dashboard UI | Packages CRUD, Payment configs CRUD, Secure routing | M2 | PLANNED |
-| 5 | E2E Testing & Final Pass | Verify 100% test pass on tests/Feature/SubscriptionPaymentTest.php | M3, M4 | PLANNED |
+| 2 | Backend APIs & Callback | API routes, Controllers, Webhook triggering, placeholder parsing | M1 | DONE |
+| 3 | User Frontend UI | Pricing page, Checkout modal, dynamic VietQR rendering | M2 | DONE |
+| 4 | Admin Dashboard UI | Packages CRUD, Payment configs CRUD, Secure routing | M2 | DONE |
+| 5 | E2E Testing & Final Pass | Verify 100% test pass on tests/Feature/SubscriptionPaymentTest.php | M3, M4 | DONE |
 
 ## Interface Contracts
 ### Public API Contracts

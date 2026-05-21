@@ -38,45 +38,49 @@ class PaymentCallbackController extends Controller
             ], 500);
         }
 
-        $transaction = Transaction::where('user_id', $userId)
-            ->where('amount', $amount)
-            ->where('status', 'pending')
-            ->latest()
-            ->first();
-
-        $package = null;
-        if ($transaction) {
-            $package = SubscriptionPackage::find($transaction->subscription_package_id);
-        }
-        if (!$package) {
-            $package = SubscriptionPackage::where('price', $amount)->first();
-        }
-
-        if (!$package) {
-            return response()->json([
-                'error' => 'Unprocessable Content',
-                'message' => "No subscription package found for price {$amount}.",
-            ], 422);
-        }
-
-        if (!$transaction) {
-            $recentSuccess = Transaction::where('user_id', $userId)
-                ->where('amount', $amount)
-                ->where('status', 'success')
-                ->where('updated_at', '>=', now()->subMinutes(5))
-                ->latest()
-                ->first();
-
-            if ($recentSuccess) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Subscription upgraded successfully (duplicate callback ignored)',
-                ]);
-            }
-        }
-
         DB::beginTransaction();
         try {
+            $transaction = Transaction::where('user_id', $userId)
+                ->where('amount', $amount)
+                ->where('status', 'pending')
+                ->latest()
+                ->lockForUpdate()
+                ->first();
+
+            $package = null;
+            if ($transaction) {
+                $package = SubscriptionPackage::find($transaction->subscription_package_id);
+            }
+            if (!$package) {
+                $package = SubscriptionPackage::where('price', $amount)->first();
+            }
+
+            if (!$package) {
+                DB::rollBack();
+                return response()->json([
+                    'error' => 'Unprocessable Content',
+                    'message' => "No subscription package found for price {$amount}.",
+                ], 422);
+            }
+
+            if (!$transaction) {
+                $recentSuccess = Transaction::where('user_id', $userId)
+                    ->where('amount', $amount)
+                    ->where('status', 'success')
+                    ->where('updated_at', '>=', now()->subMinutes(5))
+                    ->latest()
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($recentSuccess) {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Subscription upgraded successfully (duplicate callback ignored)',
+                    ]);
+                }
+            }
+
             if ($transaction) {
                 $transaction->update([
                     'status' => 'success',
