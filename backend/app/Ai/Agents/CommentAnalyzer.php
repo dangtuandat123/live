@@ -49,90 +49,37 @@ class CommentAnalyzer implements Agent, HasStructuredOutput
         $keywordList = implode(', ', $this->trackingKeywords);
 
         return <<<PROMPT
-Bạn là một AI phân tích bình luận Livestream bán hàng (TikTok/Social) thông minh và nhạy bén nhất tại thị trường Việt Nam.
-Nhiệm vụ của bạn là đọc các bình luận thời gian thực và phân tích để tìm ra Insight khách hàng, hỗ trợ chốt đơn thần tốc, chăm sóc khách hàng và tối ưu doanh thu.
+Bạn là chuyên gia phân tích hành vi khách hàng trên Livestream bán hàng Việt Nam. Nhiệm vụ: đọc danh sách bình luận và phân loại từng bình luận.
 
-=== NGỮ CẢNH HỆ THỐNG ===
+Trả về JSON duy nhất: {"results": [{"id": int, "sentiment": "positive"|"neutral"|"negative", "intent_tag": "Chốt đơn"|"Hỏi thông tin"|"Phản hồi SP"|"Yêu cầu hỗ trợ"|null, "question_tag": string|null, "product_tag": string|null, "has_phone": bool}]}
+Không kèm bất kỳ giải thích nào ngoài JSON.
+
+=== BỐI CẢNH ===
+Đây là Livestream bán hàng trực tuyến trên TikTok. Người xem vừa mua sắm, vừa tương tác giải trí. Trong một phiên live, người xem có thể: đặt hàng, hỏi thông tin sản phẩm, phản hồi trải nghiệm, yêu cầu hỗ trợ sau mua, hoặc chỉ đơn giản là tương tác xã hội (chào hỏi, cổ vũ, tham gia minigame/đoán số, bình luận cho vui).
 - Sản phẩm đang bán: {$productContext}
-- Từ khóa cần theo dõi: {$keywordList}
+- Từ khóa theo dõi: {$keywordList}
 
-=== QUY TẮC PHÂN LOẠI CHI TIẾT ===
+=== CÁCH SUY LUẬN ===
 
-1. **sentiment** (Cảm xúc của khách hàng đối với sản phẩm/thương hiệu):
-   - "positive" (Tích cực / Tạo Social Proof):
-     + Lời khen ngợi, thích thú, tin tưởng trực tiếp về sản phẩm ("đẹp quá", "thơm xỉu", "dùng mê lắm").
-     + Chia sẻ kết quả sử dụng tốt sau khi mua ("dùng 2 tuần thấy đỡ rụng tóc hẳn", "mua lần 2 rồi, chất vải siêu mát"). Đây là các Social Proof cực kỳ đắt giá giúp kích thích khách hàng khác mua hàng.
-   - "negative" (Tiêu cực / Rủi ro cao):
-     + Phàn nàn, khiếu nại về sản phẩm đã mua hoặc dịch vụ ("sao chưa giao hàng", "bị vỡ nắp rồi shop", "dùng bị ngứa", "lừa đảo").
-     + Thể hiện sự thất vọng, tức giận, huỷ đơn.
-   - "neutral" (Trung lập):
-     + Câu hỏi bình thường về thông tin sản phẩm ("có màu xanh không", "bao nhiêu tiền").
-     + Lời chào hỏi, tương tác vui vẻ, biểu tượng cảm xúc đơn thuần.
-     + Việc mô tả tình trạng cá nhân để nhờ tư vấn ("da mình bị mụn ẩn thì dùng loại nào").
+**sentiment** — Cảm xúc mà người bình luận thể hiện:
+- "positive": Cảm xúc tích cực hướng về sản phẩm hoặc shop (khen, hài lòng, yêu thích, ủng hộ).
+- "negative": Cảm xúc tiêu cực (phàn nàn, thất vọng, tức giận, yêu cầu hủy/trả).
+- "neutral": Không thể hiện cảm xúc rõ ràng hoặc trung lập (hỏi thông tin, chào, tương tác xã hội).
 
-2. **intent_tag** (Ý định hành động - Quyết định phễu bán hàng):
-   - "Chốt đơn" (High Purchase Intent):
-     + Khách hàng thể hiện ý muốn mua hàng rõ ràng bằng cách cung cấp thông tin giao dịch: SĐT, địa chỉ, size, màu kèm yêu cầu ship.
-     + KHÁCH HÀNG SỬ DỤNG CÚ PHÁP CHỐT ĐƠN LIVESTREAM VIỆT NAM: Chứa mã sản phẩm dạng "Mã + chữ/số" hoặc "M + chữ/số" (ví dụ: "Mã 2", "Mã 2 ạ", "M2", "mã A", "mã A ạ", "MS1").
-     + LƯU Ý ĐẶC BIỆT: KHÔNG phân loại các bình luận chỉ chứa mã đơn lẻ hoặc kèm kính ngữ như "Mã 2 ạ" thành "Hỏi thông tin", hãy phân loại là "Chốt đơn". Đây là hành vi chốt đơn trực tiếp của khách hàng.
-   - "Hỏi thông tin" (Information Seeking):
-     + Khách hàng hỏi chi tiết về thông số, tính năng, cách dùng, giá cả, ưu đãi ("size L nặng bn kg mặc vừa", "có được kiểm tra hàng không shop", "chai này bao nhiêu ml").
-   - "Phản hồi SP" (Product Feedback / Social Proof):
-     + Đánh giá hoặc phản hồi trực tiếp sau khi trải nghiệm sản phẩm (dù là khen hay chê).
-   - "Yêu cầu hỗ trợ" (Customer Support / Post-purchase issue):
-     + Yêu cầu xử lý vấn đề sau mua: đổi size, hoàn tiền, báo lỗi vận chuyển, hủy đơn ("cho mình hủy mã 2 nhé", "giao lộn size rồi đổi sao shop").
-   - null: Các comment spam tương tác, nói chuyện phiếm không có ý định mua hoặc hỏi cụ thể (ví dụ chỉ ghi "đã mua", "chốt chốt", "hello" để nhận quà mini-game).
+**intent_tag** — Ý định thực sự đằng sau bình luận. Hãy tự hỏi: "Người này đang muốn gì?"
+- "Chốt đơn": Người bình luận đang thể hiện RÕ RÀNG ý định đặt mua. Tín hiệu đáng tin: cung cấp SĐT/địa chỉ giao hàng, nêu rõ sản phẩm kèm size/màu/số lượng và yêu cầu mua/ship, hoặc sử dụng cú pháp đặt hàng mà shop quy định (ví dụ "Mã...", "M...", "MS..."). Lưu ý: cú pháp đặt hàng phải có tiền tố rõ ràng thể hiện hành động đặt hàng, không phải bất kỳ ký tự/số nào cũng là mã đơn.
+- "Hỏi thông tin": Bình luận chứa câu hỏi thực sự hoặc yêu cầu tìm hiểu về sản phẩm (giá, tồn kho, công dụng, thành phần, cách dùng, ship...).
+- "Phản hồi SP": Chia sẻ trải nghiệm cá nhân sau khi đã sử dụng sản phẩm (tốt hoặc xấu).
+- "Yêu cầu hỗ trợ": Vấn đề phát sinh sau mua (đổi trả, hoàn tiền, lỗi vận chuyển, hủy đơn).
+- null: Tất cả các bình luận KHÔNG mang ý định mua bán hoặc hỏi cụ thể. Bao gồm: lời chào, cổ vũ, tương tác xã hội, tham gia trò chơi/minigame, hoặc nội dung quá ngắn gọn/mơ hồ không đủ ngữ cảnh để xác định ý định.
 
-3. **question_tag** (Loại câu hỏi cụ thể - Giúp nhân viên phản hồi đúng trọng tâm):
-   Phân loại chính xác thành một trong các nhãn sau (hoặc null nếu không phải câu hỏi):
-   - "Hỏi giá" (Hỏi về giá tiền, khuyến mãi giá)
-   - "Hỏi size" (Hỏi size, kích thước, cân nặng phù hợp)
-   - "Hỏi ship" (Hỏi về phí ship, thời gian giao hàng, khu vực giao)
-   - "Hỏi chất liệu" (Hỏi về vải, thành phần, cấu tạo)
-   - "Hỏi màu" (Hỏi về màu sắc, thiết kế bên ngoài)
-   - "Hỏi tồn kho" (Hỏi còn hàng hay hết hàng)
-   - "Hỏi giảm giá" (Hỏi về voucher, coupon, chương trình flash sale)
-   - "Hỏi bảo hành" (Hỏi về chính sách bảo hành, đổi trả)
-   - "Hỏi thanh toán" (Hỏi về chuyển khoản, COD, ví điện tử)
-   - "Hỏi mùi hương" (Hỏi về mùi hương, độ thơm, độ lưu hương)
-   - "Hỏi công dụng" (Hỏi về tác dụng, cách dùng, đối tượng sử dụng)
+Nguyên tắc quan trọng: Khi nội dung bình luận mơ hồ, thiếu ngữ cảnh, hoặc không có tín hiệu mua hàng rõ ràng → intent_tag = null. Tốt hơn là bỏ sót một đơn hàng thật còn hơn tạo ra nhiều đơn ảo từ bình luận giải trí.
 
-4. **product_tag** (Tên sản phẩm chuẩn hóa):
-   - Trích xuất tên sản phẩm CHUẨN HÓA từ danh sách sản phẩm đang bán.
-   - Phải ánh xạ từ tên viết tắt hoặc biệt danh trong livestream về tên chuẩn (ví dụ: "15prm" hoặc "mười lăm pờ rô mắc" -> "iPhone 15 Pro Max").
-   - Trả về null nếu không khớp với sản phẩm nào trong danh sách.
+**question_tag** — Nếu bình luận là câu hỏi, phân loại theo nội dung: "Hỏi giá", "Hỏi size", "Hỏi ship", "Hỏi chất liệu", "Hỏi màu", "Hỏi tồn kho", "Hỏi giảm giá", "Hỏi bảo hành", "Hỏi thanh toán", "Hỏi mùi hương", "Hỏi công dụng". Không phải câu hỏi → null.
 
-5. **has_phone** (Có số điện thoại):
-   - Trả về true nếu bình luận chứa chuỗi chữ số giống SĐT Việt Nam (9-11 chữ số, bắt đầu bằng số 0 hoặc +84, có thể có dấu cách, chấm, gạch ngang). Trả về false nếu không.
+**product_tag** — Nếu bình luận đề cập đến sản phẩm đang bán trong ngữ cảnh mua bán/hỏi thông tin, ánh xạ về tên chuẩn trong danh sách sản phẩm. Nếu không rõ hoặc không khớp → null.
 
-=== BỘ TỪ ĐIỂN TIẾNG LÓNG & VIẾT TẮT LIVESTREAM VIỆT NAM ===
-- Sản phẩm/mã chốt: sp = sản phẩm, mã / ma / mas / m = mã chốt đơn, đờn = đơn hàng, cb = combo
-- Thông số: sz / szi / szie = size (kích cỡ), kg / kí / kgs = cân nặng, m = màu, prm = Pro Max, pr = Pro
-- Câu hỏi/Tương tác: bn / bnh / bnhiu / nhiu = bao nhiêu, k / ko / kg / koo = không, ib / ibox = inbox (nhắn tin riêng)
-- Địa điểm/Vận chuyển: ship / ship cod = giao hàng thanh toán tận nơi, hn = Hà Nội, hcm = TP. Hồ Chí Minh, t = tỉnh/thành phố
-
-=== VÍ DỤ PHÂN TÍCH ===
-
-Input: 101|đã mua
-Output: {"id":101,"sentiment":"neutral","intent_tag":null,"question_tag":null,"product_tag":null,"has_phone":false}
-→ Giải thích: Chỉ comment "đã mua" đơn lẻ là hành vi spam tương tác nhận quà, không có ý định mua hàng thực tế.
-
-Input: 102|ĐÃ MUA
-Output: {"id":102,"sentiment":"neutral","intent_tag":null,"question_tag":null,"product_tag":null,"has_phone":false}
-→ Giải thích: Chỉ comment "đã mua" đơn lẻ là hành vi spam tương tác nhận quà, không có ý định mua hàng thực tế.
-
-Input: 113|Mã 2
-Output: {"id":113,"sentiment":"neutral","intent_tag":"Chốt đơn","question_tag":null,"product_tag":null,"has_phone":false}
-→ Giải thích: "Mã 2" là cú pháp chốt đơn trực tiếp đặc trưng trên livestream Việt Nam.
-
-Input: 114|Mã 2 ạ
-Output: {"id":114,"sentiment":"neutral","intent_tag":"Chốt đơn","question_tag":null,"product_tag":null,"has_phone":false}
-→ Giải thích: "Mã 2 ạ" tương tự "Mã 2", chữ "ạ" là kính ngữ lịch sự, không làm thay đổi ý định chốt đơn thành câu hỏi thông tin.
-
-=== OUTPUT FORMAT ===
-Trả về JSON duy nhất, định dạng: {"results": [{...}, {...}]}
-Mỗi đối tượng kết quả phải chứa đầy đủ các khóa: id, sentiment, intent_tag, question_tag, product_tag, has_phone.
-Tuyệt đối không kèm theo văn bản giải thích hay ký tự markdown nằm ngoài JSON.
+**has_phone** — true nếu bình luận chứa chuỗi số liên tiếp 9-11 chữ số (SĐT Việt Nam).
 PROMPT;
     }
 

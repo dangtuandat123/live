@@ -190,6 +190,7 @@ class LiveSessionController extends Controller
                 'question_tag' => $e->question_tag,
                 'product_tag' => $e->product_tag,
                 'has_phone' => $e->has_phone ?? false,
+                'ai_processed' => (bool) $e->ai_processed,
             ]);
 
         // Sync status từ Python service nếu đang live
@@ -373,6 +374,7 @@ class LiveSessionController extends Controller
                     'question_tag' => $e->question_tag,
                     'product_tag' => $e->product_tag,
                     'has_phone' => $e->has_phone ?? false,
+                    'ai_processed' => (bool) $e->ai_processed,
                 ]);
 
             $liveSession->load('stats');
@@ -488,6 +490,7 @@ class LiveSessionController extends Controller
                 'question_tag' => $e->question_tag,
                 'product_tag' => $e->product_tag,
                 'has_phone' => $e->has_phone ?? false,
+                'ai_processed' => (bool) $e->ai_processed,
             ]);
 
         $liveSession->load('stats');

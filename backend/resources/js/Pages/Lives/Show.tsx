@@ -26,6 +26,67 @@ import {
 } from "lucide-react"
 import * as React from "react"
 
+const TIKTOK_EMOJI_MAP: Record<string, string> = {
+  'laughcry': '😂',
+  'heart': '❤️',
+  'smile': '😊',
+  'cry': '😢',
+  'lol': '😆',
+  'shock': '😱',
+  'wink': '😉',
+  'cool': '😎',
+  'angry': '😡',
+  'yes': '👍',
+  'surprised': '😲',
+  'happy': '😊',
+  'sad': '😢',
+  'love': '😍',
+  'cheeky': '😜',
+  'playful': '😜',
+  'wow': '😮',
+  'applause': '👏',
+  'scream': '😱',
+  'rage': '😡',
+  'sweat': '😅',
+  'thinking': '🤔',
+  'bored': '😑',
+  'sleepy': '😴',
+  'kiss': '😘',
+  'proud': '😏',
+  'silly': '😜',
+  'stunned': '😳',
+  'neutral': '😐',
+  'funny': '😂',
+  'rose': '🌹',
+  'fire': '🔥',
+  'clap': '👏',
+  'thumbsup': '👍',
+  'crying': '😭',
+  'thanks': '🙏',
+  'thankyou': '🙏',
+  'flower': '🌸',
+  'gift': '🎁',
+  'tiktok': '🎵',
+  'star': '⭐',
+  'laugh': '😄',
+  'ok': '👌',
+  'eyes': '👀',
+  'wave': '👋',
+  'crown': '👑',
+  'slap': '👋',
+  'cute': '🥰',
+  'amazing': '😲',
+  'loveyou': '🥰',
+}
+
+function renderCommentText(text: string): string {
+  if (!text) return text
+  return text.replace(/\[([a-zA-Z0-9_-]+)\]/g, (match, p1) => {
+    const key = p1.toLowerCase()
+    return TIKTOK_EMOJI_MAP[key] ?? match
+  })
+}
+
 // --- Types ---
 interface SessionData {
   id: number
@@ -69,6 +130,7 @@ interface CommentData {
   question_tag: string | null
   product_tag: string | null
   has_phone: boolean
+  ai_processed: boolean
 }
 
 interface TopProduct {
@@ -390,6 +452,25 @@ function CommentsPanel() {
 
   return (
     <Card className="h-full flex flex-col">
+      <style>{`
+        @keyframes ai-scan {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        @keyframes slide-fade-in {
+          0% {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-comment-entry {
+          animation: slide-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div>
@@ -481,9 +562,27 @@ function CommentsPanel() {
             ) : visible.map((comment) => {
               const isPinned = pinnedIds.has(comment.id)
               const isOrder = markedOrderIds.has(comment.id) || comment.intent_tag === "Chốt đơn"
-              const sentimentColor = isPinned ? "border-l-yellow-500 bg-yellow-500/5" : comment.sentiment === "positive" ? "border-l-emerald-500" : comment.sentiment === "negative" ? "border-l-red-500" : "border-l-muted-foreground/30"
+              const isAnalyzing = !comment.ai_processed
+              const sentimentColor = isPinned 
+                ? "border-l-yellow-500 bg-yellow-500/5" 
+                : isAnalyzing 
+                  ? "border-l-indigo-500 bg-indigo-500/5 animate-pulse relative overflow-hidden" 
+                  : comment.sentiment === "positive" 
+                    ? "border-l-emerald-500" 
+                    : comment.sentiment === "negative" 
+                      ? "border-l-red-500" 
+                      : "border-l-muted-foreground/30"
               return (
-                <div key={comment.id} className={`group relative flex items-start gap-2.5 border-l-2 py-2.5 pl-3 transition-colors ${sentimentColor}`}>
+                <div key={comment.id} className={`group relative flex items-start gap-2.5 border-l-2 py-2.5 pl-3 transition-colors ${sentimentColor} animate-comment-entry`}>
+                  {isAnalyzing && (
+                    <div 
+                      className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-indigo-500/10 to-transparent" 
+                      style={{
+                        backgroundSize: '200% 100%',
+                        animation: 'ai-scan 1.5s infinite linear'
+                      }}
+                    />
+                  )}
                   <a
                     href={comment.unique_id ? `https://www.tiktok.com/@${comment.unique_id}` : '#'}
                     target="_blank"
@@ -508,12 +607,20 @@ function CommentsPanel() {
                           rel="noopener noreferrer"
                           className="text-sm font-medium hover:underline hover:text-primary transition-colors"
                         >{comment.user}</a>
-                        <SentimentBadge sentiment={comment.sentiment} />
+                        {isAnalyzing ? (
+                          <Badge variant="secondary" className="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 gap-1 text-[10px] px-1.5 py-0 animate-pulse font-normal border border-indigo-500/20">
+                            <SparklesIcon className="size-2.5 animate-spin text-indigo-500" /> AI đang phân tích
+                          </Badge>
+                        ) : (
+                          <>
+                            <SentimentBadge sentiment={comment.sentiment} />
+                            {isOrder && <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-emerald-600">Đơn hàng</Badge>}
+                          </>
+                        )}
                         {comment.has_phone && (
                           <Badge variant="outline" className="gap-1 text-[10px] px-1.5 py-0"><PhoneIcon className="size-2.5" />SĐT</Badge>
                         )}
                         {isPinned && <PinIcon className="size-3 text-yellow-500" />}
-                        {isOrder && <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-emerald-600">Đơn hàng</Badge>}
                       </div>
                       {/* Time + Quick Actions — stacked to prevent layout shift */}
                       <div className="relative shrink-0 flex items-center">
@@ -543,8 +650,8 @@ function CommentsPanel() {
                         </div>
                       </div>
                     </div>
-                    <p className="text-sm text-muted-foreground break-words">{comment.text}</p>
-                    {(comment.intent_tag || comment.question_tag || comment.product_tag) && (
+                    <p className="text-sm text-muted-foreground break-words">{renderCommentText(comment.text)}</p>
+                    {!isAnalyzing && (comment.intent_tag || comment.question_tag || comment.product_tag) && (
                       <div className="flex items-center gap-1 flex-wrap pt-0.5">
                         {comment.intent_tag && !(comment.intent_tag === "Hỏi thông tin" && comment.question_tag) && (
                           <span className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium ${
@@ -872,7 +979,7 @@ function CustomersPanel() {
                     </td>
                     <td className="p-2 truncate">{c.time || <span className="text-muted-foreground">—</span>}</td>
                     <td className="p-2">{c.product ? <Badge variant="secondary" className="truncate max-w-full">{c.product}</Badge> : <span className="text-muted-foreground">—</span>}</td>
-                    <td className="p-2 text-sm text-muted-foreground truncate">{c.comment}</td>
+                    <td className="p-2 text-sm text-muted-foreground truncate">{renderCommentText(c.comment)}</td>
                     <td className="p-2 text-center">
                       {order ? (
                         <button onClick={() => openOrderDialog(i)} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors">
@@ -1397,7 +1504,7 @@ export default function LivesShow({
       } catch (err) {
         setIsOffline(true)
       }
-    }, 3000)
+    }, 5000)
 
     return () => clearInterval(interval)
   }, [session.id, session.status, session.tiktok_session_id])
