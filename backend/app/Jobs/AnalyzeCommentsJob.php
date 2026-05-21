@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\LiveEvent;
 use App\Models\LiveSession;
 use App\Services\RunwareAiService;
+use App\Services\TikTokService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -19,7 +20,7 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 2;
-    public int $timeout = 60;
+    public int $timeout = 90;
     public array $backoff = [10, 30];
 
     /**
@@ -48,7 +49,7 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
         return 'analyze-comments-' . $this->liveSessionId;
     }
 
-    public function handle(RunwareAiService $runware): void
+    public function handle(RunwareAiService $runware, TikTokService $tiktokService): void
     {
         $session = LiveSession::with(['products', 'keywords'])->find($this->liveSessionId);
         if (!$session) {
@@ -93,19 +94,69 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
         $keywords = $session->keywords->pluck('keyword')->toArray();
 
         try {
-            // Build system prompt
-            $systemPrompt = $this->buildSystemPrompt($products, $keywords);
+            // Lấy snapshot (ảnh + audio) từ live stream nếu có tiktok_session_id
+            $snapshot = null;
+            if ($session->tiktok_session_id) {
+                $snapshot = $tiktokService->getSnapshot($session->tiktok_session_id);
+            }
+
+            // Build system prompt — bao gồm live context
+            $liveTitle = $snapshot['title'] ?? $session->name ?? '';
+            $streamerName = $snapshot['streamer'] ?? $session->tiktok_username ?? '';
+            $viewerCount = $snapshot['viewer_count'] ?? 0;
+
+            $systemPrompt = $this->buildSystemPrompt($products, $keywords, $liveTitle, $streamerName, $viewerCount);
 
             // Build user message: "ID|text" per line
             $userMessage = $commentsText->map(fn ($c) => "{$c['id']}|{$c['text']}")->join("\n");
 
-            // Gọi Runware AI
-            $response = $runware->chatJson(
-                systemPrompt: $systemPrompt,
-                userMessage: $userMessage,
-                temperature: 0,
-                maxTokens: 4096,
-            );
+            // Gọi Runware AI — multimodal nếu có snapshot, text-only nếu không
+            $hasImage = !empty($snapshot['image_b64']);
+            $hasAudio = !empty($snapshot['audio_b64']);
+
+            if ($hasImage || $hasAudio) {
+                // Multimodal: text + image + audio
+                $parts = [];
+
+                if ($hasImage) {
+                    $parts[] = RunwareAiService::imageUrl(
+                        'data:image/jpeg;base64,' . $snapshot['image_b64']
+                    );
+                }
+
+                if ($hasAudio) {
+                    $parts[] = RunwareAiService::audioBase64(
+                        $snapshot['audio_b64'],
+                        'mp3'
+                    );
+                }
+
+                $parts[] = RunwareAiService::text(
+                    "Bình luận cần phân tích (format: ID|nội_dung):\n" . $userMessage
+                );
+
+                Log::info('AI multimodal analysis', [
+                    'session_id' => $this->liveSessionId,
+                    'has_image' => $hasImage,
+                    'has_audio' => $hasAudio,
+                    'comments_count' => $commentsText->count(),
+                ]);
+
+                $response = $runware->chatMultimodal(
+                    systemPrompt: $systemPrompt,
+                    parts: $parts,
+                    temperature: 0,
+                    maxTokens: 4096,
+                );
+            } else {
+                // Text-only fallback
+                $response = $runware->chatJson(
+                    systemPrompt: $systemPrompt,
+                    userMessage: $userMessage,
+                    temperature: 0,
+                    maxTokens: 4096,
+                );
+            }
 
             if (!$response) {
                 Log::warning('Runware AI returned null response', [
@@ -195,9 +246,15 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
 
     /**
      * Build system prompt cho AI phân tích comment.
+     * Bao gồm live context: title, streamer, viewer count.
      */
-    private function buildSystemPrompt(array $products, array $keywords): string
-    {
+    private function buildSystemPrompt(
+        array $products,
+        array $keywords,
+        string $liveTitle = '',
+        string $streamerName = '',
+        int $viewerCount = 0,
+    ): string {
         $productContext = collect($products)
             ->map(function ($p) {
                 $kws = !empty($p['keywords']) ? ' (từ khóa: ' . implode(', ', $p['keywords']) . ')' : '';
@@ -207,9 +264,39 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
 
         $keywordList = implode(', ', $keywords);
 
+        // Live context block — cho AI biết đang xem gì
+        $liveContext = '';
+        if ($liveTitle || $streamerName) {
+            $liveContext = "\n--- NGỮ CẢNH LIVESTREAM ---";
+            if ($liveTitle) {
+                $liveContext .= "\nTiêu đề live: {$liveTitle}";
+            }
+            if ($streamerName) {
+                $liveContext .= "\nHost/Streamer: {$streamerName}";
+            }
+            if ($viewerCount > 0) {
+                $liveContext .= "\nSố viewer hiện tại: {$viewerCount}";
+            }
+            $liveContext .= "\n---";
+        }
+
+        // Multimodal instruction block
+        $multimodalNote = <<<'NOTE'
+
+=== HÌNH ẢNH & ÂM THANH ===
+Bạn CÓ THỂ nhận được hình ảnh chụp màn hình livestream và đoạn audio ngắn từ stream.
+- Hình ảnh: cho biết sản phẩm đang được trình bày, không gian live, banner/text overlay.
+- Audio: cho biết host đang nói gì, giới thiệu sản phẩm nào, có đang chạy khuyến mãi không.
+→ Dùng thông tin này để HIỂU NGỮ CẢNH tốt hơn khi phân loại bình luận.
+→ VÍ DỤ: Nếu host đang giới thiệu "kem dưỡng da" và viewer hỏi "bao nhiêu" → product_tag = kem dưỡng da, question_tag = "Hỏi giá".
+→ Nếu KHÔNG có hình/audio, phân tích dựa trên text bình luận.
+NOTE;
+
         return <<<PROMPT
 Bạn là AI chuyên gia phân tích bình luận livestream bán hàng TikTok Việt Nam.
 Nhiệm vụ: phân loại chính xác từng bình luận theo 5 tiêu chí bên dưới.
+{$liveContext}
+{$multimodalNote}
 
 === CONTEXT ===
 Sản phẩm đang bán: {$productContext}

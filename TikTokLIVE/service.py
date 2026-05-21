@@ -10,6 +10,7 @@ API:
     POST /sessions/start        → Bắt đầu theo dõi
     GET  /sessions/{id}         → Lấy thông tin + events
     GET  /sessions/{id}/stats   → Chỉ lấy thống kê
+    GET  /sessions/{id}/snapshot→ Capture ảnh + audio từ stream
     POST /sessions/{id}/stop    → Dừng theo dõi
     GET  /sessions              → Danh sách sessions
     GET  /health                → Health check
@@ -23,8 +24,11 @@ import os
 os.environ["SSL_CERT_FILE"] = certifi.where()
 
 import asyncio
+import base64
 import os
+import subprocess
 import sys
+import tempfile
 import time
 import uuid
 import logging
@@ -121,6 +125,13 @@ class SessionInfo:
         self.streamer_username: Optional[str] = None
         self.streamer_followers: Optional[int] = None
 
+        # Stream URL (HLS m3u8) — dùng cho FFmpeg capture
+        self.stream_url: Optional[str] = None
+
+        # Snapshot cache — tránh gọi FFmpeg quá nhiều
+        self._snapshot_cache: Optional[dict] = None
+        self._snapshot_at: float = 0
+
         # Live stats (updated realtime)
         self.stats = {
             "viewer_count": 0,
@@ -206,6 +217,139 @@ def extract_user(event) -> dict:
 
 
 # ============================================================
+# FFmpeg Snapshot Capture
+# ============================================================
+SNAPSHOT_CACHE_TTL = 25  # seconds — cache snapshot 25s (AI polls mỗi 30s)
+
+
+def capture_image_from_stream(stream_url: str) -> Optional[str]:
+    """Capture 1 frame JPEG từ HLS/FLV stream, return base64 string."""
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", stream_url,
+            "-frames:v", "1",
+            "-q:v", "5",  # quality 1-31, lower = better
+            "-vf", "scale=640:-1",  # resize to 640px width
+            tmp_path,
+        ]
+
+        result = subprocess.run(
+            cmd, capture_output=True, timeout=15,
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+        )
+
+        if result.returncode != 0:
+            logger.warning(f"FFmpeg image capture failed: {result.stderr.decode('utf-8', errors='replace')[:200]}")
+            return None
+
+        if not os.path.exists(tmp_path) or os.path.getsize(tmp_path) == 0:
+            return None
+
+        with open(tmp_path, "rb") as f:
+            return base64.b64encode(f.read()).decode("utf-8")
+
+    except subprocess.TimeoutExpired:
+        logger.warning("FFmpeg image capture timeout")
+        return None
+    except Exception as e:
+        logger.warning(f"FFmpeg image capture error: {e}")
+        return None
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+
+def capture_audio_from_stream(stream_url: str, duration: int = 3) -> Optional[str]:
+    """Capture N giây audio MP3 từ HLS/FLV stream, return base64 string."""
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", stream_url,
+            "-t", str(duration),
+            "-vn",  # no video
+            "-acodec", "libmp3lame",
+            "-ar", "16000",  # 16kHz — đủ cho speech recognition
+            "-ac", "1",  # mono
+            "-b:a", "32k",  # low bitrate — giảm size
+            tmp_path,
+        ]
+
+        result = subprocess.run(
+            cmd, capture_output=True, timeout=duration + 15,
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+        )
+
+        if result.returncode != 0:
+            logger.warning(f"FFmpeg audio capture failed: {result.stderr.decode('utf-8', errors='replace')[:200]}")
+            return None
+
+        if not os.path.exists(tmp_path) or os.path.getsize(tmp_path) == 0:
+            return None
+
+        with open(tmp_path, "rb") as f:
+            return base64.b64encode(f.read()).decode("utf-8")
+
+    except subprocess.TimeoutExpired:
+        logger.warning("FFmpeg audio capture timeout")
+        return None
+    except Exception as e:
+        logger.warning(f"FFmpeg audio capture error: {e}")
+        return None
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+
+def get_snapshot(session: SessionInfo) -> dict:
+    """Lấy snapshot (image + audio) từ stream, với cache TTL."""
+    now = time.time()
+
+    # Dùng cache nếu còn hạn
+    if session._snapshot_cache and (now - session._snapshot_at) < SNAPSHOT_CACHE_TTL:
+        return session._snapshot_cache
+
+    if not session.stream_url:
+        return {"image_b64": None, "audio_b64": None, "title": session.title, "error": "No stream URL"}
+
+    logger.info(f"[{session.session_id}] Capturing snapshot from stream...")
+
+    image_b64 = capture_image_from_stream(session.stream_url)
+    audio_b64 = capture_audio_from_stream(session.stream_url, duration=3)
+
+    snapshot = {
+        "image_b64": image_b64,
+        "audio_b64": audio_b64,
+        "title": session.title,
+        "streamer": session.streamer_nickname,
+        "viewer_count": session.stats.get("viewer_count", 0),
+        "captured_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    # Cache
+    session._snapshot_cache = snapshot
+    session._snapshot_at = now
+
+    logger.info(f"[{session.session_id}] Snapshot: image={'yes' if image_b64 else 'no'}, audio={'yes' if audio_b64 else 'no'}")
+
+    return snapshot
+
+
+# ============================================================
 # TikTok Client Setup
 # ============================================================
 def setup_tiktok_client(session: SessionInfo) -> TikTokLiveClient:
@@ -222,6 +366,7 @@ def setup_tiktok_client(session: SessionInfo) -> TikTokLiveClient:
         if client.room_info:
             owner = client.room_info.get("owner", {})
             stats = client.room_info.get("stats", {})
+            stream_url_info = client.room_info.get("stream_url", {})
 
             session.title = client.room_info.get("title", "")
             session.stats["viewer_count"] = client.room_info.get("user_count", 0)
@@ -231,6 +376,19 @@ def setup_tiktok_client(session: SessionInfo) -> TikTokLiveClient:
             session.streamer_nickname = owner.get("nickname", "")
             session.streamer_username = owner.get("display_id", "")
             session.streamer_followers = owner.get("follower_count", 0)
+
+            # Lấy HLS stream URL cho snapshot capture
+            hls_url = stream_url_info.get("hls_pull_url", "")
+            if hls_url:
+                session.stream_url = hls_url
+                logger.info(f"[{session.session_id}] Stream URL captured: {hls_url[:80]}...")
+            else:
+                # Fallback: FLV HD
+                flv_urls = stream_url_info.get("flv_pull_url", {})
+                if isinstance(flv_urls, dict):
+                    session.stream_url = flv_urls.get("HD1", "") or flv_urls.get("SD1", "")
+                elif isinstance(flv_urls, str):
+                    session.stream_url = flv_urls
 
         logger.info(f"[{session.session_id}] Connected: {session.title} (Room {session.room_id})")
         session.add_event("connected", data={"room_id": session.room_id, "title": session.title})
@@ -444,6 +602,30 @@ async def get_session_stats(session_id: str, x_service_key: str = Header(None)):
         raise HTTPException(status_code=404, detail="Session not found")
 
     return session.to_dict(include_events=False)
+
+
+@app.get("/sessions/{session_id}/snapshot")
+async def get_session_snapshot(session_id: str, x_service_key: str = Header(None)):
+    """Capture ảnh + audio từ live stream cho AI phân tích."""
+    verify_api_key(x_service_key)
+
+    session = sessions.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if session.status != "live":
+        return {
+            "image_b64": None,
+            "audio_b64": None,
+            "title": session.title,
+            "error": f"Session not live (status: {session.status})",
+        }
+
+    # Chạy FFmpeg trong thread pool để không block event loop
+    loop = asyncio.get_event_loop()
+    snapshot = await loop.run_in_executor(None, get_snapshot, session)
+
+    return snapshot
 
 
 @app.post("/sessions/{session_id}/stop")

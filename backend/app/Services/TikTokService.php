@@ -83,6 +83,34 @@ class TikTokService
         }
     }
 
+    /**
+     * Capture snapshot (ảnh + audio) từ live stream cho AI phân tích.
+     *
+     * @return array{image_b64: ?string, audio_b64: ?string, title: ?string}|null
+     */
+    public function getSnapshot(string $sessionId): ?array
+    {
+        try {
+            // Timeout cao hơn vì FFmpeg capture mất vài giây
+            $response = Http::timeout(20)
+                ->withHeaders(['X-Service-Key' => $this->apiKey])
+                ->get($this->baseUrl . "/sessions/{$sessionId}/snapshot");
+
+            if ($response->failed()) {
+                Log::warning('TikTok snapshot failed', [
+                    'session_id' => $sessionId,
+                    'status' => $response->status(),
+                ]);
+                return null;
+            }
+
+            return $response->json();
+        } catch (ConnectionException $e) {
+            Log::warning('TikTok snapshot connection failed', ['error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
     // --- Internal ---
 
     private function client()
