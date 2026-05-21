@@ -354,6 +354,26 @@ class LiveSessionController extends Controller
             return response()->json(['message' => 'No TikTok session linked'], 400);
         }
 
+        // Khởi tạo TTL cho cache: cache lâu hơn (1 giờ) nếu phiên live đã kết thúc
+        $cacheTtl = in_array($liveSession->status, ['ended', 'error']) ? 3600 : 5;
+        $historyTtl = in_array($liveSession->status, ['ended', 'error']) ? 3600 : 10;
+
+        $topProducts = \Illuminate\Support\Facades\Cache::remember("live_session_{$liveSession->id}_top_products", $cacheTtl, function () use ($liveSession) {
+            return $this->getTopProducts($liveSession);
+        });
+
+        $potentialCustomers = \Illuminate\Support\Facades\Cache::remember("live_session_{$liveSession->id}_potential_customers", $cacheTtl, function () use ($liveSession) {
+            return $this->getPotentialCustomers($liveSession);
+        });
+
+        $topQuestions = \Illuminate\Support\Facades\Cache::remember("live_session_{$liveSession->id}_top_questions", $cacheTtl, function () use ($liveSession) {
+            return $this->getTopQuestions($liveSession);
+        });
+
+        $statsHistory = \Illuminate\Support\Facades\Cache::remember("live_session_{$liveSession->id}_stats_history", $historyTtl, function () use ($liveSession) {
+            return $this->getFormattedStatsHistory($liveSession);
+        });
+
         // Nếu session đã bị lỗi hoặc kết thúc, không gọi service nữa mà trả về dữ liệu DB hiện tại
         if ($liveSession->status === 'error' || $liveSession->status === 'ended') {
             $latestComments = $liveSession->events()
@@ -386,10 +406,10 @@ class LiveSessionController extends Controller
                 'status' => $liveSession->status,
                 'error_message' => $liveSession->error_message,
                 'duration' => $liveSession->duration_formatted,
-                'topProducts' => $this->getTopProducts($liveSession),
-                'potentialCustomers' => $this->getPotentialCustomers($liveSession),
-                'topQuestions' => $this->getTopQuestions($liveSession),
-                'statsHistory' => $this->getFormattedStatsHistory($liveSession),
+                'topProducts' => $topProducts,
+                'potentialCustomers' => $potentialCustomers,
+                'topQuestions' => $topQuestions,
+                'statsHistory' => $statsHistory,
             ]);
         }
 
@@ -502,10 +522,10 @@ class LiveSessionController extends Controller
             'status' => (isset($serviceData) && isset($serviceData['status'])) ? $serviceData['status'] : $liveSession->status,
             'error_message' => $liveSession->error_message,
             'duration' => $liveSession->duration_formatted,
-            'topProducts' => $this->getTopProducts($liveSession),
-            'potentialCustomers' => $this->getPotentialCustomers($liveSession),
-            'topQuestions' => $this->getTopQuestions($liveSession),
-            'statsHistory' => $this->getFormattedStatsHistory($liveSession),
+            'topProducts' => $topProducts,
+            'potentialCustomers' => $potentialCustomers,
+            'topQuestions' => $topQuestions,
+            'statsHistory' => $statsHistory,
         ]);
     }
 
@@ -552,15 +572,24 @@ class LiveSessionController extends Controller
                         default => md5($eventType . '_' . ($event['timestamp'] ?? '')),
                     };
 
+                    // Đồng bộ hóa trích xuất số điện thoại (Instant Phone Capture)
+                    $hasPhone = false;
+                    if ($eventType === 'comment' && !empty($event['data']['comment'])) {
+                        $normalized = preg_replace('/[\s.\-]/', '', $event['data']['comment']);
+                        $hasPhone = (bool) preg_match('/0\d{9,10}/', $normalized);
+                    }
+
                     LiveEvent::create([
                         'live_session_id' => $session->id,
                         'event_type' => $event['type'] ?? 'unknown',
-                        'tiktok_user_id' => $event['user_id'] ?? null,
+                        // Sửa lỗi lọt trùng lặp do nullability: gán giá trị mặc định cho tiktok_user_id nếu null
+                        'tiktok_user_id' => !empty($event['user_id']) ? (string) $event['user_id'] : 'anonymous',
                         'tiktok_unique_id' => $event['unique_id'] ?? null,
                         'tiktok_nickname' => $event['nickname'] ?? null,
                         'data' => $event['data'] ?? [],
                         'data_hash' => $dataHash,
                         'event_at' => $eventAt,
+                        'has_phone' => $hasPhone,
                     ]);
                     $pageCount++;
                 } catch (\Illuminate\Database\UniqueConstraintViolationException) {

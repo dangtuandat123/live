@@ -23,6 +23,7 @@ class LiveSession extends Model
         'started_at',
         'ended_at',
         'error_message',
+        'ai_context_summary',
     ];
 
     protected function casts(): array

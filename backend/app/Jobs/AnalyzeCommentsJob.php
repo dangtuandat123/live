@@ -94,7 +94,7 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
         $keywords = $session->keywords->pluck('keyword')->toArray();
 
         try {
-            // Chỉ sử dụng metadata từ session database (không gọi FFmpeg snapshot nữa để tiết kiệm CPU và 95% token)
+            // Live metadata
             $liveTitle = $session->name ?? '';
             $streamerName = $session->tiktok_username ?? '';
             $viewerCount = 0;
@@ -103,20 +103,54 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
                 $viewerCount = $session->stats->viewer_count ?? 0;
             }
 
-            $systemPrompt = $this->buildSystemPrompt($products, $keywords, $liveTitle, $streamerName, $viewerCount);
+            // === Audio Capture: Lấy audio 3s từ livestream qua Python FFmpeg ===
+            $audioB64 = null;
+            if ($session->tiktok_session_id) {
+                try {
+                    $snapshot = $tiktokService->getSnapshot($session->tiktok_session_id);
+                    $audioB64 = $snapshot['audio_b64'] ?? null;
+                    if ($audioB64) {
+                        Log::info('Audio captured for AI analysis', [
+                            'session_id' => $this->liveSessionId,
+                            'audio_size_bytes' => strlen(base64_decode($audioB64)),
+                        ]);
+                    }
+                } catch (\Throwable $snapEx) {
+                    Log::warning('Audio capture failed, falling back to text-only', [
+                        'session_id' => $this->liveSessionId,
+                        'error' => $snapEx->getMessage(),
+                    ]);
+                }
+            }
+
+            // === Memory: Đọc context từ batch trước ===
+            $memoryContext = $session->ai_context_summary ?? '';
+
+            $systemPrompt = $this->buildSystemPrompt(
+                $products, $keywords, $liveTitle, $streamerName, $viewerCount,
+                $memoryContext, (bool) $audioB64,
+            );
 
             // Build user message: "ID|text" per line
             $userMessage = $commentsText->map(fn ($c) => "{$c['id']}|{$c['text']}")->join("\n");
 
-            // Gọi API phân tích Text-only — cực kỳ nhanh, rẻ và chính xác hơn do AI không bị phân tâm
-            Log::info('AI text-only comment analysis start', [
+            // === Build multimodal parts: text + audio (nếu có) ===
+            $parts = [RunwareAiService::text($userMessage)];
+            if ($audioB64) {
+                $parts[] = RunwareAiService::audioBase64($audioB64, 'mp3');
+            }
+
+            $hasAudio = (bool) $audioB64;
+            Log::info('AI multimodal comment analysis start', [
                 'session_id' => $this->liveSessionId,
                 'comments_count' => $commentsText->count(),
+                'has_audio' => $hasAudio,
+                'has_memory' => !empty($memoryContext),
             ]);
 
-            $response = $runware->chatJson(
+            $response = $runware->chatMultimodal(
                 systemPrompt: $systemPrompt,
-                userMessage: $userMessage,
+                parts: $parts,
                 temperature: 0,
                 maxTokens: 4096,
             );
@@ -189,6 +223,14 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
             // Cập nhật aggregate stats
             $this->updateAggregateStats($session);
 
+            // === Memory: Lưu session_note từ AI cho batch tiếp theo ===
+            $sessionNote = $response['session_note'] ?? null;
+            if ($sessionNote && is_string($sessionNote)) {
+                $session->update([
+                    'ai_context_summary' => mb_substr($sessionNote, 0, 500),
+                ]);
+            }
+
             // Vét sạch comments chưa được xử lý AI của session này
             $hasMoreUnprocessed = LiveEvent::where('live_session_id', $this->liveSessionId)
                 ->where('event_type', 'comment')
@@ -222,20 +264,43 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
                 'comments_count' => $commentsText->count(),
             ]);
 
+            // Khắc phục lỗi Poison Pill deadlock: Đánh dấu các comment là đã xử lý (sentiment neutral)
+            // nếu lỗi không thể tự phục hồi (JSON parse, null response) hoặc đã đạt số lần thử tối đa.
+            $isLastAttempt = $this->attempts() >= $this->tries;
+            $isUnrecoverable = !str_contains($e->getMessage(), 'rate limit') && 
+                               !str_contains($e->getMessage(), 'timeout') && 
+                               !str_contains($e->getMessage(), 'Connection');
+
+            if ($isLastAttempt || $isUnrecoverable) {
+                try {
+                    DB::table('live_events')
+                        ->whereIn('id', $unprocessed->pluck('id'))
+                        ->update(['ai_processed' => true, 'sentiment' => 'neutral']);
+                    Log::warning('Marked batch comments as processed (neutral) due to unrecoverable AI error or max retries reached to prevent queue deadlock', [
+                        'session_id' => $this->liveSessionId,
+                        'comments_ids' => $unprocessed->pluck('id')->toArray(),
+                    ]);
+                } catch (\Throwable $dbEx) {
+                    Log::error('Failed to mark poison pill comments as processed', [
+                        'error' => $dbEx->getMessage(),
+                    ]);
+                }
+            }
+
             // Không retry nếu lỗi auth
             if (str_contains($e->getMessage(), 'API key') || str_contains($e->getMessage(), '401') || str_contains($e->getMessage(), 'auth')) {
                 $this->fail($e);
                 return;
             }
 
-            // Rethrow để Laravel queue tự động retry theo $tries/$backoff
+            // Rethrow để Laravel queue tự động retry theo $tries/$backoff nếu còn lượt
             throw $e;
         }
     }
 
     /**
      * Build system prompt cho AI phân tích comment.
-     * Bao gồm live context: title, streamer, viewer count.
+     * Bao gồm: live context, memory từ batch trước, hướng dẫn audio.
      */
     private function buildSystemPrompt(
         array $products,
@@ -243,6 +308,8 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
         string $liveTitle = '',
         string $streamerName = '',
         int $viewerCount = 0,
+        string $memoryContext = '',
+        bool $hasAudio = false,
     ): string {
         $productContext = collect($products)
             ->map(function ($p) {
@@ -258,16 +325,41 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
             $liveContext = "\n- Live: {$liveTitle} | Host: {$streamerName} | Viewer: {$viewerCount}";
         }
 
+        // Memory section — ngữ cảnh từ batch phân tích trước
+        $memorySection = '';
+        if (!empty($memoryContext)) {
+            $memorySection = <<<MEM
+
+=== BỘ NHỚ PHIÊN LIVE ===
+Ghi chú từ lần phân tích trước (dùng để hiểu ngữ cảnh liên tục):
+{$memoryContext}
+MEM;
+        }
+
+        // Audio section — hướng dẫn AI sử dụng audio nếu có
+        $audioSection = '';
+        if ($hasAudio) {
+            $audioSection = <<<AUDIO
+
+=== AUDIO LIVESTREAM ===
+Bạn cũng nhận được đoạn audio 3 giây gần nhất từ livestream. Hãy nghe để hiểu:
+- Streamer đang giới thiệu hoặc bán sản phẩm nào → dùng để xác định product_tag chính xác hơn.
+- Đang chạy minigame/đoán số/chơi trò chơi → các comment chứa số hoặc nội dung ngắn có thể là tham gia trò chơi, không phải mã đơn hàng.
+- Giọng nói và nội dung streamer đang nói → giúp hiểu ngữ cảnh bình luận của người xem.
+Nếu audio nhiễu hoặc không rõ, hãy bỏ qua và phân tích dựa trên text.
+AUDIO;
+        }
+
         return <<<PROMPT
 Bạn là chuyên gia phân tích hành vi khách hàng trên Livestream bán hàng Việt Nam. Nhiệm vụ: đọc danh sách bình luận và phân loại từng bình luận.
 
-Trả về JSON duy nhất: {"results": [{"id": int, "sentiment": "positive"|"neutral"|"negative", "intent_tag": "Chốt đơn"|"Hỏi thông tin"|"Phản hồi SP"|"Yêu cầu hỗ trợ"|null, "question_tag": string|null, "product_tag": string|null, "has_phone": bool}]}
+Trả về JSON duy nhất: {"results": [{"id": int, "sentiment": "positive"|"neutral"|"negative", "intent_tag": "Chốt đơn"|"Hỏi thông tin"|"Phản hồi SP"|"Yêu cầu hỗ trợ"|null, "question_tag": string|null, "product_tag": string|null, "has_phone": bool}], "session_note": "string (max 300 ký tự)"}
 Không kèm bất kỳ giải thích nào ngoài JSON.
 
 === BỐI CẢNH ===
 Đây là Livestream bán hàng trực tuyến trên TikTok. Người xem vừa mua sắm, vừa tương tác giải trí. Trong một phiên live, người xem có thể: đặt hàng, hỏi thông tin sản phẩm, phản hồi trải nghiệm, yêu cầu hỗ trợ sau mua, hoặc chỉ đơn giản là tương tác xã hội (chào hỏi, cổ vũ, tham gia minigame/đoán số, bình luận cho vui).
 - Sản phẩm đang bán: {$productContext}
-- Từ khóa theo dõi: {$keywordList}{$liveContext}
+- Từ khóa theo dõi: {$keywordList}{$liveContext}{$memorySection}{$audioSection}
 
 === CÁCH SUY LUẬN ===
 
@@ -290,6 +382,8 @@ Nguyên tắc quan trọng: Khi nội dung bình luận mơ hồ, thiếu ngữ 
 **product_tag** — Nếu bình luận đề cập đến sản phẩm đang bán trong ngữ cảnh mua bán/hỏi thông tin, ánh xạ về tên chuẩn trong danh sách sản phẩm. Nếu không rõ hoặc không khớp → null.
 
 **has_phone** — true nếu bình luận chứa chuỗi số liên tiếp 9-11 chữ số (SĐT Việt Nam).
+
+**session_note** — Viết ghi chú ngắn gọn (tối đa 300 ký tự) tóm tắt ngữ cảnh hiện tại của buổi live để giúp lần phân tích tiếp theo hiểu rõ hơn. Ví dụ: "Đang bán Áo thun đen, nhiều người hỏi size. Có minigame đoán số đang chạy. Streamer vừa chuyển sang giới thiệu Váy đỏ."
 PROMPT;
     }
 
