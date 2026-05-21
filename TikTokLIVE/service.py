@@ -84,6 +84,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger("tiktok-live-service")
 
+# --- Dependency check (FFmpeg) ---
+FFMPEG_AVAILABLE = None
+
+def check_ffmpeg() -> bool:
+    """Kiểm tra xem lệnh 'ffmpeg' có khả dụng trong hệ thống hay không (được cache)."""
+    global FFMPEG_AVAILABLE
+    if FFMPEG_AVAILABLE is not None:
+        return FFMPEG_AVAILABLE
+
+    try:
+        subprocess.run(
+            ["ffmpeg", "-version"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+            timeout=5
+        )
+        FFMPEG_AVAILABLE = True
+    except (FileNotFoundError, subprocess.SubprocessError):
+        FFMPEG_AVAILABLE = False
+
+    return FFMPEG_AVAILABLE
+
 # --- App ---
 app = FastAPI(title="TikTok LIVE Service", version="1.0.0")
 
@@ -224,6 +247,10 @@ SNAPSHOT_CACHE_TTL = 25  # seconds — cache snapshot 25s (AI polls mỗi 30s)
 
 def capture_image_from_stream(stream_url: str) -> Optional[str]:
     """Capture 1 frame JPEG từ HLS/FLV stream, return base64 string."""
+    if not check_ffmpeg():
+        logger.warning("FFmpeg is not installed or not in PATH. Skipping image capture.")
+        return None
+
     tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
@@ -269,6 +296,10 @@ def capture_image_from_stream(stream_url: str) -> Optional[str]:
 
 def capture_audio_from_stream(stream_url: str, duration: int = 3) -> Optional[str]:
     """Capture N giây audio MP3 từ HLS/FLV stream, return base64 string."""
+    if not check_ffmpeg():
+        logger.warning("FFmpeg is not installed or not in PATH. Skipping audio capture.")
+        return None
+
     tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
@@ -521,6 +552,7 @@ async def health():
         "status": "ok",
         "active_sessions": len([s for s in sessions.values() if s.status == "live"]),
         "total_sessions": len(sessions),
+        "ffmpeg_installed": check_ffmpeg(),
     }
 
 
@@ -679,6 +711,16 @@ if __name__ == "__main__":
 
     try:
         logger.info(f"Base dir: {BASE_DIR}")
+        
+        # Kiểm tra dependency FFmpeg khi khởi động
+        if not check_ffmpeg():
+            logger.warning(
+                "⚠️ [WARNING] FFmpeg is not installed or not added to system PATH. "
+                "Stream screen capture and audio extraction will NOT work."
+            )
+        else:
+            logger.info("FFmpeg dependency check: OK")
+
         logger.info(f"Starting TikTok LIVE Service on 0.0.0.0:{SERVICE_PORT}")
         uvicorn.run(app, host="0.0.0.0", port=SERVICE_PORT)
     except Exception as e:

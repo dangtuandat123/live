@@ -240,6 +240,32 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
             // Cập nhật aggregate stats
             $this->updateAggregateStats($session);
 
+            // Vét sạch comments chưa được xử lý AI của session này
+            $hasMoreUnprocessed = LiveEvent::where('live_session_id', $this->liveSessionId)
+                ->where('event_type', 'comment')
+                ->where('ai_processed', false)
+                ->exists();
+
+            if ($hasMoreUnprocessed) {
+                // Giải phóng unique lock của job hiện tại để Laravel cho phép dispatch job tiếp theo
+                $lockKey = 'laravel_unique_job:' . self::class . ':' . $this->uniqueId();
+                try {
+                    cache()->forget($lockKey);
+                } catch (\Throwable $cacheEx) {
+                    Log::warning('Failed to clear unique job lock key', [
+                        'key' => $lockKey,
+                        'error' => $cacheEx->getMessage(),
+                    ]);
+                }
+
+                // Dispatch tiếp với delay 2 giây để tránh spam / rate limit Runware/Gemini AI
+                self::dispatch($this->liveSessionId)->delay(now()->addSeconds(2));
+
+                Log::info('Dispatched next AnalyzeCommentsJob to process remaining comments', [
+                    'session_id' => $this->liveSessionId,
+                ]);
+            }
+
         } catch (\Throwable $e) {
             Log::error('AI comment analysis failed', [
                 'session_id' => $this->liveSessionId,
