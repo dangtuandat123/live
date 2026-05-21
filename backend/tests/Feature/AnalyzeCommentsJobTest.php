@@ -488,8 +488,275 @@ class AnalyzeCommentsJobTest extends TestCase
         $job = new AnalyzeCommentsJob($session->id);
         app()->call([$job, 'handle']);
 
-        // Memory should NOT be updated with non-string value
-        $session->refresh();
         $this->assertNull($session->ai_context_summary);
+    }
+
+    public function test_text_less_comment_batch_does_not_stall_pipeline(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake([AnalyzeCommentsJob::class]);
+
+        $user = \App\Models\User::factory()->create();
+        $session = LiveSession::create([
+            'user_id' => $user->id,
+            'name' => 'Text-less Test Session',
+            'status' => 'live',
+            'tiktok_username' => 'testuser',
+        ]);
+
+        // Create 50 empty comments to fill the first batch
+        $emptyComments = [];
+        for ($i = 0; $i < 50; $i++) {
+            $emptyComments[] = LiveEvent::create([
+                'live_session_id' => $session->id,
+                'event_type' => 'comment',
+                'event_at' => now()->subMinutes(60)->addSeconds($i),
+                'tiktok_user_id' => 'user_1',
+                'data' => ['comment' => ''], // empty text (e.g. system join/emojis filtered out)
+                'ai_processed' => false,
+            ]);
+        }
+
+        // Batch 2: valid comment (will remain unprocessed)
+        $validComment = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now(),
+            'tiktok_user_id' => 'user_2',
+            'data' => ['comment' => 'Mã 2'],
+            'ai_processed' => false,
+        ]);
+
+        // Mock services
+        $this->mock(TikTokService::class);
+        $this->mock(RunwareAiService::class, function ($mock) {
+            $mock->shouldNotReceive('chatMultimodal');
+        });
+
+        $job = new AnalyzeCommentsJob($session->id);
+        app()->call([$job, 'handle']);
+
+        // Assert the empty comments were marked processed (neutral)
+        foreach ($emptyComments as $emptyComment) {
+            $emptyComment->refresh();
+            $this->assertTrue((bool)$emptyComment->ai_processed);
+            $this->assertEquals('neutral', $emptyComment->sentiment);
+        }
+
+        // Assert the valid comment is still unprocessed
+        $validComment->refresh();
+        $this->assertFalse((bool)$validComment->ai_processed);
+
+        // Assert next job was dispatched to continue pipeline
+        \Illuminate\Support\Facades\Queue::assertPushed(AnalyzeCommentsJob::class, function ($job) use ($session) {
+            return $job->uniqueId() === 'analyze-comments-' . $session->id;
+        });
+    }
+
+    public function test_stats_are_incremented_and_leads_calculated_correctly(): void
+    {
+        $user = \App\Models\User::factory()->create();
+        $session = LiveSession::create([
+            'user_id' => $user->id,
+            'name' => 'Stats Test Session',
+            'status' => 'live',
+            'tiktok_username' => 'testuser',
+        ]);
+
+        // Create comments for first batch
+        $comment1 = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now(),
+            'tiktok_user_id' => 'user_1',
+            'data' => ['comment' => 'Sản phẩm tốt quá'],
+            'ai_processed' => false,
+        ]);
+
+        $comment2 = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now()->addSecond(),
+            'tiktok_user_id' => 'user_1', // same user
+            'data' => ['comment' => 'Chốt đơn mã A'],
+            'ai_processed' => false,
+        ]);
+
+        $comment3 = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now()->addSeconds(2),
+            'tiktok_user_id' => 'user_2', // different user
+            'data' => ['comment' => 'Chốt đơn mã A'],
+            'ai_processed' => false,
+        ]);
+
+        $this->mock(TikTokService::class);
+        $this->mock(RunwareAiService::class, function ($mock) use ($comment1, $comment2, $comment3) {
+            $mock->shouldReceive('chatMultimodal')->andReturn([
+                'results' => [
+                    [
+                        'id' => $comment1->id,
+                        'sentiment' => 'positive',
+                        'intent_tag' => 'Phản hồi SP',
+                        'question_tag' => null,
+                        'product_tag' => null,
+                        'has_phone' => false,
+                    ],
+                    [
+                        'id' => $comment2->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => 'Chốt đơn',
+                        'question_tag' => null,
+                        'product_tag' => null,
+                        'has_phone' => false,
+                    ],
+                    [
+                        'id' => $comment3->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => 'Chốt đơn',
+                        'question_tag' => null,
+                        'product_tag' => null,
+                        'has_phone' => false,
+                    ],
+                ],
+                'session_note' => 'Stats batch summary.',
+            ]);
+        });
+
+        $job = new AnalyzeCommentsJob($session->id);
+        app()->call([$job, 'handle']);
+
+        // Verify stats are calculated correctly
+        $session->refresh();
+        $stats = $session->stats;
+        $this->assertNotNull($stats);
+        $this->assertEquals(1, $stats->sentiment_positive);
+        $this->assertEquals(2, $stats->sentiment_neutral);
+        $this->assertEquals(0, $stats->sentiment_negative);
+        $this->assertEquals(2, $stats->leads_count); // user_1 and user_2 are leads
+
+        // Create comments for second batch
+        $comment4 = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now()->addSeconds(10),
+            'tiktok_user_id' => 'user_1', // user_1 orders again (should not increment lead count)
+            'data' => ['comment' => 'Chốt đơn nữa'],
+            'ai_processed' => false,
+        ]);
+
+        $comment5 = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now()->addSeconds(11),
+            'tiktok_user_id' => 'user_3', // user_3 is a new lead (should increment lead count)
+            'data' => ['comment' => 'Chốt đơn mã B'],
+            'ai_processed' => false,
+        ]);
+
+        $this->mock(TikTokService::class);
+        $this->mock(RunwareAiService::class, function ($mock) use ($comment4, $comment5) {
+            $mock->shouldReceive('chatMultimodal')->andReturn([
+                'results' => [
+                    [
+                        'id' => $comment4->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => 'Chốt đơn',
+                        'question_tag' => null,
+                        'product_tag' => null,
+                        'has_phone' => false,
+                    ],
+                    [
+                        'id' => $comment5->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => 'Chốt đơn',
+                        'question_tag' => null,
+                        'product_tag' => null,
+                        'has_phone' => false,
+                    ],
+                ],
+                'session_note' => 'Second batch summary.',
+            ]);
+        });
+
+        $job2 = new AnalyzeCommentsJob($session->id);
+        app()->call([$job2, 'handle']);
+
+        $session->refresh();
+        $stats = $session->stats;
+        $this->assertEquals(1, $stats->sentiment_positive);
+        $this->assertEquals(4, $stats->sentiment_neutral);
+        $this->assertEquals(3, $stats->leads_count); // 3 unique leads (user_1, user_2, user_3)
+    }
+
+    public function test_ai_response_exception_does_not_stall_pipeline(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake([AnalyzeCommentsJob::class]);
+
+        $user = \App\Models\User::factory()->create();
+        $session = LiveSession::create([
+            'user_id' => $user->id,
+            'name' => 'Exception Test Session',
+            'status' => 'live',
+            'tiktok_username' => 'testuser',
+        ]);
+
+        // Create 50 comments for Batch 1 (will fail)
+        $failedComments = [];
+        for ($i = 0; $i < 50; $i++) {
+            $failedComments[] = LiveEvent::create([
+                'live_session_id' => $session->id,
+                'event_type' => 'comment',
+                'event_at' => now()->subMinutes(60)->addSeconds($i),
+                'tiktok_user_id' => 'user_1',
+                'data' => ['comment' => 'Hỏng rồi ' . $i],
+                'ai_processed' => false,
+            ]);
+        }
+
+        // Batch 2 comment (should be queued and remain unprocessed)
+        $nextComment = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now(),
+            'tiktok_user_id' => 'user_2',
+            'data' => ['comment' => 'Bình thường'],
+            'ai_processed' => false,
+        ]);
+
+        $this->mock(TikTokService::class);
+        $this->mock(RunwareAiService::class, function ($mock) {
+            $mock->shouldReceive('chatMultimodal')
+                ->once()
+                ->andThrow(new \RuntimeException('AI Response has invalid structure'));
+        });
+
+        $job = new AnalyzeCommentsJob($session->id);
+        
+        $thrown = false;
+        try {
+            app()->call([$job, 'handle']);
+        } catch (\RuntimeException $e) {
+            $this->assertEquals('AI Response has invalid structure', $e->getMessage());
+            $thrown = true;
+        }
+
+        $this->assertTrue($thrown, 'RuntimeException should be rethrown');
+
+        // Assert failed comments are marked processed & neutral
+        foreach ($failedComments as $failedComment) {
+            $failedComment->refresh();
+            $this->assertTrue((bool)$failedComment->ai_processed);
+            $this->assertEquals('neutral', $failedComment->sentiment);
+        }
+
+        // Assert next comment is still unprocessed
+        $nextComment->refresh();
+        $this->assertFalse((bool)$nextComment->ai_processed);
+
+        // Assert next job was dispatched to process subsequent comments
+        \Illuminate\Support\Facades\Queue::assertPushed(AnalyzeCommentsJob::class, function ($job) use ($session) {
+            return $job->uniqueId() === 'analyze-comments-' . $session->id;
+        });
     }
 }

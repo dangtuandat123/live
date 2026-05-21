@@ -15,19 +15,13 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
+class AnalyzeCommentsJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 2;
     public int $timeout = 120;
     public array $backoff = [10, 30];
-
-    /**
-     * Mỗi session chỉ có tối đa 1 job trong queue (ShouldBeUnique).
-     * Tránh tràn queue khi polling dispatch nhiều lần.
-     */
-    public int $uniqueFor = 30; // 30s lock
 
     /**
      * Giá trị hợp lệ cho các AI fields — validation trước khi lưu DB.
@@ -51,250 +45,349 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
 
     public function handle(RunwareAiService $runware, TikTokService $tiktokService): void
     {
-        $session = LiveSession::with(['products', 'keywords', 'stats'])->find($this->liveSessionId);
-        if (!$session) {
+        $lockKey = 'analyze-comments-lock-' . $this->liveSessionId;
+        $lock = cache()->lock($lockKey, 120);
+        if (!$lock->get()) {
             return;
         }
 
-        // Chỉ xử lý AI cho phiên live đang hoạt động
-        if (!in_array($session->status, ['live', 'connecting'])) {
-            return;
-        }
-
-        // Batch 50 comments — giảm từ 100 để tăng accuracy
-        $unprocessed = LiveEvent::where('live_session_id', $this->liveSessionId)
-            ->where('event_type', 'comment')
-            ->where('ai_processed', false)
-            ->orderBy('event_at')
-            ->limit(50)
-            ->get();
-
-        if ($unprocessed->isEmpty()) {
-            return;
-        }
-
-        // Build compact input: "ID|text"
-        $commentsText = $unprocessed
-            ->map(fn ($e) => ['id' => $e->id, 'text' => $e->data['comment'] ?? ''])
-            ->filter(fn ($c) => !empty($c['text']));
-
-        if ($commentsText->isEmpty()) {
-            LiveEvent::whereIn('id', $unprocessed->pluck('id'))
-                ->update(['ai_processed' => true, 'sentiment' => 'neutral']);
-            return;
-        }
-
-        // Chuẩn bị context
-        $products = $session->products->map(fn ($p) => [
-            'name' => $p->name,
-            'keywords' => $p->keywords ?? [],
-        ])->toArray();
-
-        $productNames = $session->products->pluck('name')->toArray();
-        $keywords = $session->keywords->pluck('keyword')->toArray();
+        $dispatchedNext = false;
 
         try {
-            // Live metadata
-            $liveTitle = $session->name ?? '';
-            $streamerName = $session->tiktok_username ?? '';
-            $viewerCount = 0;
-
-            if ($session->stats) {
-                $viewerCount = $session->stats->viewer_count ?? 0;
+            $session = LiveSession::with(['products', 'keywords', 'stats'])->find($this->liveSessionId);
+            if (!$session) {
+                return;
             }
 
-            // === Audio Capture: Lấy audio 3s từ livestream qua Python FFmpeg ===
-            $audioB64 = null;
-            if ($session->tiktok_session_id) {
-                try {
-                    $snapshot = $tiktokService->getSnapshot($session->tiktok_session_id);
-                    $audioB64 = $snapshot['audio_b64'] ?? null;
-                    if ($audioB64) {
-                        Log::info('Audio captured for AI analysis', [
+            // Chỉ xử lý AI cho phiên live đang hoạt động
+            if (!in_array($session->status, ['live', 'connecting'])) {
+                return;
+            }
+
+            // Batch 50 comments — giảm từ 100 để tăng accuracy
+            $unprocessed = LiveEvent::where('live_session_id', $this->liveSessionId)
+                ->where('event_type', 'comment')
+                ->where('ai_processed', false)
+                ->orderBy('event_at')
+                ->limit(50)
+                ->get();
+
+            if ($unprocessed->isEmpty()) {
+                return;
+            }
+
+            // Build compact input: "ID|text"
+            $commentsText = $unprocessed
+                ->map(fn ($e) => ['id' => $e->id, 'text' => $e->data['comment'] ?? ''])
+                ->filter(fn ($c) => !empty($c['text']));
+
+            if ($commentsText->isEmpty()) {
+                LiveEvent::whereIn('id', $unprocessed->pluck('id'))
+                    ->update(['ai_processed' => true, 'sentiment' => 'neutral']);
+                
+                // Check if there are more unprocessed comments to continue the pipeline
+                $hasMoreUnprocessed = LiveEvent::where('live_session_id', $this->liveSessionId)
+                    ->where('event_type', 'comment')
+                    ->where('ai_processed', false)
+                    ->exists();
+
+                if ($hasMoreUnprocessed) {
+                    $lock->release();
+                    $dispatchedNext = true;
+                    self::dispatch($this->liveSessionId)->delay(now()->addSeconds(2));
+                }
+                return;
+            }
+
+            // Chuẩn bị context
+            $products = $session->products->map(fn ($p) => [
+                'name' => $p->name,
+                'keywords' => $p->keywords ?? [],
+            ])->toArray();
+
+            $productNames = $session->products->pluck('name')->toArray();
+            $keywords = $session->keywords->pluck('keyword')->toArray();
+
+            try {
+                // Live metadata
+                $liveTitle = $session->name ?? '';
+                $streamerName = $session->tiktok_username ?? '';
+                $viewerCount = 0;
+
+                if ($session->stats) {
+                    $viewerCount = $session->stats->viewer_count ?? 0;
+                }
+
+                // === Audio Capture: Lấy audio 3s từ livestream qua Python FFmpeg ===
+                $audioB64 = null;
+                if ($session->tiktok_session_id) {
+                    try {
+                        $snapshot = $tiktokService->getSnapshot($session->tiktok_session_id);
+                        $audioB64 = $snapshot ? ($snapshot['audio_b64'] ?? null) : null;
+                        if ($audioB64) {
+                            Log::info('Audio captured for AI analysis', [
+                                'session_id' => $this->liveSessionId,
+                                'audio_size_bytes' => strlen(base64_decode($audioB64)),
+                            ]);
+                        }
+                    } catch (\Throwable $snapEx) {
+                        Log::warning('Audio capture failed, falling back to text-only', [
                             'session_id' => $this->liveSessionId,
-                            'audio_size_bytes' => strlen(base64_decode($audioB64)),
+                            'error' => $snapEx->getMessage(),
                         ]);
                     }
-                } catch (\Throwable $snapEx) {
-                    Log::warning('Audio capture failed, falling back to text-only', [
+                }
+
+                // === Memory: Đọc context từ batch trước ===
+                $memoryContext = $session->ai_context_summary ?? '';
+
+                $systemPrompt = $this->buildSystemPrompt(
+                    $products, $keywords, $liveTitle, $streamerName, $viewerCount,
+                    $memoryContext, (bool) $audioB64,
+                );
+
+                // Build user message: "ID|text" per line
+                $userMessage = $commentsText->map(fn ($c) => "{$c['id']}|{$c['text']}")->join("\n");
+
+                // === Build multimodal parts: text + audio (nếu có) ===
+                $parts = [RunwareAiService::text($userMessage)];
+                if ($audioB64) {
+                    $parts[] = RunwareAiService::audioBase64($audioB64, 'mp3');
+                }
+
+                $hasAudio = (bool) $audioB64;
+                Log::info('AI multimodal comment analysis start', [
+                    'session_id' => $this->liveSessionId,
+                    'comments_count' => $commentsText->count(),
+                    'has_audio' => $hasAudio,
+                    'has_memory' => !empty($memoryContext),
+                ]);
+
+                $response = $runware->chatMultimodal(
+                    systemPrompt: $systemPrompt,
+                    parts: $parts,
+                    temperature: 0,
+                    maxTokens: 4096,
+                );
+
+                if (!$response) {
+                    throw new \RuntimeException('Runware AI returned null response');
+                }
+
+                // Extract results array
+                $results = $response['results'] ?? $response;
+
+                // Đảm bảo là array
+                if (!is_array($results) || empty($results)) {
+                    throw new \RuntimeException('AI response is empty or not an array');
+                }
+
+                // Nếu không phải là list tuần tự (associative array), kiểm tra xem có phải single object không
+                if (!array_is_list($results)) {
+                    if (isset($results['id'])) {
+                        $results = [$results];
+                    } else {
+                        throw new \RuntimeException('AI response format is invalid: expected list of results');
+                    }
+                }
+
+                // Debug log
+                if (!empty($results) && config('app.debug')) {
+                    Log::info('AI analysis batch', [
                         'session_id' => $this->liveSessionId,
-                        'error' => $snapEx->getMessage(),
+                        'input_count' => $commentsText->count(),
+                        'output_count' => count($results),
+                        'sample' => array_slice($results, 0, 3),
                     ]);
                 }
-            }
 
-            // === Memory: Đọc context từ batch trước ===
-            $memoryContext = $session->ai_context_summary ?? '';
+                // Prepare local variables to track batch statistics changes
+                $batchStats = [
+                    'positive' => 0,
+                    'neutral' => 0,
+                    'negative' => 0,
+                    'new_leads_count' => 0,
+                ];
 
-            $systemPrompt = $this->buildSystemPrompt(
-                $products, $keywords, $liveTitle, $streamerName, $viewerCount,
-                $memoryContext, (bool) $audioB64,
-            );
+                // Validate + save trong transaction
+                DB::transaction(function () use ($results, $unprocessed, $productNames, $session, &$batchStats) {
+                    $processedIds = [];
+                    $positive = 0;
+                    $neutral = 0;
+                    $negative = 0;
+                    $chotDonUsers = [];
+                    $updatesGrouped = [];
 
-            // Build user message: "ID|text" per line
-            $userMessage = $commentsText->map(fn ($c) => "{$c['id']}|{$c['text']}")->join("\n");
+                    foreach ($results as $result) {
+                        $eventId = $result['id'] ?? null;
+                        if (!$eventId) {
+                            continue;
+                        }
 
-            // === Build multimodal parts: text + audio (nếu có) ===
-            $parts = [RunwareAiService::text($userMessage)];
-            if ($audioB64) {
-                $parts[] = RunwareAiService::audioBase64($audioB64, 'mp3');
-            }
+                        $processedIds[] = $eventId;
 
-            $hasAudio = (bool) $audioB64;
-            Log::info('AI multimodal comment analysis start', [
-                'session_id' => $this->liveSessionId,
-                'comments_count' => $commentsText->count(),
-                'has_audio' => $hasAudio,
-                'has_memory' => !empty($memoryContext),
-            ]);
+                        // Validate AI output trước khi save
+                        $validated = $this->validateResult($result, $productNames);
 
-            $response = $runware->chatMultimodal(
-                systemPrompt: $systemPrompt,
-                parts: $parts,
-                temperature: 0,
-                maxTokens: 4096,
-            );
+                        // Find matching event in unprocessed to identify user ID
+                        $event = $unprocessed->firstWhere('id', $eventId);
+                        $tiktokUserId = $event ? $event->tiktok_user_id : null;
 
-            if (!$response) {
-                throw new \RuntimeException('Runware AI returned null response');
-            }
+                        // Increment local counts
+                        if ($validated['sentiment'] === 'positive') {
+                            $positive++;
+                        } elseif ($validated['sentiment'] === 'negative') {
+                            $negative++;
+                        } else {
+                            $neutral++;
+                        }
 
-            // Extract results array
-            $results = $response['results'] ?? $response;
+                        if ($validated['intent_tag'] === 'Chốt đơn' && $tiktokUserId) {
+                            $chotDonUsers[] = $tiktokUserId;
+                        }
 
-            // Đảm bảo là array
-            if (!is_array($results) || empty($results)) {
-                throw new \RuntimeException('AI response is empty or not an array');
-            }
-
-            // Nếu không phải là list tuần tự (associative array), kiểm tra xem có phải single object không
-            if (!array_is_list($results)) {
-                if (isset($results['id'])) {
-                    $results = [$results];
-                } else {
-                    throw new \RuntimeException('AI response format is invalid: expected list of results');
-                }
-            }
-
-            // Debug log
-            if (!empty($results) && config('app.debug')) {
-                Log::info('AI analysis batch', [
-                    'session_id' => $this->liveSessionId,
-                    'input_count' => $commentsText->count(),
-                    'output_count' => count($results),
-                    'sample' => array_slice($results, 0, 3),
-                ]);
-            }
-
-            // Validate + save trong transaction
-            DB::transaction(function () use ($results, $unprocessed, $productNames) {
-                $processedIds = [];
-                foreach ($results as $result) {
-                    $eventId = $result['id'] ?? null;
-                    if (!$eventId) {
-                        continue;
-                    }
-
-                    $processedIds[] = $eventId;
-
-                    // Validate AI output trước khi save
-                    $validated = $this->validateResult($result, $productNames);
-
-                    LiveEvent::where('id', $eventId)
-                        ->where('live_session_id', $this->liveSessionId)
-                        ->update([
+                        // Group updates by target attributes serialization to perform bulk updates
+                        $groupKey = serialize([
                             'sentiment' => $validated['sentiment'],
                             'intent_tag' => $validated['intent_tag'],
                             'question_tag' => $validated['question_tag'],
                             'product_tag' => $validated['product_tag'],
                             'has_phone' => $validated['has_phone'],
-                            'ai_processed' => true,
                         ]);
-                }
 
-                // Đánh dấu comments không có trong results (AI bỏ sót)
-                $missingIds = $unprocessed->pluck('id')->diff($processedIds)->toArray();
-                if (!empty($missingIds)) {
-                    LiveEvent::whereIn('id', $missingIds)
-                        ->update(['ai_processed' => true, 'sentiment' => 'neutral']);
-                }
-            });
+                        $updatesGrouped[$groupKey][] = $eventId;
+                    }
 
-            // Cập nhật aggregate stats
-            $this->updateAggregateStats($session);
+                    // Calculate the new leads count before executing the bulk comments update query
+                    $chotDonUsers = array_values(array_unique($chotDonUsers));
+                    $newLeadsCount = 0;
+                    if (!empty($chotDonUsers)) {
+                        $existingLeads = LiveEvent::where('live_session_id', $this->liveSessionId)
+                            ->where('event_type', 'comment')
+                            ->where('ai_processed', true)
+                            ->where('intent_tag', 'Chốt đơn')
+                            ->whereIn('tiktok_user_id', $chotDonUsers)
+                            ->pluck('tiktok_user_id')
+                            ->unique()
+                            ->toArray();
 
-            // === Memory: Lưu session_note từ AI cho batch tiếp theo ===
-            $sessionNote = $response['session_note'] ?? null;
-            if ($sessionNote && is_string($sessionNote)) {
-                $session->update([
-                    'ai_context_summary' => mb_substr($sessionNote, 0, 500),
-                ]);
-            }
+                        $newLeads = array_diff($chotDonUsers, $existingLeads);
+                        $newLeadsCount = count($newLeads);
+                    }
 
-            // Vét sạch comments chưa được xử lý AI của session này
-            $hasMoreUnprocessed = LiveEvent::where('live_session_id', $this->liveSessionId)
-                ->where('event_type', 'comment')
-                ->where('ai_processed', false)
-                ->exists();
+                    // Execute grouped bulk updates
+                    foreach ($updatesGrouped as $serializedAttributes => $ids) {
+                        $attributes = unserialize($serializedAttributes);
+                        $attributes['ai_processed'] = true;
 
-            if ($hasMoreUnprocessed) {
-                // Giải phóng unique lock của job hiện tại để Laravel cho phép dispatch job tiếp theo
-                $lockKey = 'laravel_unique_job:' . self::class . ':' . $this->uniqueId();
-                try {
-                    cache()->forget($lockKey);
-                } catch (\Throwable $cacheEx) {
-                    Log::warning('Failed to clear unique job lock key', [
-                        'key' => $lockKey,
-                        'error' => $cacheEx->getMessage(),
+                        LiveEvent::whereIn('id', $ids)
+                            ->where('live_session_id', $this->liveSessionId)
+                            ->update($attributes);
+                    }
+
+                    // Đánh dấu comments không có trong results (AI bỏ sót)
+                    $missingIds = $unprocessed->pluck('id')->diff($processedIds)->toArray();
+                    if (!empty($missingIds)) {
+                        LiveEvent::whereIn('id', $missingIds)
+                            ->where('live_session_id', $this->liveSessionId)
+                            ->update(['ai_processed' => true, 'sentiment' => 'neutral']);
+                        
+                        $neutral += count($missingIds);
+                    }
+
+                    $batchStats = [
+                        'positive' => $positive,
+                        'neutral' => $neutral,
+                        'negative' => $negative,
+                        'new_leads_count' => $newLeadsCount,
+                    ];
+
+                    // Cập nhật aggregate stats inside transaction
+                    $this->updateAggregateStats($session, $batchStats);
+                });
+
+                // === Memory: Lưu session_note từ AI cho batch tiếp theo ===
+                $sessionNote = $response['session_note'] ?? null;
+                if ($sessionNote && is_string($sessionNote)) {
+                    $session->update([
+                        'ai_context_summary' => mb_substr($sessionNote, 0, 500),
                     ]);
                 }
 
-                // Dispatch tiếp với delay 2 giây để tránh spam / rate limit Runware/Gemini AI
-                self::dispatch($this->liveSessionId)->delay(now()->addSeconds(2));
+                // Vét sạch comments chưa được xử lý AI của session này
+                $hasMoreUnprocessed = LiveEvent::where('live_session_id', $this->liveSessionId)
+                    ->where('event_type', 'comment')
+                    ->where('ai_processed', false)
+                    ->exists();
 
-                Log::info('Dispatched next AnalyzeCommentsJob to process remaining comments', [
-                    'session_id' => $this->liveSessionId,
-                ]);
-            }
+                if ($hasMoreUnprocessed) {
+                    $lock->release();
+                    $dispatchedNext = true;
 
-        } catch (\Throwable $e) {
-            Log::error('AI comment analysis failed', [
-                'session_id' => $this->liveSessionId,
-                'error' => $e->getMessage(),
-                'comments_count' => $commentsText->count(),
-            ]);
+                    // Dispatch tiếp với delay 2 giây để tránh spam / rate limit Runware/Gemini AI
+                    self::dispatch($this->liveSessionId)->delay(now()->addSeconds(2));
 
-            // Khắc phục lỗi Poison Pill deadlock: Đánh dấu các comment là đã xử lý (sentiment neutral)
-            // nếu lỗi không thể tự phục hồi (JSON parse, null response) hoặc đã đạt số lần thử tối đa.
-            $isLastAttempt = $this->attempts() >= $this->tries;
-            $isUnrecoverable = !str_contains($e->getMessage(), 'rate limit') && 
-                               !str_contains($e->getMessage(), 'timeout') && 
-                               !str_contains($e->getMessage(), 'Connection');
-
-            if ($isLastAttempt || $isUnrecoverable) {
-                try {
-                    DB::table('live_events')
-                        ->whereIn('id', $unprocessed->pluck('id'))
-                        ->update(['ai_processed' => true, 'sentiment' => 'neutral']);
-                    Log::warning('Marked batch comments as processed (neutral) due to unrecoverable AI error or max retries reached to prevent queue deadlock', [
+                    Log::info('Dispatched next AnalyzeCommentsJob to process remaining comments', [
                         'session_id' => $this->liveSessionId,
-                        'comments_ids' => $unprocessed->pluck('id')->toArray(),
-                    ]);
-                } catch (\Throwable $dbEx) {
-                    Log::error('Failed to mark poison pill comments as processed', [
-                        'error' => $dbEx->getMessage(),
                     ]);
                 }
-            }
 
-            // Không retry nếu lỗi auth
-            if (str_contains($e->getMessage(), 'API key') || str_contains($e->getMessage(), '401') || str_contains($e->getMessage(), 'auth')) {
-                $this->fail($e);
-                return;
-            }
+            } catch (\Throwable $e) {
+                Log::error('AI comment analysis failed', [
+                    'session_id' => $this->liveSessionId,
+                    'error' => $e->getMessage(),
+                    'comments_count' => $commentsText->count(),
+                ]);
 
-            // Rethrow để Laravel queue tự động retry theo $tries/$backoff nếu còn lượt
-            throw $e;
+                // Khắc phục lỗi Poison Pill deadlock: Đánh dấu các comment là đã xử lý (sentiment neutral)
+                // nếu lỗi không thể tự phục hồi (JSON parse, null response) hoặc đã đạt số lần thử tối đa.
+                $isLastAttempt = $this->attempts() >= $this->tries;
+                $errMsg = strtolower($e->getMessage());
+                $isUnrecoverable = !str_contains($errMsg, 'rate limit') && 
+                                   !str_contains($errMsg, 'timeout') && 
+                                   !str_contains($errMsg, 'connection');
+
+                if ($isLastAttempt || $isUnrecoverable) {
+                    try {
+                        DB::table('live_events')
+                            ->whereIn('id', $unprocessed->pluck('id'))
+                            ->update(['ai_processed' => true, 'sentiment' => 'neutral']);
+                        Log::warning('Marked batch comments as processed (neutral) due to unrecoverable AI error or max retries reached to prevent queue deadlock', [
+                            'session_id' => $this->liveSessionId,
+                            'comments_ids' => $unprocessed->pluck('id')->toArray(),
+                        ]);
+
+                        // Check if there are more unprocessed comments to continue the pipeline
+                        $hasMoreUnprocessed = LiveEvent::where('live_session_id', $this->liveSessionId)
+                            ->where('event_type', 'comment')
+                            ->where('ai_processed', false)
+                            ->exists();
+
+                        if ($hasMoreUnprocessed) {
+                            $lock->release();
+                            $dispatchedNext = true;
+                            self::dispatch($this->liveSessionId)->delay(now()->addSeconds(2));
+                        }
+                    } catch (\Throwable $dbEx) {
+                        Log::error('Failed to mark poison pill comments as processed', [
+                            'error' => $dbEx->getMessage(),
+                        ]);
+                    }
+                }
+
+                // Không retry nếu lỗi auth
+                if (str_contains($e->getMessage(), 'API key') || str_contains($e->getMessage(), '401') || str_contains($e->getMessage(), 'auth')) {
+                    $this->fail($e);
+                    return;
+                }
+
+                // Rethrow để Laravel queue tự động retry theo $tries/$backoff nếu còn lượt
+                throw $e;
+            }
+        } finally {
+            if (isset($lock) && !$dispatchedNext) {
+                $lock->release();
+            }
         }
     }
 
@@ -462,27 +555,28 @@ PROMPT;
      * Leads = COUNT DISTINCT tiktok_user_id WHERE intent_tag = 'Chốt đơn'
      * → Tránh 1 user spam "đã mua" 82 lần tính 82 leads.
      */
-    private function updateAggregateStats(LiveSession $session): void
+    private function updateAggregateStats(LiveSession $session, array $batchStats): void
     {
-        $stats = LiveEvent::where('live_session_id', $session->id)
-            ->where('event_type', 'comment')
-            ->where('ai_processed', true)
-            ->selectRaw("
-                SUM(CASE WHEN sentiment = 'positive' THEN 1 ELSE 0 END) as positive,
-                SUM(CASE WHEN sentiment = 'neutral' THEN 1 ELSE 0 END) as neutral,
-                SUM(CASE WHEN sentiment = 'negative' THEN 1 ELSE 0 END) as negative,
-                COUNT(DISTINCT CASE WHEN intent_tag = 'Chốt đơn' THEN tiktok_user_id END) as leads
-            ")
-            ->first();
+        $newLeadsCount = $batchStats['new_leads_count'] ?? 0;
 
-        $session->stats()->updateOrCreate(
-            ['live_session_id' => $session->id],
-            [
-                'sentiment_positive' => $stats->positive ?? 0,
-                'sentiment_neutral' => $stats->neutral ?? 0,
-                'sentiment_negative' => $stats->negative ?? 0,
-                'leads_count' => $stats->leads ?? 0,
-            ]
-        );
+        $statsModel = $session->stats;
+        if (!$statsModel) {
+            // Create stats record if not exists
+            $session->stats()->create([
+                'sentiment_positive' => $batchStats['positive'],
+                'sentiment_neutral' => $batchStats['neutral'],
+                'sentiment_negative' => $batchStats['negative'],
+                'leads_count' => $newLeadsCount,
+            ]);
+        } else {
+            // Increment the stats values atomically using the query builder to bypass model casts
+            $session->stats()->update([
+                'sentiment_positive' => DB::raw("sentiment_positive + {$batchStats['positive']}"),
+                'sentiment_neutral' => DB::raw("sentiment_neutral + {$batchStats['neutral']}"),
+                'sentiment_negative' => DB::raw("sentiment_negative + {$batchStats['negative']}"),
+                'leads_count' => DB::raw("leads_count + {$newLeadsCount}"),
+            ]);
+            $statsModel->refresh();
+        }
     }
 }
