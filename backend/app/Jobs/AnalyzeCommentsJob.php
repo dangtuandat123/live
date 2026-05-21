@@ -101,9 +101,9 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
             }
 
             // Build system prompt — bao gồm live context
-            $liveTitle = $snapshot['title'] ?? $session->name ?? '';
-            $streamerName = $snapshot['streamer'] ?? $session->tiktok_username ?? '';
-            $viewerCount = $snapshot['viewer_count'] ?? 0;
+            $liveTitle = ($snapshot && isset($snapshot['title'])) ? $snapshot['title'] : ($session->name ?? '');
+            $streamerName = ($snapshot && isset($snapshot['streamer'])) ? $snapshot['streamer'] : ($session->tiktok_username ?? '');
+            $viewerCount = ($snapshot && isset($snapshot['viewer_count'])) ? $snapshot['viewer_count'] : 0;
 
             $systemPrompt = $this->buildSystemPrompt($products, $keywords, $liveTitle, $streamerName, $viewerCount);
 
@@ -159,28 +159,24 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
             }
 
             if (!$response) {
-                Log::warning('Runware AI returned null response', [
-                    'session_id' => $this->liveSessionId,
-                    'comments_count' => $commentsText->count(),
-                ]);
-                return;
+                throw new \RuntimeException('Runware AI returned null response');
             }
 
             // Extract results array
             $results = $response['results'] ?? $response;
 
-            // Nếu response là object có key khác thay vì array of results
-            if (!isset($results[0]) && isset($response['results'])) {
-                $results = $response['results'];
+            // Đảm bảo là array
+            if (!is_array($results) || empty($results)) {
+                throw new \RuntimeException('AI response is empty or not an array');
             }
 
-            // Đảm bảo là array of results
-            if (!is_array($results) || empty($results)) {
-                Log::warning('Runware AI unexpected response format', [
-                    'session_id' => $this->liveSessionId,
-                    'response_keys' => array_keys($response),
-                ]);
-                return;
+            // Nếu không phải là list tuần tự (associative array), kiểm tra xem có phải single object không
+            if (!array_is_list($results)) {
+                if (isset($results['id'])) {
+                    $results = [$results];
+                } else {
+                    throw new \RuntimeException('AI response format is invalid: expected list of results');
+                }
             }
 
             // Debug log
@@ -240,7 +236,11 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
             // Không retry nếu lỗi auth
             if (str_contains($e->getMessage(), 'API key') || str_contains($e->getMessage(), '401') || str_contains($e->getMessage(), 'auth')) {
                 $this->fail($e);
+                return;
             }
+
+            // Rethrow để Laravel queue tự động retry theo $tries/$backoff
+            throw $e;
         }
     }
 
