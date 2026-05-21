@@ -1262,6 +1262,7 @@ function StatsPanel() {
 // --- Main Page ---
 export default function LivesShow({ session: initialSession, stats: initialStats, comments: initialComments, topProducts: initialTopProducts, potentialCustomers: initialPotentialCustomers, topQuestions: initialTopQuestions }: PageProps) {
   const [soundEnabled, setSoundEnabled] = React.useState(true)
+  const [isOffline, setIsOffline] = React.useState(false)
 
   // Live state — updated via polling
   const [session, setSession] = React.useState(initialSession)
@@ -1294,15 +1295,27 @@ export default function LivesShow({ session: initialSession, stats: initialStats
           },
         })
         if (res.ok) {
+          setIsOffline(false)
           const data = await res.json()
           if (data.comments) setComments(data.comments)
           if (data.stats) setStats(data.stats)
           if (data.topProducts) setTopProducts(data.topProducts)
           if (data.potentialCustomers) setPotentialCustomers(data.potentialCustomers)
           if (data.topQuestions) setTopQuestions(data.topQuestions)
-          if (data.status) setSession(prev => ({ ...prev, status: data.status, duration: data.duration ?? prev.duration }))
+          if (data.status) {
+            setSession(prev => ({
+              ...prev,
+              status: data.status,
+              error_message: data.status === 'error' ? (data.error_message ?? prev.error_message) : prev.error_message,
+              duration: data.duration ?? prev.duration
+            }))
+          }
+        } else {
+          setIsOffline(true)
         }
-      } catch { /* network error — skip */ }
+      } catch (err) {
+        setIsOffline(true)
+      }
     }, 3000)
 
     return () => clearInterval(interval)
@@ -1349,6 +1362,28 @@ export default function LivesShow({ session: initialSession, stats: initialStats
       </header>
 
       <div className="flex flex-1 flex-col gap-2 px-4 pb-4 overflow-hidden">
+        {/* Offline Warning Banner */}
+        {isOffline && (
+          <div className="flex items-center gap-2 px-4 py-2 text-sm bg-destructive/10 border border-destructive/20 text-destructive rounded-lg animate-pulse shrink-0">
+            <span className="relative flex size-2 shrink-0">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-75" />
+              <span className="relative inline-flex size-2 rounded-full bg-current" />
+            </span>
+            <span>⚠️ Mất kết nối tới máy chủ. Đang thử kết nối lại...</span>
+          </div>
+        )}
+
+        {/* Session Error Message Banner */}
+        {session.status === 'error' && (
+          <div className="flex items-center gap-2 px-4 py-3 text-sm bg-destructive/10 border border-destructive/20 text-destructive rounded-lg shrink-0">
+            <AlertTriangleIcon className="size-4 shrink-0 text-destructive" />
+            <div className="flex-1">
+              <p className="font-semibold text-sm">Phiên phân tích bị lỗi</p>
+              <p className="text-xs opacity-90">{session.error_message || 'Không thể kết nối TikTok service. Kiểm tra lại kết nối VPS.'}</p>
+            </div>
+          </div>
+        )}
+
         {/* Session Header */}
         <div className="flex items-center justify-between">
           <div className="shrink-0">

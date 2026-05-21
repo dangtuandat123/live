@@ -322,7 +322,12 @@ export default function LivesIndex({ sessions, kpi, filters }: Props) {
               variant="outline"
               size="sm"
               disabled={sessions.current_page <= 1}
-              onClick={() => router.get(route("lives.index"), { page: sessions.current_page - 1 }, { preserveState: true })}
+              onClick={() => {
+                const params: Record<string, any> = { page: sessions.current_page - 1 }
+                if (search) params.search = search
+                if (statusFilter && statusFilter !== "all") params.status = statusFilter
+                router.get(route("lives.index"), params, { preserveState: true })
+              }}
             >
               <ChevronLeftIcon className="mr-1 size-4" />
               Trước
@@ -334,7 +339,12 @@ export default function LivesIndex({ sessions, kpi, filters }: Props) {
               variant="outline"
               size="sm"
               disabled={sessions.current_page >= sessions.last_page}
-              onClick={() => router.get(route("lives.index"), { page: sessions.current_page + 1 }, { preserveState: true })}
+              onClick={() => {
+                const params: Record<string, any> = { page: sessions.current_page + 1 }
+                if (search) params.search = search
+                if (statusFilter && statusFilter !== "all") params.status = statusFilter
+                router.get(route("lives.index"), params, { preserveState: true })
+              }}
             >
               Sau
               <ChevronRightIcon className="ml-1 size-4" />

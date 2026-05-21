@@ -34,47 +34,38 @@ import {
   ArrowDownIcon,
   ActivityIcon,
 } from "lucide-react"
+import * as React from "react"
 
-// --- Mock Data ---
+// --- Types ---
 
-const stats = [
-  {
-    title: "Tổng người dùng",
-    value: "1,247",
-    change: "+52 tháng này",
-    trend: "up" as const,
-    icon: <UsersIcon className="size-4" />,
-  },
-  {
-    title: "Tổng phiên Live",
-    value: "8,432",
-    change: "+312 tháng này",
-    trend: "up" as const,
-    icon: <VideoIcon className="size-4" />,
-  },
-  {
-    title: "Doanh thu tháng",
-    value: "45.2M",
-    change: "+18% so với T4",
-    trend: "up" as const,
-    icon: <DollarSignIcon className="size-4" />,
-  },
-  {
-    title: "User hoạt động",
-    value: "834",
-    change: "-3% so với tuần trước",
-    trend: "down" as const,
-    icon: <ActivityIcon className="size-4" />,
-  },
-]
+interface DashboardStat {
+  title: string
+  value: string
+  change: string
+  trend: "up" | "down"
+}
 
-const revenueData = [
-  { month: "T1", revenue: 28500000, users: 890 },
-  { month: "T2", revenue: 32100000, users: 945 },
-  { month: "T3", revenue: 35800000, users: 1020 },
-  { month: "T4", revenue: 38200000, users: 1105 },
-  { month: "T5", revenue: 45200000, users: 1247 },
-]
+interface RevenueDataPoint {
+  month: string
+  revenue: number
+  users: number
+}
+
+interface RecentUser {
+  id: number
+  name: string
+  email: string
+  role: string
+  plan: string
+  date: string
+  sessions: number
+}
+
+interface Props {
+  stats: DashboardStat[]
+  revenueData: RevenueDataPoint[]
+  recentUsers: RecentUser[]
+}
 
 const revenueConfig = {
   revenue: {
@@ -87,14 +78,6 @@ const revenueConfig = {
   },
 } satisfies ChartConfig
 
-const recentUsers = [
-  { id: 1, name: "Nguyễn Thị Hoa", email: "hoa.nguyen@email.com", role: "user", plan: "Pro", date: "20/05/2026", sessions: 12 },
-  { id: 2, name: "Trần Văn Minh", email: "minh.tran@email.com", role: "user", plan: "Free", date: "19/05/2026", sessions: 3 },
-  { id: 3, name: "Lê Phương Anh", email: "anh.le@email.com", role: "user", plan: "Business", date: "18/05/2026", sessions: 47 },
-  { id: 4, name: "Phạm Đức Hùng", email: "hung.pham@email.com", role: "user", plan: "Pro", date: "17/05/2026", sessions: 8 },
-  { id: 5, name: "Vũ Mai Linh", email: "linh.vu@email.com", role: "admin", plan: "Business", date: "16/05/2026", sessions: 24 },
-]
-
 function PlanBadge({ plan }: { plan: string }) {
   const variant = plan === "Business" ? "default" : plan === "Pro" ? "secondary" : "outline"
   return <Badge variant={variant}>{plan}</Badge>
@@ -102,7 +85,14 @@ function PlanBadge({ plan }: { plan: string }) {
 
 // --- Main ---
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ stats = [], revenueData = [], recentUsers = [] }: Props) {
+  const getStatIcon = (title: string) => {
+    if (title.toLowerCase().includes("người dùng")) return <UsersIcon className="size-4" />
+    if (title.toLowerCase().includes("phiên live")) return <VideoIcon className="size-4" />
+    if (title.toLowerCase().includes("doanh thu")) return <DollarSignIcon className="size-4" />
+    return <ActivityIcon className="size-4" />
+  }
+
   return (
     <AdminLayout>
       <Head title="Admin - Tổng quan" />
@@ -140,7 +130,7 @@ export default function AdminDashboard() {
                 <CardTitle className="text-sm font-medium">
                   {stat.title}
                 </CardTitle>
-                <div className="text-muted-foreground">{stat.icon}</div>
+                <div className="text-muted-foreground">{getStatIcon(stat.title)}</div>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{stat.value}</div>
@@ -167,22 +157,28 @@ export default function AdminDashboard() {
             <CardDescription>Doanh thu và số lượng user theo tháng (VNĐ)</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={revenueConfig} className="aspect-auto h-[280px] w-full">
-              <BarChart data={revenueData}>
-                <CartesianGrid vertical={false} />
-                <XAxis
-                  dataKey="month"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                />
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent indicator="dashed" />}
-                />
-                <Bar dataKey="revenue" fill="var(--color-revenue)" radius={4} />
-              </BarChart>
-            </ChartContainer>
+            {revenueData.length > 0 ? (
+              <ChartContainer config={revenueConfig} className="aspect-auto h-[280px] w-full">
+                <BarChart data={revenueData}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis
+                    dataKey="month"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                  />
+                  <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent indicator="dashed" />}
+                  />
+                  <Bar dataKey="revenue" fill="var(--color-revenue)" radius={4} />
+                </BarChart>
+              </ChartContainer>
+            ) : (
+              <div className="flex h-[280px] items-center justify-center text-muted-foreground text-sm">
+                Chưa có dữ liệu tăng trưởng
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -205,22 +201,30 @@ export default function AdminDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                    <TableCell>
-                      <Badge variant={user.role === "admin" ? "destructive" : "outline"}>
-                        {user.role === "admin" ? "Admin" : "User"}
-                      </Badge>
+                {recentUsers.length > 0 ? (
+                  recentUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">{user.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                      <TableCell>
+                        <Badge variant={user.role === "admin" ? "destructive" : "outline"}>
+                          {user.role === "admin" ? "Admin" : "User"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <PlanBadge plan={user.plan} />
+                      </TableCell>
+                      <TableCell className="text-right">{user.sessions}</TableCell>
+                      <TableCell className="text-muted-foreground">{user.date}</TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                      Chưa có người dùng mới đăng ký
                     </TableCell>
-                    <TableCell>
-                      <PlanBadge plan={user.plan} />
-                    </TableCell>
-                    <TableCell className="text-right">{user.sessions}</TableCell>
-                    <TableCell className="text-muted-foreground">{user.date}</TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </CardContent>

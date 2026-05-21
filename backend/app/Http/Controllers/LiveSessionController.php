@@ -284,11 +284,53 @@ class LiveSessionController extends Controller
             return response()->json(['message' => 'No TikTok session linked'], 400);
         }
 
+        // Nếu session đã bị lỗi hoặc kết thúc, không gọi service nữa mà trả về dữ liệu DB hiện tại
+        if ($liveSession->status === 'error' || $liveSession->status === 'ended') {
+            $latestComments = $liveSession->events()
+                ->where('event_type', 'comment')
+                ->orderByDesc('event_at')
+                ->limit(200)
+                ->get()
+                ->map(fn (LiveEvent $e) => [
+                    'id' => $e->id,
+                    'user' => $e->tiktok_nickname ?? 'Unknown',
+                    'unique_id' => $e->tiktok_unique_id,
+                    'avatar_url' => $e->data['avatar_url'] ?? null,
+                    'text' => $e->data['comment'] ?? '',
+                    'time' => $e->event_at?->diffForHumans() ?? '',
+                    'event_at' => $e->event_at?->toISOString(),
+                    'sentiment' => $e->sentiment ?? 'neutral',
+                    'intent_tag' => $e->intent_tag,
+                    'question_tag' => $e->question_tag,
+                    'product_tag' => $e->product_tag,
+                    'has_phone' => $e->has_phone ?? false,
+                ]);
+
+            $liveSession->load('stats');
+
+            return response()->json([
+                'new_events' => 0,
+                'comments' => $latestComments,
+                'stats' => $liveSession->stats,
+                'status' => $liveSession->status,
+                'error_message' => $liveSession->error_message,
+                'duration' => $liveSession->duration_formatted,
+                'topProducts' => $this->getTopProducts($liveSession),
+                'potentialCustomers' => $this->getPotentialCustomers($liveSession),
+                'topQuestions' => $this->getTopQuestions($liveSession),
+            ]);
+        }
+
         $newEventsCount = $this->fetchAndStoreEvents($liveSession);
+
+        $cacheKey = "live_session_fail_count_{$liveSession->id}";
 
         // Cập nhật status + stats
         $serviceData = $this->tiktokService->getStats($liveSession->tiktok_session_id);
         if ($serviceData) {
+            // Xóa bộ đếm lỗi nếu kết nối thành công
+            \Illuminate\Support\Facades\Cache::forget($cacheKey);
+
             $this->syncStats($liveSession, $serviceData);
 
             // Cập nhật duration nếu đang live
@@ -297,10 +339,22 @@ class LiveSessionController extends Controller
                     'duration_seconds' => (int) $liveSession->started_at->diffInSeconds(now()),
                 ]);
             }
+        } else {
+            // Tăng số lần lỗi kết nối liên tiếp
+            $failCount = (int) \Illuminate\Support\Facades\Cache::get($cacheKey, 0) + 1;
+            \Illuminate\Support\Facades\Cache::put($cacheKey, $failCount, 300); // lưu trong 5 phút
+
+            if ($failCount >= 5) {
+                $liveSession->update([
+                    'status' => 'error',
+                    'error_message' => 'Không thể kết nối tới dịch vụ TikTok LIVE. Máy chủ phân tích có thể đang bảo trì.',
+                ]);
+                \Illuminate\Support\Facades\Cache::forget($cacheKey);
+            }
         }
 
-        // Dispatch AI phân tích nếu có events mới
-        if ($newEventsCount > 0) {
+        // Dispatch AI phân tích nếu có events mới và session không bị lỗi
+        if ($newEventsCount > 0 && $liveSession->status !== 'error') {
             AnalyzeCommentsJob::dispatch($liveSession->id);
         }
 
@@ -332,6 +386,7 @@ class LiveSessionController extends Controller
             'comments' => $latestComments,
             'stats' => $liveSession->stats,
             'status' => $liveSession->status,
+            'error_message' => $liveSession->error_message,
             'duration' => $liveSession->duration_formatted,
             'topProducts' => $this->getTopProducts($liveSession),
             'potentialCustomers' => $this->getPotentialCustomers($liveSession),

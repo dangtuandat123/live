@@ -121,8 +121,8 @@ export default function UsersIndex({ users }: Props) {
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {user.email_verified_at
-                        ? new Date(user.email_verified_at).toLocaleDateString("vi-VN")
+                      {user.created_at
+                        ? new Date(user.created_at).toLocaleDateString("vi-VN")
                         : "—"
                       }
                     </TableCell>

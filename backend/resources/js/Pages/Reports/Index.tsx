@@ -139,6 +139,29 @@ export default function ReportsIndex({
   return (
     <AuthenticatedLayout>
       <Head title="Báo cáo" />
+      <style dangerouslySetInnerHTML={{__html: `
+        @media print {
+          header, 
+          aside,
+          .sidebar-trigger,
+          button,
+          [role="combobox"],
+          .no-print {
+            display: none !important;
+          }
+          main, .flex-1 {
+            padding: 0 !important;
+            margin: 0 !important;
+            background: white !important;
+            color: black !important;
+          }
+          .card {
+            border: 1px solid #e2e8f0 !important;
+            box-shadow: none !important;
+            break-inside: avoid;
+          }
+        }
+      `}} />
       <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 border-b border-border/40 bg-background/95 backdrop-blur-md sticky top-0 z-40">
         <div className="flex items-center gap-2 px-4">
           <SidebarTrigger className="-ml-1" />
@@ -175,7 +198,7 @@ export default function ReportsIndex({
                 <SelectItem value="90d">90 ngày qua</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => window.print()}>
               <DownloadIcon className="mr-2 size-4" />
               Xuất PDF
             </Button>
