@@ -373,7 +373,8 @@ function CommentsPanel() {
   const filtered = allComments.filter((c) => {
     if (filter === "pinned" && !pinnedIds.has(c.id)) return false
     if (filter === "order" && !markedOrderIds.has(c.id) && c.intent_tag !== "Chốt đơn") return false
-    if (filter === "question" && !c.question_tag) return false
+    if (filter === "question" && !c.question_tag && c.intent_tag !== "Hỏi thông tin") return false
+    if (filter === "support" && c.intent_tag !== "Yêu cầu hỗ trợ" && c.intent_tag !== "Phản hồi SP") return false
     if ((filter === "positive" || filter === "negative") && c.sentiment !== filter) return false
     if (search && !c.text.toLowerCase().includes(search.toLowerCase()) && !c.user.toLowerCase().includes(search.toLowerCase())) return false
     return true
@@ -411,7 +412,8 @@ function CommentsPanel() {
             { key: "all", label: "Tất cả", count: allComments.length },
             { key: "pinned", label: "📌 Ghim", count: pinnedIds.size },
             { key: "order", label: "🛒 Chốt đơn", count: allComments.filter(c => c.intent_tag === "Chốt đơn" || markedOrderIds.has(c.id)).length },
-            { key: "question", label: "Hỏi", count: allComments.filter(c => c.question_tag).length },
+            { key: "question", label: "❓ Hỏi", count: allComments.filter(c => c.question_tag || c.intent_tag === "Hỏi thông tin").length },
+            { key: "support", label: "🔔 Phản hồi", count: allComments.filter(c => c.intent_tag === "Yêu cầu hỗ trợ" || c.intent_tag === "Phản hồi SP").length },
             { key: "positive", label: "Tích cực", count: allComments.filter(c => c.sentiment === "positive").length },
             { key: "negative", label: "Tiêu cực", count: allComments.filter(c => c.sentiment === "negative").length },
           ] as const).map((tab) => (
@@ -488,7 +490,13 @@ function CommentsPanel() {
                     {(comment.intent_tag || comment.question_tag || comment.product_tag) && (
                       <div className="flex items-center gap-1 flex-wrap pt-0.5">
                         {comment.intent_tag && (
-                          <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">
+                          <span className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                            comment.intent_tag === "Chốt đơn" ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10" :
+                            comment.intent_tag === "Hỏi thông tin" ? "text-blue-600 dark:text-blue-400 bg-blue-500/10" :
+                            comment.intent_tag === "Phản hồi SP" ? "text-purple-600 dark:text-purple-400 bg-purple-500/10" :
+                            comment.intent_tag === "Yêu cầu hỗ trợ" ? "text-red-600 dark:text-red-400 bg-red-500/10" :
+                            "text-gray-600 dark:text-gray-400 bg-gray-500/10"
+                          }`}>
                             <ShoppingCartIcon className="size-2.5" />{comment.intent_tag}
                           </span>
                         )}

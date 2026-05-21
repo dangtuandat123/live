@@ -28,6 +28,17 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
      */
     public int $uniqueFor = 30; // 30s lock
 
+    /**
+     * Giá trị hợp lệ cho các AI fields — validation trước khi lưu DB.
+     */
+    private const VALID_SENTIMENTS = ['positive', 'neutral', 'negative'];
+    private const VALID_INTENTS = ['Chốt đơn', 'Hỏi thông tin', 'Phản hồi SP', 'Yêu cầu hỗ trợ'];
+    private const VALID_QUESTIONS = [
+        'Hỏi giá', 'Hỏi size', 'Hỏi ship', 'Hỏi chất liệu',
+        'Hỏi màu', 'Hỏi tồn kho', 'Hỏi giảm giá', 'Hỏi bảo hành',
+        'Hỏi thanh toán', 'Hỏi mùi hương', 'Hỏi công dụng',
+    ];
+
     public function __construct(
         private int $liveSessionId,
     ) {}
@@ -49,12 +60,12 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
             return;
         }
 
-        // Lấy tất cả comments chưa phân tích, batch 100 (gấp đôi cũ, giảm số API calls)
+        // Batch 50 comments — giảm từ 100 để tăng accuracy
         $unprocessed = LiveEvent::where('live_session_id', $this->liveSessionId)
             ->where('event_type', 'comment')
             ->where('ai_processed', false)
             ->orderBy('event_at')
-            ->limit(100)
+            ->limit(50)
             ->get();
 
         if ($unprocessed->isEmpty()) {
@@ -72,16 +83,17 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
             return;
         }
 
-        // Chuẩn bị context ngắn gọn
+        // Chuẩn bị context
         $products = $session->products->map(fn ($p) => [
             'name' => $p->name,
             'keywords' => $p->keywords ?? [],
         ])->toArray();
 
+        $productNames = $session->products->pluck('name')->toArray();
         $keywords = $session->keywords->pluck('keyword')->toArray();
 
         try {
-            // Compact prompt: "ID|text" per line — tiết kiệm token
+            // Compact prompt: "ID|text" per line
             $promptText = $commentsText->map(fn ($c) => "{$c['id']}|{$c['text']}")->join("\n");
 
             $agent = (new CommentAnalyzer())
@@ -93,13 +105,18 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
             // Structured output response
             $results = $response['results'] ?? [];
 
-            // Debug: log first batch response để verify format
-            if (!empty($results)) {
-                Log::info('AI analysis sample', ['first_result' => $results[0] ?? null, 'count' => count($results)]);
+            // Debug log
+            if (!empty($results) && config('app.debug')) {
+                Log::info('AI analysis batch', [
+                    'session_id' => $this->liveSessionId,
+                    'input_count' => $commentsText->count(),
+                    'output_count' => count($results),
+                    'sample' => array_slice($results, 0, 3),
+                ]);
             }
 
-            // Bulk update trong transaction để đảm bảo consistency
-            DB::transaction(function () use ($results, $unprocessed) {
+            // Validate + save trong transaction
+            DB::transaction(function () use ($results, $unprocessed, $productNames) {
                 $processedIds = [];
                 foreach ($results as $result) {
                     $eventId = $result['id'] ?? null;
@@ -109,14 +126,17 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
 
                     $processedIds[] = $eventId;
 
+                    // Validate AI output trước khi save
+                    $validated = $this->validateResult($result, $productNames);
+
                     LiveEvent::where('id', $eventId)
                         ->where('live_session_id', $this->liveSessionId)
                         ->update([
-                            'sentiment' => $result['sentiment'] ?? 'neutral',
-                            'intent_tag' => $result['intent_tag'] ?? null,
-                            'question_tag' => $result['question_tag'] ?? null,
-                            'product_tag' => $result['product_tag'] ?? null,
-                            'has_phone' => $result['has_phone'] ?? false,
+                            'sentiment' => $validated['sentiment'],
+                            'intent_tag' => $validated['intent_tag'],
+                            'question_tag' => $validated['question_tag'],
+                            'product_tag' => $validated['product_tag'],
+                            'has_phone' => $validated['has_phone'],
                             'ai_processed' => true,
                         ]);
                 }
@@ -129,7 +149,7 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
                 }
             });
 
-            // Cập nhật sentiment stats + leads count (ngoài transaction vì re-count toàn bộ)
+            // Cập nhật aggregate stats
             $this->updateAggregateStats($session);
 
         } catch (\Throwable $e) {
@@ -147,7 +167,79 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
     }
 
     /**
-     * Gộp cập nhật sentiment + leads trong 1 query thay vì 2.
+     * Validate AI response trước khi lưu DB.
+     * Reject giá trị không hợp lệ, fuzzy match product_tag.
+     */
+    private function validateResult(array $result, array $productNames): array
+    {
+        $sentiment = $result['sentiment'] ?? 'neutral';
+        if (!in_array($sentiment, self::VALID_SENTIMENTS)) {
+            $sentiment = 'neutral';
+        }
+
+        $intentTag = $result['intent_tag'] ?? null;
+        if ($intentTag !== null && !in_array($intentTag, self::VALID_INTENTS)) {
+            $intentTag = null;
+        }
+
+        $questionTag = $result['question_tag'] ?? null;
+        if ($questionTag !== null && !in_array($questionTag, self::VALID_QUESTIONS)) {
+            $questionTag = null;
+        }
+
+        $productTag = $result['product_tag'] ?? null;
+        if ($productTag !== null) {
+            $productTag = $this->matchProductTag($productTag, $productNames);
+        }
+
+        return [
+            'sentiment' => $sentiment,
+            'intent_tag' => $intentTag,
+            'question_tag' => $questionTag,
+            'product_tag' => $productTag,
+            'has_phone' => (bool) ($result['has_phone'] ?? false),
+        ];
+    }
+
+    /**
+     * Fuzzy match product_tag against danh sách sản phẩm đã đăng ký.
+     * Trả null nếu không match — tránh hallucination.
+     */
+    private function matchProductTag(string $aiTag, array $productNames): ?string
+    {
+        // Exact match
+        foreach ($productNames as $name) {
+            if (mb_strtolower($aiTag) === mb_strtolower($name)) {
+                return $name;
+            }
+        }
+
+        // Contains match — AI tag chứa tên sản phẩm hoặc ngược lại
+        foreach ($productNames as $name) {
+            if (
+                mb_stripos($aiTag, $name) !== false ||
+                mb_stripos($name, $aiTag) !== false
+            ) {
+                return $name;
+            }
+        }
+
+        // Nếu không match → giữ nguyên tag (có thể là sản phẩm user chưa đăng ký)
+        // nhưng log warning nếu debug mode
+        if (config('app.debug')) {
+            Log::debug('AI product_tag not in product list', [
+                'ai_tag' => $aiTag,
+                'registered_products' => $productNames,
+            ]);
+        }
+
+        return $aiTag;
+    }
+
+    /**
+     * Gộp cập nhật sentiment + leads.
+     * Leads = COUNT DISTINCT tiktok_user_id WHERE intent_tag = 'Chốt đơn'
+     * → Tránh 1 user spam "đã mua" 82 lần tính 82 leads.
      */
     private function updateAggregateStats(LiveSession $session): void
     {
@@ -158,7 +250,7 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
                 SUM(CASE WHEN sentiment = 'positive' THEN 1 ELSE 0 END) as positive,
                 SUM(CASE WHEN sentiment = 'neutral' THEN 1 ELSE 0 END) as neutral,
                 SUM(CASE WHEN sentiment = 'negative' THEN 1 ELSE 0 END) as negative,
-                SUM(CASE WHEN intent_tag = 'Chốt đơn' THEN 1 ELSE 0 END) as leads
+                COUNT(DISTINCT CASE WHEN intent_tag = 'Chốt đơn' THEN tiktok_user_id END) as leads
             ")
             ->first();
 
