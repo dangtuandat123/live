@@ -1398,6 +1398,14 @@ export default function LivesShow({ session: initialSession, stats: initialStats
                   </span>
                   Đang Live
                 </Badge>
+              ) : session.status === 'disconnected' ? (
+                <Badge className="bg-amber-500 hover:bg-amber-600 text-white gap-1 animate-pulse">
+                  <span className="relative flex size-2">
+                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-75" />
+                    <span className="relative inline-flex size-2 rounded-full bg-current" />
+                  </span>
+                  Mất kết nối · Đang thử lại...
+                </Badge>
               ) : session.status === 'connecting' ? (
                 <Badge variant="secondary" className="gap-1">Đang kết nối...</Badge>
               ) : session.status === 'error' ? (
@@ -1446,7 +1454,15 @@ export default function LivesShow({ session: initialSession, stats: initialStats
                     <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/10">
                       <EyeIcon className="size-6 text-primary" />
                     </div>
-                    <p className="text-sm font-medium">{session.status === 'live' ? 'Đang phát trực tiếp' : session.status === 'connecting' ? 'Đang kết nối...' : 'Phiên đã kết thúc'}</p>
+                    <p className="text-sm font-medium">
+                      {session.status === 'live'
+                        ? 'Đang phát trực tiếp'
+                        : session.status === 'disconnected'
+                        ? 'Mất kết nối tạm thời · Đang tự động kết nối lại...'
+                        : session.status === 'connecting'
+                        ? 'Đang kết nối...'
+                        : 'Phiên đã kết thúc'}
+                    </p>
                     <p className="text-xs text-muted-foreground">@{session.tiktok_username}</p>
                     {session.status === 'live' && (
                       <Badge variant="destructive" className="gap-1">

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\TikTokSessionNotFoundException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -24,11 +25,15 @@ class TikTokService
      *
      * @return array{session_id: string, status: string}|null
      */
-    public function startSession(string $tiktokUsername): ?array
+    public function startSession(string $tiktokUsername, ?string $sessionId = null): ?array
     {
-        return $this->post('/sessions/start', [
+        $payload = [
             'tiktok_username' => $tiktokUsername,
-        ]);
+        ];
+        if ($sessionId) {
+            $payload['session_id'] = $sessionId;
+        }
+        return $this->post('/sessions/start', $payload);
     }
 
     /**
@@ -127,6 +132,10 @@ class TikTokService
             $response = $this->client()->get($this->baseUrl . $path, $query);
 
             if ($response->failed()) {
+                if ($response->status() === 404) {
+                    throw new TikTokSessionNotFoundException("TikTok session not found on service");
+                }
+
                 Log::error('TikTok service GET failed', [
                     'path' => $path,
                     'status' => $response->status(),
@@ -151,6 +160,10 @@ class TikTokService
             $response = $this->client()->post($this->baseUrl . $path, $data);
 
             if ($response->failed()) {
+                if ($response->status() === 404) {
+                    throw new TikTokSessionNotFoundException("TikTok session not found on service");
+                }
+
                 Log::error('TikTok service POST failed', [
                     'path' => $path,
                     'status' => $response->status(),

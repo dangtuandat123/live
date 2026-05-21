@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\AnalyzeCommentsJob;
+use App\Jobs\CaptureThumbnailJob;
 use App\Models\LiveEvent;
 use App\Models\LiveSession;
 use App\Models\LiveStat;
@@ -192,9 +193,39 @@ class LiveSessionController extends Controller
         // Sync status từ Python service nếu đang live
         $serviceData = null;
         if ($liveSession->tiktok_session_id && in_array($liveSession->status, ['connecting', 'live'])) {
-            $serviceData = $this->tiktokService->getStats($liveSession->tiktok_session_id);
-            if ($serviceData) {
-                $this->syncStats($liveSession, $serviceData);
+            try {
+                $serviceData = $this->tiktokService->getStats($liveSession->tiktok_session_id);
+                if ($serviceData) {
+                    $this->syncStats($liveSession, $serviceData);
+                }
+            } catch (\App\Exceptions\TikTokSessionNotFoundException $e) {
+                // Thử tự động khôi phục (healing) nếu trạng thái trong DB đang là live/connecting (ví dụ Python service bị restart)
+                $healed = false;
+                if (in_array($liveSession->status, ['live', 'connecting'])) {
+                    try {
+                        $result = $this->tiktokService->startSession($liveSession->tiktok_username, $liveSession->tiktok_session_id);
+                        if ($result && isset($result['session_id'])) {
+                            $liveSession->update([
+                                'status' => 'connecting',
+                            ]);
+                            $healed = true;
+                        }
+                    } catch (\Exception $restartException) {
+                        \Illuminate\Support\Facades\Log::error('Auto-healing in show failed to restart: ' . $restartException->getMessage());
+                    }
+                }
+
+                if (!$healed) {
+                    $durationSeconds = 0;
+                    if ($liveSession->started_at) {
+                        $durationSeconds = (int) $liveSession->started_at->diffInSeconds(now());
+                    }
+                    $liveSession->update([
+                        'status' => 'ended',
+                        'ended_at' => now(),
+                        'duration_seconds' => $durationSeconds,
+                    ]);
+                }
             }
         }
 
@@ -203,7 +234,7 @@ class LiveSessionController extends Controller
                 'id' => $liveSession->id,
                 'name' => $liveSession->name,
                 'platform' => $liveSession->platform,
-                'status' => $liveSession->status,
+                'status' => ($serviceData && isset($serviceData['status'])) ? $serviceData['status'] : $liveSession->status,
                 'tiktok_username' => $liveSession->tiktok_username,
                 'tiktok_session_id' => $liveSession->tiktok_session_id,
                 'duration' => $liveSession->duration_formatted,
@@ -250,7 +281,11 @@ class LiveSessionController extends Controller
 
         // Gọi Python service dừng
         if ($liveSession->tiktok_session_id) {
-            $this->tiktokService->stopSession($liveSession->tiktok_session_id);
+            try {
+                $this->tiktokService->stopSession($liveSession->tiktok_session_id);
+            } catch (\App\Exceptions\TikTokSessionNotFoundException $e) {
+                // Đã bị dừng hoặc đóng trước đó ở VPS
+            }
         }
 
         // Tính duration
@@ -266,9 +301,40 @@ class LiveSessionController extends Controller
         ]);
 
         // Fetch events cuối cùng trước khi kết thúc
-        $this->fetchAndStoreEvents($liveSession);
+        try {
+            $this->fetchAndStoreEvents($liveSession);
+        } catch (\App\Exceptions\TikTokSessionNotFoundException $e) {
+            // Phiên live đã bị đóng hoàn toàn
+        }
 
         return redirect()->route('lives.index')->with('success', 'Đã kết thúc phiên phân tích.');
+    }
+
+    /**
+     * Xóa phiên live.
+     */
+    public function destroy(Request $request, LiveSession $liveSession)
+    {
+        if ($liveSession->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        // Gọi Python service dừng nếu đang chạy ngầm
+        if ($liveSession->tiktok_session_id && in_array($liveSession->status, ['connecting', 'live'])) {
+            try {
+                $this->tiktokService->stopSession($liveSession->tiktok_session_id);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed to stop TikTok session during deletion', [
+                    'session_id' => $liveSession->tiktok_session_id,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
+        // Xóa session (DB cascade sẽ tự động xóa các bảng quan hệ liên quan)
+        $liveSession->delete();
+
+        return redirect()->route('lives.index')->with('success', 'Đã xóa phiên phân tích thành công.');
     }
 
     /**
@@ -321,36 +387,76 @@ class LiveSessionController extends Controller
             ]);
         }
 
-        $newEventsCount = $this->fetchAndStoreEvents($liveSession);
-
         $cacheKey = "live_session_fail_count_{$liveSession->id}";
+        $newEventsCount = 0;
 
-        // Cập nhật status + stats
-        $serviceData = $this->tiktokService->getStats($liveSession->tiktok_session_id);
-        if ($serviceData) {
-            // Xóa bộ đếm lỗi nếu kết nối thành công
-            \Illuminate\Support\Facades\Cache::forget($cacheKey);
+        try {
+            $newEventsCount = $this->fetchAndStoreEvents($liveSession);
 
-            $this->syncStats($liveSession, $serviceData);
-
-            // Cập nhật duration nếu đang live
-            if ($liveSession->status === 'live' && $liveSession->started_at) {
-                $liveSession->update([
-                    'duration_seconds' => (int) $liveSession->started_at->diffInSeconds(now()),
-                ]);
-            }
-        } else {
-            // Tăng số lần lỗi kết nối liên tiếp
-            $failCount = (int) \Illuminate\Support\Facades\Cache::get($cacheKey, 0) + 1;
-            \Illuminate\Support\Facades\Cache::put($cacheKey, $failCount, 300); // lưu trong 5 phút
-
-            if ($failCount >= 5) {
-                $liveSession->update([
-                    'status' => 'error',
-                    'error_message' => 'Không thể kết nối tới dịch vụ TikTok LIVE. Máy chủ phân tích có thể đang bảo trì.',
-                ]);
+            // Cập nhật status + stats
+            $serviceData = $this->tiktokService->getStats($liveSession->tiktok_session_id);
+            if ($serviceData) {
+                // Xóa bộ đếm lỗi nếu kết nối thành công
                 \Illuminate\Support\Facades\Cache::forget($cacheKey);
+
+                $this->syncStats($liveSession, $serviceData);
+
+                // Cập nhật duration nếu đang live
+                if ($liveSession->status === 'live' && $liveSession->started_at) {
+                    $liveSession->update([
+                        'duration_seconds' => (int) $liveSession->started_at->diffInSeconds(now()),
+                    ]);
+                }
+            } else {
+                // Tăng số lần lỗi kết nối liên tiếp
+                $failCount = (int) \Illuminate\Support\Facades\Cache::get($cacheKey, 0) + 1;
+                \Illuminate\Support\Facades\Cache::put($cacheKey, $failCount, 300); // lưu trong 5 phút
+
+                if ($failCount >= 5) {
+                    $liveSession->update([
+                        'status' => 'error',
+                        'error_message' => 'Không thể kết nối tới dịch vụ TikTok LIVE. Máy chủ phân tích có thể đang bảo trì.',
+                    ]);
+                    \Illuminate\Support\Facades\Cache::forget($cacheKey);
+                }
             }
+        } catch (\App\Exceptions\TikTokSessionNotFoundException $e) {
+            // Thử tự động khôi phục (healing) nếu trạng thái trong DB đang là live/connecting (ví dụ Python service bị restart)
+            if (in_array($liveSession->status, ['live', 'connecting'])) {
+                try {
+                    $result = $this->tiktokService->startSession($liveSession->tiktok_username, $liveSession->tiktok_session_id);
+                    if ($result && isset($result['session_id'])) {
+                        $liveSession->update([
+                            'status' => 'connecting',
+                        ]);
+                        return response()->json([
+                            'new_events' => 0,
+                            'comments' => [],
+                            'stats' => $liveSession->stats,
+                            'status' => 'connecting',
+                            'error_message' => null,
+                            'duration' => $liveSession->duration_formatted,
+                            'topProducts' => $this->getTopProducts($liveSession),
+                            'potentialCustomers' => $this->getPotentialCustomers($liveSession),
+                            'topQuestions' => $this->getTopQuestions($liveSession),
+                        ]);
+                    }
+                } catch (\Exception $restartException) {
+                    \Illuminate\Support\Facades\Log::error('Auto-healing in fetchEvents failed to restart: ' . $restartException->getMessage());
+                }
+            }
+
+            // Nếu không thể khôi phục hoặc thực tế đã kết thúc
+            $durationSeconds = 0;
+            if ($liveSession->started_at) {
+                $durationSeconds = (int) $liveSession->started_at->diffInSeconds(now());
+            }
+            $liveSession->update([
+                'status' => 'ended',
+                'ended_at' => now(),
+                'duration_seconds' => $durationSeconds,
+            ]);
+            \Illuminate\Support\Facades\Cache::forget($cacheKey);
         }
 
         // Dispatch AI phân tích nếu có events mới và session không bị lỗi
@@ -385,7 +491,7 @@ class LiveSessionController extends Controller
             'new_events' => $newEventsCount,
             'comments' => $latestComments,
             'stats' => $liveSession->stats,
-            'status' => $liveSession->status,
+            'status' => (isset($serviceData) && isset($serviceData['status'])) ? $serviceData['status'] : $liveSession->status,
             'error_message' => $liveSession->error_message,
             'duration' => $liveSession->duration_formatted,
             'topProducts' => $this->getTopProducts($liveSession),
@@ -524,6 +630,18 @@ class LiveSessionController extends Controller
                 'viewer_count' => $stats['viewer_count'] ?? 0,
             ],
         );
+
+        // Tự động tải hoặc cập nhật thumbnail định kỳ mỗi 10 phút nếu phiên live đang hoạt động (live/connecting)
+        if (in_array($session->status, ['live', 'connecting'])) {
+            $cacheKey = "live_session_{$session->id}_thumbnail_lock";
+            if (!\Illuminate\Support\Facades\Cache::has($cacheKey)) {
+                // Đặt lock tạm thời trong 2 phút để tránh spam gửi Job liên tục khi đang xử lý
+                \Illuminate\Support\Facades\Cache::put($cacheKey, true, 120);
+
+                $coverUrl = $serviceData['cover_url'] ?? null;
+                CaptureThumbnailJob::dispatch($session->id, $coverUrl);
+            }
+        }
     }
 
 

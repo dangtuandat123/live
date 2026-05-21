@@ -33,9 +33,18 @@ import {
   UsersIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  Trash2Icon,
 } from "lucide-react"
 import { Link } from "@inertiajs/react"
 import * as React from "react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 // --- Types ---
 
@@ -77,6 +86,7 @@ interface Props {
 export default function LivesIndex({ sessions, kpi, filters }: Props) {
   const [search, setSearch] = React.useState(filters.search ?? "")
   const [statusFilter, setStatusFilter] = React.useState(filters.status ?? "all")
+  const [deletingSession, setDeletingSession] = React.useState<Session | null>(null)
 
   // Debounced search
   const searchTimerRef = React.useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -219,10 +229,10 @@ export default function LivesIndex({ sessions, kpi, filters }: Props) {
         {/* Session Cards Grid */}
         <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           {paginated.map((session) => (
-            <Link
+            <div
               key={session.id}
-              href={route("lives.show", session.id)}
-              className="group block"
+              onClick={() => router.visit(route("lives.show", session.id))}
+              className="group block cursor-pointer"
             >
               <div className="relative overflow-hidden rounded-xl border bg-card transition-all hover:shadow-lg hover:border-primary/30">
                 {/* Portrait Thumbnail */}
@@ -288,15 +298,28 @@ export default function LivesIndex({ sessions, kpi, filters }: Props) {
                 </div>
 
                 {/* Bottom bar */}
-                <div className="px-3 py-2 flex items-center justify-between">
+                <div className="px-3 py-1.5 flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">{session.date}</span>
-                  <div className="flex items-center gap-1.5">
-                    <UsersIcon className="size-3 text-muted-foreground" />
-                    <span className="text-xs font-medium">{session.leads}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <UsersIcon className="size-3" />
+                      <span className="text-xs font-medium text-foreground">{session.leads}</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDeletingSession(session)
+                      }}
+                    >
+                      <Trash2Icon className="size-3.5" />
+                    </Button>
                   </div>
                 </div>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
 
@@ -352,6 +375,40 @@ export default function LivesIndex({ sessions, kpi, filters }: Props) {
           </div>
         )}
       </div>
+
+      {/* Dialog Xác nhận Xóa */}
+      <Dialog open={deletingSession !== null} onOpenChange={(open) => !open && setDeletingSession(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Xóa phiên phân tích?</DialogTitle>
+            <DialogDescription>
+              Bạn có chắc chắn muốn xóa phiên phân tích{" "}
+              <strong className="text-foreground">"{deletingSession?.name}"</strong>? Hành động này sẽ
+              xóa vĩnh viễn toàn bộ bình luận, phân tích AI và thống kê liên quan.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeletingSession(null)}
+            >
+              Hủy
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deletingSession) {
+                  router.delete(route("lives.destroy", deletingSession.id), {
+                    onSuccess: () => setDeletingSession(null),
+                  })
+                }
+              }}
+            >
+              Xác nhận xóa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AuthenticatedLayout>
   )
 }

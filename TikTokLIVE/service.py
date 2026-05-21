@@ -140,12 +140,15 @@ class SessionInfo:
         self.connected_at: Optional[str] = None
         self.ended_at: Optional[str] = None
         self.error: Optional[str] = None
+        self.retries = 0  # Số lần tự động kết nối lại (reconnect)
 
         # Room info (populated on connect)
         self.room_id: Optional[str] = None
         self.title: Optional[str] = None
+        self.cover_url: Optional[str] = None
         self.streamer_nickname: Optional[str] = None
         self.streamer_username: Optional[str] = None
+        self.streamer_avatar: Optional[str] = None
         self.streamer_followers: Optional[int] = None
 
         # Stream URL (HLS m3u8) — dùng cho FFmpeg capture
@@ -195,9 +198,11 @@ class SessionInfo:
             "error": self.error,
             "room_id": self.room_id,
             "title": self.title,
+            "cover_url": self.cover_url,
             "streamer": {
                 "nickname": self.streamer_nickname,
                 "username": self.streamer_username,
+                "avatar": self.streamer_avatar,
                 "followers": self.streamer_followers,
             },
             "stats": self.stats.copy(),
@@ -395,6 +400,7 @@ def setup_tiktok_client(session: SessionInfo) -> TikTokLiveClient:
     @client.on(ConnectEvent)
     async def on_connect(event):
         session.status = "live"
+        session.retries = 0  # Reset số lần reconnect khi kết nối thành công
         session.connected_at = datetime.now(timezone.utc).isoformat()
         session.room_id = str(client.room_id)
 
@@ -411,6 +417,20 @@ def setup_tiktok_client(session: SessionInfo) -> TikTokLiveClient:
             session.streamer_nickname = owner.get("nickname", "")
             session.streamer_username = owner.get("display_id", "")
             session.streamer_followers = owner.get("follower_count", 0)
+
+            # Lấy cover image URL
+            cover = client.room_info.get("cover", {})
+            if cover:
+                urls = cover.get("url_list", [])
+                if urls:
+                    session.cover_url = urls[0]
+
+            # Lấy streamer avatar URL
+            avatar_thumb = owner.get("avatar_thumb", {})
+            if avatar_thumb:
+                urls = avatar_thumb.get("url_list", [])
+                if urls:
+                    session.streamer_avatar = urls[0]
 
             # Lấy HLS stream URL cho snapshot capture
             hls_url = stream_url_info.get("hls_pull_url", "")
@@ -492,43 +512,93 @@ def setup_tiktok_client(session: SessionInfo) -> TikTokLiveClient:
 
     @client.on(DisconnectEvent)
     async def on_disconnect(event):
+        # Khi mất mạng đột ngột mà không có LiveEndEvent trước đó, chuyển trạng thái thành disconnected để kích hoạt reconnect
         if session.status == "live":
-            session.status = "ended"
-            session.ended_at = datetime.now(timezone.utc).isoformat()
+            session.status = "disconnected"
             session.add_event("disconnected")
-            logger.info(f"[{session.session_id}] Disconnected")
+            logger.info(f"[{session.session_id}] Disconnected (temporary). Will try to reconnect.")
 
     @client.on(RoomUserSeqEvent)
     async def on_viewer_update(event):
-        total = getattr(event, 'total_user', None)
-        if total is not None:
-            session.stats["viewer_count"] = total
-            session.stats["total_views"] = max(session.stats["total_views"], total)
+        # viewer_count là số người xem đồng thời hiện tại (concurrent viewers)
+        viewer_count = getattr(event, 'total', None)
+        if viewer_count is not None:
+            session.stats["viewer_count"] = viewer_count
+
+        # total_user là tổng số người xem tích lũy (total unique viewers)
+        total_user = getattr(event, 'total_user', None)
+        if total_user is not None:
+            session.stats["total_views"] = max(session.stats["total_views"], total_user)
 
     return client
 
 
 async def run_client(session: SessionInfo):
-    """Chạy TikTokLiveClient trong background task."""
-    try:
-        client = setup_tiktok_client(session)
-        session._client = client
-        await client.start(fetch_room_info=True, fetch_gift_info=True)
-    except asyncio.TimeoutError:
-        session.status = "error"
-        session.error = "Connection timeout — user có thể không đang live"
-        session.ended_at = datetime.now(timezone.utc).isoformat()
-        logger.error(f"[{session.session_id}] Timeout connecting")
-    except Exception as e:
-        error_msg = str(e).lower()
-        if "offline" in error_msg or "not found" in error_msg or "not live" in error_msg:
-            session.status = "error"
-            session.error = f"User không đang live: {e}"
-        else:
-            session.status = "error"
-            session.error = str(e)
-        session.ended_at = datetime.now(timezone.utc).isoformat()
-        logger.error(f"[{session.session_id}] Error: {e}")
+    """Chạy TikTokLiveClient trong background task với cơ chế tự động kết nối lại (Auto Reconnect)."""
+    while session.status in ("connecting", "live", "disconnected"):
+        try:
+            # Khởi tạo đối tượng client mới cho mỗi lượt kết nối để làm sạch state bên trong
+            client = setup_tiktok_client(session)
+            session._client = client
+            
+            logger.info(f"[{session.session_id}] Starting TikTok client connection for {session.tiktok_username}...")
+            await client.start(fetch_room_info=True, fetch_gift_info=True)
+            
+            # Nếu start() kết thúc bình thường (không ném ngoại lệ) mà status vẫn là live,
+            # coi như stream bị đứt websocket ngầm mà không bắn event Disconnect.
+            if session.status == "live":
+                session.status = "disconnected"
+                session.add_event("disconnected")
+                
+        except asyncio.CancelledError:
+            logger.info(f"[{session.session_id}] Task cancelled by user stop.")
+            session.status = "ended"
+            break
+        except asyncio.TimeoutError:
+            logger.error(f"[{session.session_id}] Connection timeout")
+            if session.status == "connecting":
+                # Lần đầu tiên kết nối mà bị timeout -> coi như user không live
+                session.status = "error"
+                session.error = "Connection timeout — user có thể không đang live"
+                session.ended_at = datetime.now(timezone.utc).isoformat()
+                break
+            else:
+                session.status = "disconnected"
+                session.add_event("disconnected")
+        except Exception as e:
+            error_msg = str(e).lower()
+            logger.error(f"[{session.session_id}] Connection exception: {e}")
+            
+            if session.status == "connecting":
+                # Lần đầu tiên kết nối thất bại
+                if "offline" in error_msg or "not found" in error_msg or "not live" in error_msg:
+                    session.status = "error"
+                    session.error = f"User không đang live: {e}"
+                else:
+                    session.status = "error"
+                    session.error = str(e)
+                session.ended_at = datetime.now(timezone.utc).isoformat()
+                break
+            else:
+                session.status = "disconnected"
+                session.add_event("disconnected")
+        
+        # Xử lý Reconnect khi trạng thái là disconnected
+        if session.status == "disconnected":
+            session.retries += 1
+            if session.retries > 10:
+                logger.warning(f"[{session.session_id}] Reconnect limit exceeded (10 attempts). Ending session.")
+                session.status = "ended"
+                session.error = "Mất kết nối quá lâu (vượt quá 10 lần thử lại). Phiên live đã tự động kết thúc."
+                session.ended_at = datetime.now(timezone.utc).isoformat()
+                session.add_event("reconnect_failed")
+                break
+            
+            # Tính thời gian chờ (exponential backoff) tăng dần: 5s, 10s, 15s, ..., tối đa 30s
+            delay = min(5 * session.retries, 30)
+            logger.info(f"[{session.session_id}] Reconnecting in {delay} seconds (Attempt {session.retries}/10)...")
+            session.add_event("reconnecting", data={"attempt": session.retries, "delay": delay})
+            await asyncio.sleep(delay)
 
 
 # ============================================================
