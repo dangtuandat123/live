@@ -888,14 +888,17 @@ class LiveSessionController extends Controller
     {
         $rows = $session->events()
             ->where('event_type', 'comment')
-            ->whereNotNull('question_tag')
-            ->where('question_tag', '!=', '')
+            ->where(function ($query) {
+                $query->whereNotNull('question_tag')
+                      ->where('question_tag', '!=', '')
+                      ->orWhere('intent_tag', 'Hỏi thông tin');
+            })
             ->selectRaw("
-                question_tag as question,
+                COALESCE(NULLIF(question_tag, ''), 'Hỏi chung') as question,
                 COUNT(*) as cnt,
                 GROUP_CONCAT(DISTINCT NULLIF(product_tag, '') SEPARATOR ', ') as products
             ")
-            ->groupBy('question_tag')
+            ->groupByRaw("COALESCE(NULLIF(question_tag, ''), 'Hỏi chung')")
             ->orderByDesc('cnt')
             ->limit(15)
             ->get();

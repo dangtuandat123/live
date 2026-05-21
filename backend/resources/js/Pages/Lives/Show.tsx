@@ -546,7 +546,7 @@ function CommentsPanel() {
                     <p className="text-sm text-muted-foreground break-words">{comment.text}</p>
                     {(comment.intent_tag || comment.question_tag || comment.product_tag) && (
                       <div className="flex items-center gap-1 flex-wrap pt-0.5">
-                        {comment.intent_tag && (
+                        {comment.intent_tag && !(comment.intent_tag === "Hỏi thông tin" && comment.question_tag) && (
                           <span className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium ${
                             comment.intent_tag === "Chốt đơn" ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10" :
                             comment.intent_tag === "Hỏi thông tin" ? "text-blue-600 dark:text-blue-400 bg-blue-500/10" :
@@ -554,7 +554,16 @@ function CommentsPanel() {
                             comment.intent_tag === "Yêu cầu hỗ trợ" ? "text-red-600 dark:text-red-400 bg-red-500/10" :
                             "text-gray-600 dark:text-gray-400 bg-gray-500/10"
                           }`}>
-                            <ShoppingCartIcon className="size-2.5" />{comment.intent_tag}
+                            {(() => {
+                              const IconComponent =
+                                comment.intent_tag === "Chốt đơn" ? ShoppingCartIcon :
+                                comment.intent_tag === "Hỏi thông tin" ? HelpCircleIcon :
+                                comment.intent_tag === "Phản hồi SP" ? MessageSquareIcon :
+                                comment.intent_tag === "Yêu cầu hỗ trợ" ? AlertTriangleIcon :
+                                MessageSquareIcon;
+                              return <IconComponent className="size-2.5" />;
+                            })()}
+                            {comment.intent_tag}
                           </span>
                         )}
                         {comment.question_tag && (
@@ -1027,7 +1036,15 @@ function AIInsightsPanel() {
       {/* Tổng kết */}
       <Card className="flex flex-col min-h-0">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><SparklesIcon className="size-5" />Tổng kết AI</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2"><SparklesIcon className="size-5" />Tổng kết AI</CardTitle>
+            {sentimentTotal < stats.total_comments && (
+              <Badge variant="secondary" className="text-[10px] font-normal animate-pulse gap-1">
+                <LoaderIcon className="size-2.5 animate-spin" />
+                Đang xử lý {stats.total_comments - sentimentTotal} bình luận...
+              </Badge>
+            )}
+          </div>
         </CardHeader>
         <FadeScrollArea>
           <div className="space-y-3 px-4 text-sm text-muted-foreground">
@@ -1565,11 +1582,19 @@ export default function LivesShow({
 
             {/* Phân tích cảm xúc */}
             <Card>
-              <CardHeader className="px-3 pt-0">
-                <CardTitle className="flex items-center gap-2 text-xs">
-                  <SmileIcon className="size-3.5" />
-                  Phân tích cảm xúc
-                </CardTitle>
+              <CardHeader className="px-3 pt-0 pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-xs">
+                    <SmileIcon className="size-3.5" />
+                    Phân tích cảm xúc
+                  </CardTitle>
+                  {sentimentTotal < stats.total_comments && (
+                    <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 font-normal animate-pulse gap-1">
+                      <LoaderIcon className="size-2 animate-spin" />
+                      Đang xử lý {stats.total_comments - sentimentTotal}...
+                    </Badge>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="px-3">
                 {sentimentTotal === 0 ? (
