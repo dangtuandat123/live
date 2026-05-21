@@ -99,6 +99,7 @@ interface PageProps {
   topProducts: TopProduct[]
   potentialCustomers: PotentialCustomer[]
   topQuestions: TopQuestion[]
+  statsHistory?: any[]
 }
 
 // --- Context for sharing data across sub-components ---
@@ -109,6 +110,7 @@ const LiveContext = React.createContext<{
   topProducts: TopProduct[]
   potentialCustomers: PotentialCustomer[]
   topQuestions: TopQuestion[]
+  statsHistory: any[]
 }>(null!)
 
 function useLiveData() {
@@ -1087,11 +1089,11 @@ function AIInsightsPanel() {
 }
 
 function StatsPanel() {
-  const { stats, topProducts, potentialCustomers } = useLiveData()
+  const { stats, topProducts, potentialCustomers, statsHistory } = useLiveData()
 
-  // Dữ liệu hoạt động — tóm tắt từ thống kê thật (chưa có time-series từ backend)
-  const activityData = [
-    { time: "Hiện tại", comments: stats.total_comments, viewers: stats.total_views },
+  // Dữ liệu hoạt động — cập nhật từ statsHistory của backend
+  const activityData = statsHistory && statsHistory.length > 0 ? statsHistory : [
+    { time: "Hiện tại", comments: stats.total_comments, viewers: stats.viewer_count },
   ]
 
   const sentimentData = [
@@ -1193,7 +1195,7 @@ function StatsPanel() {
             <AreaChart accessibilityLayer data={activityData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="time" tickLine={false} axisLine={false} tickMargin={8} />
-              <YAxis tickLine={false} axisLine={false} tickMargin={8} width={35} />
+              <YAxis tickLine={false} axisLine={false} tickMargin={8} width={55} />
               <ChartTooltip content={<ChartTooltipContent />} />
               <ChartLegend content={<ChartLegendContent />} />
               <defs>
@@ -1269,7 +1271,7 @@ function StatsPanel() {
             <BarChart accessibilityLayer data={productData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
-              <YAxis tickLine={false} axisLine={false} tickMargin={8} width={35} />
+              <YAxis tickLine={false} axisLine={false} tickMargin={8} width={55} />
               <ChartTooltip content={<ChartTooltipContent />} />
               <ChartLegend content={<ChartLegendContent />} />
               <Bar dataKey="mentions" fill="var(--color-mentions)" radius={[4, 4, 0, 0]} />
@@ -1312,7 +1314,15 @@ function StatsPanel() {
 }
 
 // --- Main Page ---
-export default function LivesShow({ session: initialSession, stats: initialStats, comments: initialComments, topProducts: initialTopProducts, potentialCustomers: initialPotentialCustomers, topQuestions: initialTopQuestions }: PageProps) {
+export default function LivesShow({
+  session: initialSession,
+  stats: initialStats,
+  comments: initialComments,
+  topProducts: initialTopProducts,
+  potentialCustomers: initialPotentialCustomers,
+  topQuestions: initialTopQuestions,
+  statsHistory: initialStatsHistory
+}: PageProps) {
   const [soundEnabled, setSoundEnabled] = React.useState(true)
   const [isOffline, setIsOffline] = React.useState(false)
 
@@ -1327,6 +1337,7 @@ export default function LivesShow({ session: initialSession, stats: initialStats
   const [topProducts, setTopProducts] = React.useState(initialTopProducts ?? [])
   const [potentialCustomers, setPotentialCustomers] = React.useState(initialPotentialCustomers ?? [])
   const [topQuestions, setTopQuestions] = React.useState(initialTopQuestions ?? [])
+  const [statsHistory, setStatsHistory] = React.useState<any[]>(initialStatsHistory ?? [])
 
   // Order alerts — detect real "Chốt đơn" từ AI data
   const { alerts, dismiss } = useOrderAlerts(soundEnabled, comments)
@@ -1354,6 +1365,7 @@ export default function LivesShow({ session: initialSession, stats: initialStats
           if (data.topProducts) setTopProducts(data.topProducts)
           if (data.potentialCustomers) setPotentialCustomers(data.potentialCustomers)
           if (data.topQuestions) setTopQuestions(data.topQuestions)
+          if (data.statsHistory) setStatsHistory(data.statsHistory)
           if (data.status) {
             setSession(prev => ({
               ...prev,
@@ -1388,7 +1400,7 @@ export default function LivesShow({ session: initialSession, stats: initialStats
 
   return (
     <AuthenticatedLayout>
-      <LiveContext.Provider value={{ session, stats, comments, topProducts, potentialCustomers, topQuestions }}>
+      <LiveContext.Provider value={{ session, stats, comments, topProducts, potentialCustomers, topQuestions, statsHistory }}>
       <Head title={`${session.name} — Live`} />
       <div className="flex flex-1 max-h-svh flex-col overflow-hidden">
       <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 border-b border-border/40 bg-background/95 backdrop-blur-md sticky top-0 z-40">

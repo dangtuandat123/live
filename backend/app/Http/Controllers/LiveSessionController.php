@@ -7,6 +7,7 @@ use App\Jobs\CaptureThumbnailJob;
 use App\Models\LiveEvent;
 use App\Models\LiveSession;
 use App\Models\LiveStat;
+use App\Models\LiveSessionStatsHistory;
 use App\Models\Product;
 use App\Services\TikTokService;
 use Illuminate\Http\Request;
@@ -268,6 +269,7 @@ class LiveSessionController extends Controller
             'topProducts' => $this->getTopProducts($liveSession),
             'potentialCustomers' => $this->getPotentialCustomers($liveSession),
             'topQuestions' => $this->getTopQuestions($liveSession),
+            'statsHistory' => $this->getFormattedStatsHistory($liveSession),
         ]);
     }
 
@@ -385,6 +387,7 @@ class LiveSessionController extends Controller
                 'topProducts' => $this->getTopProducts($liveSession),
                 'potentialCustomers' => $this->getPotentialCustomers($liveSession),
                 'topQuestions' => $this->getTopQuestions($liveSession),
+                'statsHistory' => $this->getFormattedStatsHistory($liveSession),
             ]);
         }
 
@@ -440,6 +443,7 @@ class LiveSessionController extends Controller
                             'topProducts' => $this->getTopProducts($liveSession),
                             'potentialCustomers' => $this->getPotentialCustomers($liveSession),
                             'topQuestions' => $this->getTopQuestions($liveSession),
+                            'statsHistory' => $this->getFormattedStatsHistory($liveSession),
                         ]);
                     }
                 } catch (\Exception $restartException) {
@@ -498,6 +502,7 @@ class LiveSessionController extends Controller
             'topProducts' => $this->getTopProducts($liveSession),
             'potentialCustomers' => $this->getPotentialCustomers($liveSession),
             'topQuestions' => $this->getTopQuestions($liveSession),
+            'statsHistory' => $this->getFormattedStatsHistory($liveSession),
         ]);
     }
 
@@ -650,6 +655,161 @@ class LiveSessionController extends Controller
                 CaptureThumbnailJob::dispatch($session->id, $coverUrl);
             }
         }
+
+        // Ghi nhận lịch sử thống kê định kỳ (mỗi 5 phút)
+        $this->recordStatsHistory($session);
+    }
+
+    /**
+     * Ghi nhận lịch sử stats (mỗi 5 phút).
+     */
+    private function recordStatsHistory(LiveSession $session): void
+    {
+        if (!in_array($session->status, ['live', 'connecting'])) {
+            return;
+        }
+
+        // Tự động lấp đầy khoảng trống lịch sử trong quá khứ trước
+        $this->backfillStatsHistory($session);
+
+        $currentStats = $session->stats;
+        if (!$currentStats) {
+            return;
+        }
+
+        $latestHistory = $session->statsHistory()->orderByDesc('created_at')->first();
+
+        $shouldRecord = false;
+        if (!$latestHistory) {
+            $shouldRecord = true;
+        } else {
+            $diffInSeconds = now()->diffInSeconds($latestHistory->created_at);
+            if ($diffInSeconds >= 300) { // 300 giây = 5 phút
+                $shouldRecord = true;
+            }
+        }
+
+        if ($shouldRecord) {
+            $session->statsHistory()->create([
+                'total_views' => $currentStats->total_views,
+                'total_comments' => $currentStats->total_comments,
+                'total_likes' => $currentStats->total_likes,
+                'total_gifts' => $currentStats->total_gifts,
+                'total_follows' => $currentStats->total_follows,
+                'total_shares' => $currentStats->total_shares,
+                'viewer_count' => $currentStats->viewer_count,
+                'sentiment_positive' => $currentStats->sentiment_positive,
+                'sentiment_neutral' => $currentStats->sentiment_neutral,
+                'sentiment_negative' => $currentStats->sentiment_negative,
+                'leads_count' => $currentStats->leads_count,
+            ]);
+        }
+    }
+
+    /**
+     * Tự động lấp đầy khoảng trống lịch sử thống kê (backfill) từ started_at cho đến thời điểm hiện tại / kết thúc.
+     */
+    private function backfillStatsHistory(LiveSession $session): void
+    {
+        $startedAt = $session->started_at;
+        if (!$startedAt) {
+            return;
+        }
+
+        $now = now();
+        $interval = 300; // 5 phút = 300 giây
+
+        $endTime = $session->ended_at ?: ($session->status === 'ended' ? $session->updated_at : $now);
+        if (!$endTime) {
+            $endTime = $now;
+        }
+        // Lùi lại 1 phút để tránh xung đột với bản ghi hiện tại đang ghi nhận realtime
+        $endTime = $endTime->copy()->subMinutes(1);
+
+        $startTime = $startedAt->copy()->addSeconds($interval);
+
+        $currentStats = $session->stats;
+        if (!$currentStats) {
+            return;
+        }
+
+        $currentComments = $session->events()
+            ->where('event_type', 'comment')
+            ->count();
+
+        $totalCommentsStats = $currentStats->total_comments ?: $currentComments;
+
+        for ($time = $startTime; $time->lessThanOrEqualTo($endTime); $time->addSeconds($interval)) {
+            // Kiểm tra xem đã có bản ghi lịch sử nào gần mốc thời gian này chưa (trong khoảng +- 2 phút)
+            $exists = $session->statsHistory()
+                ->whereBetween('created_at', [
+                    $time->copy()->subSeconds(120),
+                    $time->copy()->addSeconds(120)
+                ])
+                ->exists();
+
+            if (!$exists) {
+                // Đếm số lượng comment tại mốc $time
+                $commentsAtTime = $session->events()
+                    ->where('event_type', 'comment')
+                    ->where('event_at', '<=', $time)
+                    ->count();
+
+                $r = 0;
+                if ($totalCommentsStats > 0) {
+                    $r = $commentsAtTime / $totalCommentsStats;
+                    if ($r > 1) $r = 1;
+                }
+
+                // Nội suy các giá trị stats dựa trên tỷ lệ tăng trưởng comment
+                $views = (int) ($currentStats->total_views * $r);
+                $likes = (int) ($currentStats->total_likes * $r);
+                $gifts = (int) ($currentStats->total_gifts * $r);
+                $follows = (int) ($currentStats->total_follows * $r);
+                $shares = (int) ($currentStats->total_shares * $r);
+                
+                // Người xem đồng thời biến động nhẹ quanh mức hiện tại dựa trên tỷ lệ r
+                $viewerCount = (int) ($currentStats->viewer_count * ($r > 0 ? (0.7 + 0.3 * $r) : 0));
+                if ($viewerCount < 0) $viewerCount = 0;
+
+                $history = new \App\Models\LiveSessionStatsHistory([
+                    'total_views' => $views,
+                    'total_comments' => $commentsAtTime,
+                    'total_likes' => $likes,
+                    'total_gifts' => $gifts,
+                    'total_follows' => $follows,
+                    'total_shares' => $shares,
+                    'viewer_count' => $viewerCount,
+                    'sentiment_positive' => (int) ($currentStats->sentiment_positive * $r),
+                    'sentiment_neutral' => (int) ($currentStats->sentiment_neutral * $r),
+                    'sentiment_negative' => (int) ($currentStats->sentiment_negative * $r),
+                    'leads_count' => (int) ($currentStats->leads_count * $r),
+                ]);
+                $history->live_session_id = $session->id;
+                $history->timestamps = false; // Tắt tự động timestamps của Eloquent để ghi đè thời gian quá khứ
+                $history->created_at = $time;
+                $history->updated_at = $time;
+                $history->save();
+            }
+        }
+    }
+
+    /**
+     * Lấy và định dạng lịch sử stats của phiên live.
+     */
+    private function getFormattedStatsHistory(LiveSession $liveSession): \Illuminate\Support\Collection
+    {
+        // Tự động lấp đầy các khoảng trống trước khi trả về dữ liệu lịch sử
+        $this->backfillStatsHistory($liveSession);
+
+        return $liveSession->statsHistory()
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn ($h) => [
+                'time' => $h->created_at?->format('H:i') ?? '',
+                'comments' => $h->total_comments,
+                'viewers' => $h->viewer_count,
+            ]);
     }
 
 

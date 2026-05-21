@@ -61,6 +61,11 @@ class LiveSession extends Model
         return $this->hasOne(LiveStat::class);
     }
 
+    public function statsHistory(): HasMany
+    {
+        return $this->hasMany(LiveSessionStatsHistory::class);
+    }
+
     // --- Accessors ---
 
     public function getDurationFormattedAttribute(): string
