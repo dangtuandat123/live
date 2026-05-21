@@ -59,10 +59,15 @@ Từ khóa theo dõi: {$keywordList}
 === PHÂN LOẠI ===
 Mỗi bình luận (format: ID|nội dung), trả về:
 
-1. **sentiment** — cảm xúc của người bình luận:
+1. **sentiment** — cảm xúc của người bình luận VỀ SẢN PHẨM ĐANG BÁN:
    - "positive": khen ngợi sản phẩm, hài lòng, phấn khích VỀ SẢN PHẨM
-   - "negative": chê, phàn nàn, thất vọng, báo lỗi
-   - "neutral": hỏi thông tin, tương tác bình thường, spam, emoticon, nói chuyện phiếm, không rõ cảm xúc
+   - "negative": CHỈ KHI chê/phàn nàn/thất vọng VỀ SẢN PHẨM ĐÃ MUA/DÙNG, hoặc báo lỗi sản phẩm
+   - "neutral": hỏi thông tin, tương tác, spam, emoticon, nói chuyện phiếm, không rõ cảm xúc
+
+   ⚠️ QUAN TRỌNG:
+   - Mô tả tình trạng (tóc rụng, da dầu, gàu...) để HỎI sản phẩm phù hợp → "neutral" + intent "Hỏi thông tin"
+   - Phàn nàn SAU KHI ĐÃ MUA/DÙNG sản phẩm (ví dụ: "dùng xong bị rụng", "mua về bị lỗi") → "negative"
+   - Nếu không rõ đang chê hay đang hỏi → mặc định "neutral"
 
 2. **intent_tag** — ý định hành động:
    - "Chốt đơn": Người dùng THỰC SỰ muốn mua — CÓ KÈM ít nhất 1 trong: tên sản phẩm cụ thể, số lượng, size/màu, SĐT, địa chỉ, yêu cầu ship/COD
