@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class LiveEvent extends Model
 {
+    protected $dateFormat = 'Y-m-d H:i:s.u';
+
     protected $fillable = [
         'live_session_id',
         'event_type',
