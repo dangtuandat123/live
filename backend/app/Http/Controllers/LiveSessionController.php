@@ -542,7 +542,7 @@ class LiveSessionController extends Controller
                 try {
                     // M1: Hash nội dung động theo loại event để dedup chính xác không bị nuốt tương tác
                     $eventType = $event['type'] ?? 'unknown';
-                    $dataHash = match ($eventType) {
+                    $dataHash = $event['id'] ?? match ($eventType) {
                         'comment' => md5($event['data']['comment'] ?? ''),
                         'gift' => md5(($event['data']['gift_id'] ?? '') . '_' . ($event['data']['repeat_count'] ?? 1)),
                         'like' => md5('like_' . ($event['data']['count'] ?? 1)),
@@ -628,16 +628,32 @@ class LiveSessionController extends Controller
     private function syncStats(LiveSession $session, array $serviceData): void
     {
         $stats = $serviceData['stats'] ?? $serviceData;
+        $currentStats = $session->stats()->first();
+
+        // Tính toán các thông số từ bảng live_events để làm nguồn đối chiếu chính xác
+        $dbCommentsCount = $session->events()->where('event_type', 'comment')->count();
+        $dbGiftsCount = $session->events()->where('event_type', 'gift')->count();
+        $dbFollowsCount = $session->events()->where('event_type', 'follow')->count();
+        $dbSharesCount = $session->events()->where('event_type', 'share')->count();
+
+        // Đảm bảo các chỉ số tích lũy không bị giảm đi (sử dụng max)
+        $totalViews = max($currentStats?->total_views ?? 0, $stats['total_views'] ?? 0);
+        $totalLikes = max($currentStats?->total_likes ?? 0, $stats['total_likes'] ?? 0);
+
+        $totalComments = max($dbCommentsCount, $stats['total_comments'] ?? 0);
+        $totalGifts = max($dbGiftsCount, $stats['total_gifts'] ?? 0);
+        $totalFollows = max($dbFollowsCount, $stats['total_follows'] ?? 0);
+        $totalShares = max($dbSharesCount, $stats['total_shares'] ?? 0);
 
         $session->stats()->updateOrCreate(
             ['live_session_id' => $session->id],
             [
-                'total_views' => $stats['total_views'] ?? 0,
-                'total_comments' => $stats['total_comments'] ?? 0,
-                'total_likes' => $stats['total_likes'] ?? 0,
-                'total_gifts' => $stats['total_gifts'] ?? 0,
-                'total_follows' => $stats['total_follows'] ?? 0,
-                'total_shares' => $stats['total_shares'] ?? 0,
+                'total_views' => $totalViews,
+                'total_comments' => $totalComments,
+                'total_likes' => $totalLikes,
+                'total_gifts' => $totalGifts,
+                'total_follows' => $totalFollows,
+                'total_shares' => $totalShares,
                 'viewer_count' => $stats['viewer_count'] ?? 0,
             ],
         );

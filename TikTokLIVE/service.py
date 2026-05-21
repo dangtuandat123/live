@@ -205,13 +205,16 @@ class SessionInfo:
         self._task: Optional[asyncio.Task] = None
 
     def add_event(self, event_type: str, nickname: str = "", unique_id: str = "", user_id: str = "", data: dict = None):
+        now = datetime.now(timezone.utc)
         self.events.append({
+            "id": uuid.uuid4().hex,
             "type": event_type,
             "nickname": nickname,
             "unique_id": unique_id,
             "user_id": user_id,
             "data": data or {},
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": now.isoformat(),
+            "timestamp_raw": now.timestamp(),
         })
 
     def to_dict(self, include_events: bool = False, since: float = 0, limit: int = 100):
@@ -237,9 +240,10 @@ class SessionInfo:
         if include_events:
             events = list(self.events)
             if since > 0:
-                cutoff = datetime.fromtimestamp(since, tz=timezone.utc).isoformat()
-                events = [e for e in events if e["timestamp"] > cutoff]
-            result["events"] = events[-limit:]
+                events = [e for e in events if e.get("timestamp_raw", 0) > since]
+                result["events"] = events[:limit]
+            else:
+                result["events"] = events[-limit:]
             result["total_events_buffered"] = len(self.events)
         return result
 
