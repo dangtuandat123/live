@@ -1,4 +1,5 @@
 import * as React from "react"
+import { Link } from "@inertiajs/react"
 import {
   Avatar,
   AvatarFallback,
@@ -124,25 +125,30 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <SparklesIcon
-                />
-                Upgrade to Pro
+              <DropdownMenuItem asChild>
+                <Link href="/subscription" className="w-full flex items-center gap-2 cursor-pointer">
+                  <SparklesIcon className="size-4 text-amber-500" />
+                  <span>Nâng cấp Pro</span>
+                </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <BadgeCheckIcon />
-                Account
+              <DropdownMenuItem asChild>
+                <Link href="/profile" className="w-full flex items-center gap-2 cursor-pointer">
+                  <BadgeCheckIcon className="size-4" />
+                  <span>Tài khoản</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/subscription" className="w-full flex items-center gap-2 cursor-pointer">
+                  <CreditCardIcon className="size-4" />
+                  <span>Thanh toán</span>
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <CreditCardIcon />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <BellIcon />
-                Notifications
+                <BellIcon className="size-4" />
+                <span>Thông báo</span>
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
@@ -172,9 +178,11 @@ export function NavUser({
               </DropdownMenuPortal>
             </DropdownMenuSub>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <LogOutIcon />
-              Log out
+            <DropdownMenuItem asChild>
+              <Link href={route('logout')} method="post" as="button" className="w-full flex items-center gap-2 text-red-500 focus:text-red-500 focus:bg-red-50 dark:focus:bg-red-950/20 cursor-pointer">
+                <LogOutIcon className="size-4" />
+                <span>Đăng xuất</span>
+              </Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

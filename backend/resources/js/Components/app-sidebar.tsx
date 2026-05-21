@@ -19,6 +19,7 @@ import {
   BarChart3Icon,
   SettingsIcon,
   ShieldCheckIcon,
+  CreditCardIcon,
 } from "lucide-react"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -62,6 +63,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       url: route("reports.index"),
       icon: <BarChart3Icon />,
       isActive: route().current("reports.*"),
+    },
+    {
+      title: "Gói dịch vụ",
+      url: route("subscription.index"),
+      icon: <CreditCardIcon />,
+      isActive: route().current("subscription.index"),
     },
     {
       title: "Cài đặt",
