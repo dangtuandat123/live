@@ -21,10 +21,14 @@ return new class extends Migration
         });
 
         // 2. Populate data_hash cho events hiện có
-        DB::statement("UPDATE live_events SET data_hash = MD5(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(data, '$.comment')), ''))");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("UPDATE live_events SET data_hash = MD5(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(data, '$.comment')), ''))");
+        }
 
         // 3. Nâng event_at lên DATETIME(3) — millisecond precision
-        DB::statement('ALTER TABLE live_events MODIFY event_at DATETIME(3) NULL');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE live_events MODIFY event_at DATETIME(3) NULL');
+        }
 
         // 4. Drop unique index cũ, tạo mới có data_hash
         Schema::table('live_events', function (Blueprint $table) {
@@ -45,7 +49,9 @@ return new class extends Migration
             $table->dropUnique('live_events_dedup_unique');
         });
 
-        DB::statement('ALTER TABLE live_events MODIFY event_at TIMESTAMP NULL');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE live_events MODIFY event_at TIMESTAMP NULL');
+        }
 
         Schema::table('live_events', function (Blueprint $table) {
             $table->unique(

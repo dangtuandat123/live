@@ -42,56 +42,61 @@ import {
   SearchIcon,
 } from "lucide-react"
 
-// --- Mock Data ---
+// --- Types ---
 
-const stats = [
-  {
-    title: "Tổng phiên Live",
-    value: "24",
-    change: "+3 tuần này",
-    trend: "up" as const,
-    icon: <VideoIcon className="size-4" />,
-  },
-  {
-    title: "Tổng bình luận",
-    value: "12,847",
-    change: "+18% so với tuần trước",
-    trend: "up" as const,
-    icon: <MessageSquareIcon className="size-4" />,
-  },
-  {
-    title: "Tổng lượt xem",
-    value: "89,234",
-    change: "-5% so với tuần trước",
-    trend: "down" as const,
-    icon: <EyeIcon className="size-4" />,
-  },
-  {
-    title: "Cảm xúc tích cực",
-    value: "78%",
-    change: "+2% so với tuần trước",
-    trend: "up" as const,
-    icon: <SmileIcon className="size-4" />,
-  },
-]
-
-const liveSession = {
-  id: "2",
-  name: "Giới thiệu BST mới",
-  views: 3201,
-  comments: 523,
-  duration: "45m",
+interface StatItem {
+  title: string
+  value: string
+  change: string
+  trend: "up" | "down"
 }
 
-const trendData = [
-  { date: "14/05", views: 4320, comments: 756 },
-  { date: "15/05", views: 6210, comments: 980 },
-  { date: "16/05", views: 9870, comments: 1890 },
-  { date: "17/05", views: 5678, comments: 892 },
-  { date: "18/05", views: 12450, comments: 2103 },
-  { date: "19/05", views: 3201, comments: 523 },
-  { date: "20/05", views: 8432, comments: 1247 },
-]
+interface ActiveLiveSession {
+  id: string
+  name: string
+  views: number
+  comments: number
+  duration: string
+}
+
+interface TrendDay {
+  date: string
+  views: number
+  comments: number
+}
+
+interface KeywordItem {
+  keyword: string
+  count: number
+  trend: "up" | "down"
+}
+
+interface ProductItem {
+  name: string
+  mentions: number
+  percent: number
+}
+
+interface RecentSessionItem {
+  id: string
+  name: string
+  status: string
+  comments: number
+  views: number
+  leads: number
+  sentiment: number
+  duration: string
+  date: string
+}
+
+interface DashboardProps {
+  stats: StatItem[]
+  liveSession: ActiveLiveSession | null
+  trendData: TrendDay[]
+  hotKeywords: KeywordItem[]
+  topProducts: ProductItem[]
+  recentSessions: RecentSessionItem[]
+}
 
 const trendConfig = {
   views: {
@@ -103,80 +108,6 @@ const trendConfig = {
     color: "var(--chart-2)",
   },
 } satisfies ChartConfig
-
-const hotKeywords = [
-  { keyword: "giá bao nhiêu", count: 487, trend: "up" as const },
-  { keyword: "còn hàng không", count: 342, trend: "up" as const },
-  { keyword: "ship về HN", count: 256, trend: "down" as const },
-  { keyword: "có size L không", count: 198, trend: "up" as const },
-  { keyword: "mua 2 giảm không", count: 134, trend: "down" as const },
-]
-
-const topProducts = [
-  { name: "Áo thun basic cotton", mentions: 342, percent: 100 },
-  { name: "Váy hoa mùa hè", mentions: 278, percent: 81 },
-  { name: "Quần jean slim fit", mentions: 195, percent: 57 },
-  { name: "Túi xách da PU", mentions: 156, percent: 46 },
-  { name: "Giày sneaker trắng", mentions: 98, percent: 29 },
-]
-
-const recentSessions = [
-  {
-    id: "1",
-    name: "Flash Sale Mùa Hè",
-    status: "ended",
-    comments: 1247,
-    views: 8432,
-    leads: 45,
-    sentiment: 82,
-    duration: "2h 15m",
-    date: "20/05/2026",
-  },
-  {
-    id: "2",
-    name: "Giới thiệu BST mới",
-    status: "live",
-    comments: 523,
-    views: 3201,
-    leads: 12,
-    sentiment: 75,
-    duration: "45m",
-    date: "20/05/2026",
-  },
-  {
-    id: "3",
-    name: "Thanh lý cuối tuần",
-    status: "ended",
-    comments: 892,
-    views: 5678,
-    leads: 28,
-    sentiment: 68,
-    duration: "1h 30m",
-    date: "19/05/2026",
-  },
-  {
-    id: "4",
-    name: "Review sản phẩm mới",
-    status: "ended",
-    comments: 2103,
-    views: 12450,
-    leads: 67,
-    sentiment: 85,
-    duration: "3h 05m",
-    date: "18/05/2026",
-  },
-  {
-    id: "5",
-    name: "Live Q&A khách hàng",
-    status: "ended",
-    comments: 756,
-    views: 4320,
-    leads: 15,
-    sentiment: 71,
-    duration: "1h 10m",
-    date: "17/05/2026",
-  },
-]
 
 // --- Components ---
 
@@ -197,7 +128,29 @@ function StatusBadge({ status }: { status: string }) {
 
 // --- Main ---
 
-export default function Dashboard() {
+export default function Dashboard({
+  stats = [],
+  liveSession = null,
+  trendData = [],
+  hotKeywords = [],
+  topProducts = [],
+  recentSessions = [],
+}: DashboardProps) {
+  // Icon mapper cho KPI cards
+  const getIcon = (title: string) => {
+    switch (title) {
+      case "Tổng phiên Live":
+        return <VideoIcon className="size-4" />
+      case "Tổng bình luận":
+        return <MessageSquareIcon className="size-4" />
+      case "Tổng lượt xem":
+        return <EyeIcon className="size-4" />
+      case "Cảm xúc tích cực":
+      default:
+        return <SmileIcon className="size-4" />
+    }
+  }
+
   return (
     <AuthenticatedLayout>
       <Head title="Tổng quan" />
@@ -243,7 +196,7 @@ export default function Dashboard() {
                 <CardTitle className="text-sm font-medium">
                   {stat.title}
                 </CardTitle>
-                <div className="text-muted-foreground">{stat.icon}</div>
+                <div className="text-muted-foreground">{getIcon(stat.title)}</div>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{stat.value}</div>
@@ -303,45 +256,51 @@ export default function Dashboard() {
               <CardDescription>Lượt xem và bình luận theo ngày</CardDescription>
             </CardHeader>
             <CardContent>
-              <ChartContainer config={trendConfig} className="aspect-auto h-[240px] w-full">
-                <AreaChart data={trendData}>
-                  <defs>
-                    <linearGradient id="fillViews" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-views)" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="var(--color-views)" stopOpacity={0.1} />
-                    </linearGradient>
-                    <linearGradient id="fillComments" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-comments)" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="var(--color-comments)" stopOpacity={0.1} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                  />
-                  <ChartTooltip
-                    cursor={false}
-                    content={<ChartTooltipContent indicator="dot" />}
-                  />
-                  <Area
-                    dataKey="views"
-                    type="natural"
-                    fill="url(#fillViews)"
-                    stroke="var(--color-views)"
-                    strokeWidth={2}
-                  />
-                  <Area
-                    dataKey="comments"
-                    type="natural"
-                    fill="url(#fillComments)"
-                    stroke="var(--color-comments)"
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ChartContainer>
+              {trendData.length > 0 ? (
+                <ChartContainer config={trendConfig} className="aspect-auto h-[240px] w-full">
+                  <AreaChart data={trendData}>
+                    <defs>
+                      <linearGradient id="fillViews" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--color-views)" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="var(--color-views)" stopOpacity={0.1} />
+                      </linearGradient>
+                      <linearGradient id="fillComments" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--color-comments)" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="var(--color-comments)" stopOpacity={0.1} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                    />
+                    <ChartTooltip
+                      cursor={false}
+                      content={<ChartTooltipContent indicator="dot" />}
+                    />
+                    <Area
+                      dataKey="views"
+                      type="natural"
+                      fill="url(#fillViews)"
+                      stroke="var(--color-views)"
+                      strokeWidth={2}
+                    />
+                    <Area
+                      dataKey="comments"
+                      type="natural"
+                      fill="url(#fillComments)"
+                      stroke="var(--color-comments)"
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ChartContainer>
+              ) : (
+                <div className="flex h-[240px] items-center justify-center text-muted-foreground text-sm">
+                  Chưa có dữ liệu xu hướng
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -358,22 +317,28 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {hotKeywords.map((item, i) => (
-                    <div key={item.keyword} className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-2">
-                        <span className="flex size-5 items-center justify-center rounded-full bg-muted text-xs font-medium">{i + 1}</span>
-                        <span className="truncate">"{item.keyword}"</span>
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <span className="font-medium tabular-nums">{item.count}</span>
-                        {item.trend === "up" ? (
-                          <ArrowUpIcon className="size-3 text-green-500" />
-                        ) : (
-                          <ArrowDownIcon className="size-3 text-red-500" />
-                        )}
-                      </span>
+                  {hotKeywords.length > 0 ? (
+                    hotKeywords.map((item, i) => (
+                      <div key={item.keyword} className="flex items-center justify-between text-sm animate-in fade-in slide-in-from-bottom-1 duration-200" style={{ animationDelay: `${i * 50}ms` }}>
+                        <span className="flex items-center gap-2">
+                          <span className="flex size-5 items-center justify-center rounded-full bg-muted text-xs font-medium">{i + 1}</span>
+                          <span className="truncate">"{item.keyword}"</span>
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="font-medium tabular-nums">{item.count}</span>
+                          {item.trend === "up" ? (
+                            <ArrowUpIcon className="size-3 text-green-500" />
+                          ) : (
+                            <ArrowDownIcon className="size-3 text-red-500" />
+                          )}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-muted-foreground text-sm text-center py-4">
+                      Chưa có từ khóa nổi bật
                     </div>
-                  ))}
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -389,18 +354,24 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {topProducts.map((product, i) => (
-                    <div key={product.name} className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="flex items-center gap-2">
-                          <span className="flex size-5 items-center justify-center rounded-full bg-muted text-xs font-medium">{i + 1}</span>
-                          <span className="truncate">{product.name}</span>
-                        </span>
-                        <span className="font-medium tabular-nums">{product.mentions}</span>
+                  {topProducts.length > 0 ? (
+                    topProducts.map((product, i) => (
+                      <div key={product.name} className="space-y-1 animate-in fade-in slide-in-from-bottom-1 duration-200" style={{ animationDelay: `${i * 50}ms` }}>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="flex items-center gap-2">
+                            <span className="flex size-5 items-center justify-center rounded-full bg-muted text-xs font-medium">{i + 1}</span>
+                            <span className="truncate">{product.name}</span>
+                          </span>
+                          <span className="font-medium tabular-nums">{product.mentions}</span>
+                        </div>
+                        <Progress value={product.percent} className="h-1.5" />
                       </div>
-                      <Progress value={product.percent} className="h-1.5" />
+                    ))
+                  ) : (
+                    <div className="text-muted-foreground text-sm text-center py-4">
+                      Chưa có sản phẩm nổi bật
                     </div>
-                  ))}
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -430,48 +401,56 @@ export default function Dashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentSessions.map((session) => (
-                  <TableRow key={session.id}>
-                    <TableCell className="font-medium">
-                      <Link
-                        href={route("lives.show", session.id)}
-                        className="hover:underline"
-                      >
-                        {session.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={session.status} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {session.comments.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {session.views.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {session.leads}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Progress value={session.sentiment} className="h-2 w-12" />
-                        <span className="text-xs tabular-nums">{session.sentiment}%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{session.duration}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {session.date}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={route("lives.show", session.id)}>
-                          <EyeIcon className="mr-1.5 size-4" />
-                          Xem
+                {recentSessions.length > 0 ? (
+                  recentSessions.map((session) => (
+                    <TableRow key={session.id}>
+                      <TableCell className="font-medium">
+                        <Link
+                          href={route("lives.show", session.id)}
+                          className="hover:underline"
+                        >
+                          {session.name}
                         </Link>
-                      </Button>
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={session.status} />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {session.comments.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {session.views.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {session.leads}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Progress value={session.sentiment} className="h-2 w-12" />
+                          <span className="text-xs tabular-nums">{session.sentiment}%</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{session.duration}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {session.date}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={route("lives.show", session.id)}>
+                            <EyeIcon className="mr-1.5 size-4" />
+                            Xem
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      Chưa có phiên live nào được tạo
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </CardContent>

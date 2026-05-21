@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LiveSessionController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
@@ -22,9 +23,7 @@ Route::get('/', function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/dashboard', function () {
-        return Inertia::render('Dashboard');
-    })->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Products (CRUD)
     Route::get('/products', [ProductController::class, 'index'])->name('products.index');
@@ -41,9 +40,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/lives/{liveSession}/fetch-events', [LiveSessionController::class, 'fetchEvents'])->name('lives.fetch-events');
 
     // Reports
-    Route::get('/reports', function () {
-        return Inertia::render('Reports/Index');
-    })->name('reports.index');
+    Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports.index');
 
     // Settings
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');

@@ -25,7 +25,45 @@ class ProductController extends Controller
             $query->where('category', $category);
         }
 
-        $products = $query->get();
+        $activeSessionIds = \App\Models\LiveSession::where('user_id', $request->user()->id)
+            ->where('status', 'live')
+            ->pluck('id')
+            ->toArray();
+
+        $products = $query->get()->map(function ($product) use ($activeSessionIds) {
+            $isLive = \DB::table('live_session_products')
+                ->whereIn('live_session_id', $activeSessionIds)
+                ->where('product_id', $product->id)
+                ->exists();
+
+            $mentions = \DB::table('live_events')
+                ->join('live_sessions', 'live_events.live_session_id', '=', 'live_sessions.id')
+                ->where('live_sessions.user_id', $product->user_id)
+                ->where('live_events.event_type', 'comment')
+                ->where('live_events.product_tag', $product->name)
+                ->count();
+
+            $prevMentions = \DB::table('live_events')
+                ->join('live_sessions', 'live_events.live_session_id', '=', 'live_sessions.id')
+                ->where('live_sessions.user_id', $product->user_id)
+                ->where('live_events.event_type', 'comment')
+                ->where('live_events.product_tag', $product->name)
+                ->where('live_events.created_at', '<', now()->subDays(7))
+                ->count();
+
+            return [
+                'id' => $product->id,
+                'name' => $product->name,
+                'sku' => $product->sku,
+                'price' => $product->price,
+                'category' => $product->category,
+                'image' => $product->image,
+                'keywords' => $product->keywords ?? [],
+                'mentions' => $mentions,
+                'prevMentions' => $prevMentions,
+                'isLive' => $isLive,
+            ];
+        });
 
         // Lấy danh sách categories unique
         $categories = Product::where('user_id', $request->user()->id)
