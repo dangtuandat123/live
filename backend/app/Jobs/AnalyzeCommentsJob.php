@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
@@ -19,6 +20,7 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
 
     public int $tries = 2;
     public int $timeout = 60;
+    public array $backoff = [10, 30];
 
     /**
      * Mỗi session chỉ có tối đa 1 job trong queue (ShouldBeUnique).
@@ -96,36 +98,38 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
                 Log::info('AI analysis sample', ['first_result' => $results[0] ?? null, 'count' => count($results)]);
             }
 
-            // Bulk prepare updates
-            $processedIds = [];
-            foreach ($results as $result) {
-                $eventId = $result['id'] ?? null;
-                if (!$eventId) {
-                    continue;
+            // Bulk update trong transaction để đảm bảo consistency
+            DB::transaction(function () use ($results, $unprocessed) {
+                $processedIds = [];
+                foreach ($results as $result) {
+                    $eventId = $result['id'] ?? null;
+                    if (!$eventId) {
+                        continue;
+                    }
+
+                    $processedIds[] = $eventId;
+
+                    LiveEvent::where('id', $eventId)
+                        ->where('live_session_id', $this->liveSessionId)
+                        ->update([
+                            'sentiment' => $result['sentiment'] ?? 'neutral',
+                            'intent_tag' => $result['intent_tag'] ?? null,
+                            'question_tag' => $result['question_tag'] ?? null,
+                            'product_tag' => $result['product_tag'] ?? null,
+                            'has_phone' => $result['has_phone'] ?? false,
+                            'ai_processed' => true,
+                        ]);
                 }
 
-                $processedIds[] = $eventId;
+                // Đánh dấu comments không có trong results (AI bỏ sót)
+                $missingIds = $unprocessed->pluck('id')->diff($processedIds)->toArray();
+                if (!empty($missingIds)) {
+                    LiveEvent::whereIn('id', $missingIds)
+                        ->update(['ai_processed' => true, 'sentiment' => 'neutral']);
+                }
+            });
 
-                LiveEvent::where('id', $eventId)
-                    ->where('live_session_id', $this->liveSessionId)
-                    ->update([
-                        'sentiment' => $result['sentiment'] ?? 'neutral',
-                        'intent_tag' => $result['intent_tag'] ?? null,
-                        'question_tag' => $result['question_tag'] ?? null,
-                        'product_tag' => $result['product_tag'] ?? null,
-                        'has_phone' => $result['has_phone'] ?? false,
-                        'ai_processed' => true,
-                    ]);
-            }
-
-            // Đánh dấu comments không có trong results (AI bỏ sót)
-            $missingIds = $unprocessed->pluck('id')->diff($processedIds)->toArray();
-            if (!empty($missingIds)) {
-                LiveEvent::whereIn('id', $missingIds)
-                    ->update(['ai_processed' => true, 'sentiment' => 'neutral']);
-            }
-
-            // Cập nhật sentiment stats + leads count trong 1 lần query
+            // Cập nhật sentiment stats + leads count (ngoài transaction vì re-count toàn bộ)
             $this->updateAggregateStats($session);
 
         } catch (\Throwable $e) {

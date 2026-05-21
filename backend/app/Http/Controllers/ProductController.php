@@ -30,27 +30,42 @@ class ProductController extends Controller
             ->pluck('id')
             ->toArray();
 
-        $products = $query->get()->map(function ($product) use ($activeSessionIds) {
-            $isLive = \DB::table('live_session_products')
+        // Preload: sản phẩm nào đang live (1 query thay vì N)
+        $liveProductIds = !empty($activeSessionIds)
+            ? \DB::table('live_session_products')
                 ->whereIn('live_session_id', $activeSessionIds)
-                ->where('product_id', $product->id)
-                ->exists();
+                ->pluck('product_id')
+                ->unique()
+                ->toArray()
+            : [];
 
-            $mentions = \DB::table('live_events')
+        // Preload: đếm mentions theo product name (1 query thay vì N)
+        $allProductNames = $query->clone()->pluck('name')->toArray();
+        $mentionsCounts = !empty($allProductNames)
+            ? \DB::table('live_events')
                 ->join('live_sessions', 'live_events.live_session_id', '=', 'live_sessions.id')
-                ->where('live_sessions.user_id', $product->user_id)
+                ->where('live_sessions.user_id', $request->user()->id)
                 ->where('live_events.event_type', 'comment')
-                ->where('live_events.product_tag', $product->name)
-                ->count();
+                ->whereIn('live_events.product_tag', $allProductNames)
+                ->selectRaw('live_events.product_tag, COUNT(*) as cnt')
+                ->groupBy('live_events.product_tag')
+                ->pluck('cnt', 'product_tag')
+            : collect();
 
-            $prevMentions = \DB::table('live_events')
+        // Preload: đếm mentions kỳ trước (1 query thay vì N)
+        $prevMentionsCounts = !empty($allProductNames)
+            ? \DB::table('live_events')
                 ->join('live_sessions', 'live_events.live_session_id', '=', 'live_sessions.id')
-                ->where('live_sessions.user_id', $product->user_id)
+                ->where('live_sessions.user_id', $request->user()->id)
                 ->where('live_events.event_type', 'comment')
-                ->where('live_events.product_tag', $product->name)
+                ->whereIn('live_events.product_tag', $allProductNames)
                 ->where('live_events.created_at', '<', now()->subDays(7))
-                ->count();
+                ->selectRaw('live_events.product_tag, COUNT(*) as cnt')
+                ->groupBy('live_events.product_tag')
+                ->pluck('cnt', 'product_tag')
+            : collect();
 
+        $products = $query->get()->map(function ($product) use ($liveProductIds, $mentionsCounts, $prevMentionsCounts) {
             return [
                 'id' => $product->id,
                 'name' => $product->name,
@@ -59,9 +74,9 @@ class ProductController extends Controller
                 'category' => $product->category,
                 'image' => $product->image,
                 'keywords' => $product->keywords ?? [],
-                'mentions' => $mentions,
-                'prevMentions' => $prevMentions,
-                'isLive' => $isLive,
+                'mentions' => (int) ($mentionsCounts[$product->name] ?? 0),
+                'prevMentions' => (int) ($prevMentionsCounts[$product->name] ?? 0),
+                'isLive' => in_array($product->id, $liveProductIds),
             ];
         });
 

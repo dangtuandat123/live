@@ -49,7 +49,7 @@ class LiveSessionController extends Controller
                 'comments' => $session->stats?->total_comments ?? $session->comments_count ?? 0,
                 'views' => $session->stats?->total_views ?? 0,
                 'leads' => $session->stats?->leads_count ?? 0,
-                'sentiment' => $this->calculateSentimentScore($session->stats),
+                'sentiment' => LiveStat::sentimentScore($session->stats),
                 'duration' => $session->duration_formatted,
                 'products' => $session->products_count ?? 0,
                 'date' => $session->created_at?->format('d/m/Y') ?? '',
@@ -469,17 +469,6 @@ class LiveSessionController extends Controller
         );
     }
 
-    private function calculateSentimentScore(?LiveStat $stats): int
-    {
-        if (!$stats) {
-            return 0;
-        }
-        $total = $stats->sentiment_positive + $stats->sentiment_neutral + $stats->sentiment_negative;
-        if ($total === 0) {
-            return 0;
-        }
-        return (int) round(($stats->sentiment_positive / $total) * 100);
-    }
 
     /**
      * Top sản phẩm được nhắc đến trong bình luận (từ AI tags).
@@ -564,7 +553,9 @@ class LiveSessionController extends Controller
      */
     private function extractPhone(string $text): string
     {
-        if (preg_match('/0\d{9,10}/', $text, $matches)) {
+        // Normalize: bỏ dấu chấm, dấu cách, gạch ngang giữa các chữ số
+        $normalized = preg_replace('/[\s.\-]/', '', $text);
+        if (preg_match('/0\d{9,10}/', $normalized, $matches)) {
             return $matches[0];
         }
         return '';

@@ -157,14 +157,29 @@ class ReportController extends Controller
                     'count' => (int) $k->count,
                     'trend' => 'up',
                 ])->toArray();
+
+            // Tính trend thực tế bằng so sánh với kỳ trước
+            if (!empty($hotKeywords) && !empty($sessionsInPrevPeriod)) {
+                $prevKeywords = \DB::table('live_events')
+                    ->whereIn('live_session_id', $sessionsInPrevPeriod)
+                    ->where('event_type', 'comment')
+                    ->whereNotNull('question_tag')
+                    ->where('question_tag', '!=', '')
+                    ->selectRaw('question_tag as keyword, COUNT(*) as count')
+                    ->groupBy('question_tag')
+                    ->get()
+                    ->pluck('count', 'keyword');
+
+                $hotKeywords = array_map(function ($k) use ($prevKeywords) {
+                    $prevCount = (int) ($prevKeywords[$k['keyword']] ?? 0);
+                    $k['trend'] = $k['count'] >= $prevCount ? 'up' : 'down';
+                    return $k;
+                }, $hotKeywords);
+            }
         }
 
         if (empty($hotKeywords)) {
-            $hotKeywords = [
-                ['keyword' => 'giá bao nhiêu', 'count' => 0, 'trend' => 'up'],
-                ['keyword' => 'còn hàng không', 'count' => 0, 'trend' => 'up'],
-                ['keyword' => 'ship về HN', 'count' => 0, 'trend' => 'down'],
-            ];
+            $hotKeywords = [];
         }
 
         // 6. Phiên live gần đây trong kỳ
@@ -183,7 +198,7 @@ class ReportController extends Controller
                     'comments' => $session->stats?->total_comments ?? $session->comments_count ?? 0,
                     'views' => $session->stats?->total_views ?? 0,
                     'leads' => $session->stats?->leads_count ?? 0,
-                    'sentiment' => $this->calculateSentimentScore($session->stats),
+                    'sentiment' => LiveStat::sentimentScore($session->stats),
                     'date' => $session->created_at?->format('d/m') ?? '',
                 ])->toArray();
         }
@@ -241,15 +256,4 @@ class ReportController extends Controller
         ]);
     }
 
-    private function calculateSentimentScore(?LiveStat $stats): int
-    {
-        if (!$stats) {
-            return 0;
-        }
-        $total = $stats->sentiment_positive + $stats->sentiment_neutral + $stats->sentiment_negative;
-        if ($total === 0) {
-            return 0;
-        }
-        return (int) round(($stats->sentiment_positive / $total) * 100);
-    }
 }
