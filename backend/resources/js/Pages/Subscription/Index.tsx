@@ -502,13 +502,13 @@ export default function SubscriptionIndex({ packages = [], activeSubscription, t
                       <TableCell className="tabular-nums font-semibold">{formatMoney(tx.amount)}</TableCell>
                       <TableCell>
                         {tx.status === "success" && (
-                          <Badge className="bg-emerald-500 text-white hover:bg-emerald-600">Thành công</Badge>
+                          <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:text-emerald-700 dark:hover:text-emerald-300 dark:border-emerald-500/30 font-medium">Thành công</Badge>
                         )}
                         {tx.status === "pending" && (
-                          <Badge variant="outline" className="text-amber-600 border-amber-500 bg-amber-50/50 hover:bg-amber-100/50">Chờ xử lý</Badge>
+                          <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 hover:text-amber-700 dark:hover:text-amber-300 dark:border-amber-500/30 font-medium">Chờ xử lý</Badge>
                         )}
                         {tx.status === "failed" && (
-                          <Badge variant="destructive">Thất bại</Badge>
+                          <Badge variant="outline" className="bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:text-red-700 dark:hover:text-red-300 dark:border-red-500/30 font-medium">Thất bại</Badge>
                         )}
                         {tx.status !== "success" && tx.status !== "pending" && tx.status !== "failed" && (
                           <Badge variant="secondary">{tx.status}</Badge>
@@ -553,13 +553,13 @@ export default function SubscriptionIndex({ packages = [], activeSubscription, t
                 </div>
 
                 {timeLeft > 0 ? (
-                  <div className="flex items-center gap-2 text-sm font-semibold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200 animate-pulse">
-                    <Loader2Icon className="size-4 animate-spin text-amber-500" />
+                  <div className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 dark:bg-amber-500/15 px-3 py-1.5 rounded-full border border-amber-500/20 dark:border-amber-500/30 animate-pulse">
+                    <Loader2Icon className="size-4 animate-spin text-amber-500 dark:text-amber-400" />
                     <span>Đang chờ chuyển khoản... ({Math.floor(timeLeft / 60).toString().padStart(2, "0")}:{(timeLeft % 60).toString().padStart(2, "0")})</span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 text-sm font-semibold text-red-600 bg-red-50 px-3 py-1.5 rounded-full border border-red-200">
-                    <AlertCircleIcon className="size-4 shrink-0" />
+                  <div className="flex items-center gap-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-500/10 dark:bg-red-500/15 px-3 py-1.5 rounded-full border border-red-500/20 dark:border-red-500/30">
+                    <AlertCircleIcon className="size-4 shrink-0 text-red-500 dark:text-red-400" />
                     <span>Mã thanh toán đã hết hạn (10 phút). Vui lòng đóng và thực hiện lại giao dịch.</span>
                   </div>
                 )}

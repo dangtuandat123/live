@@ -127,7 +127,7 @@ export function NavUser({
             <DropdownMenuGroup>
               <DropdownMenuItem asChild>
                 <Link href="/subscription" className="w-full flex items-center gap-2 cursor-pointer">
-                  <SparklesIcon className="size-4 text-amber-500" />
+                  <SparklesIcon className="size-4 text-primary" />
                   <span>Nâng cấp Pro</span>
                 </Link>
               </DropdownMenuItem>
