@@ -41,4 +41,9 @@ return [
         'timeout' => env('TIKTOK_SERVICE_TIMEOUT', 15),
     ],
 
+    'runware' => [
+        'api_key' => env('RUNWARE_API_KEY', ''),
+        'model' => env('RUNWARE_MODEL', 'google:gemini@3.1-flash-lite'),
+    ],
+
 ];
