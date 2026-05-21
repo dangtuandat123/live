@@ -22,6 +22,7 @@ import {
   BellRingIcon, BellOffIcon, DownloadIcon, ClipboardListIcon, XIcon,
   AlertTriangleIcon, FlameIcon, LightbulbIcon, HeartCrackIcon, ZapIcon,
   PinIcon, PinOffIcon, ClipboardCopyIcon, FileTextIcon, MapPinIcon, TruckIcon,
+  HeartIcon, GiftIcon, UserPlusIcon, Share2Icon,
 } from "lucide-react"
 import * as React from "react"
 
@@ -725,7 +726,10 @@ function QuestionsPanel() {
                        q.question === "Hỏi màu" ? "Nên show màu sắc" :
                        q.question === "Hỏi tồn kho" ? "Nên check kho" :
                        q.question === "Hỏi ship" ? "Thông báo phí ship" :
-                       `${q.count} lần`}
+                       q.question === "Hỏi công dụng" ? "Tư vấn công dụng/lợi ích" :
+                       q.question === "Hỏi chất liệu" ? "Nêu rõ chất liệu sản phẩm" :
+                       q.question === "Hỏi bảo hành" ? "Tư vấn chính sách bảo hành" :
+                       "Tư vấn & hỗ trợ khách hàng"}
                     </span>
                   </td>
                 </tr>
@@ -974,13 +978,14 @@ function AIInsightsPanel() {
     })
   }
 
-  if (negativePct > 10) {
+  if (stats.sentiment_negative >= 3 && negativePct > 10) {
+    const isRed = negativePct >= 25;
     dynamicAlerts.push({
       icon: HeartCrackIcon,
       title: "Cảm xúc tiêu cực tăng",
       desc: `Tỷ lệ tiêu cực hiện tại: ${negativePct}% (${stats.sentiment_negative} bình luận).`,
-      color: "red",
-      severity: "Cao",
+      color: isRed ? "red" : "amber",
+      severity: isRed ? "Cao" : "Trung bình",
     })
   }
 
@@ -1128,7 +1133,54 @@ function StatsPanel() {
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto space-y-4">
+        {/* KPI Cards Grid */}
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-semibold text-muted-foreground tracking-wider uppercase">Thả tim</CardTitle>
+              <HeartIcon className="size-4 text-rose-500 animate-pulse" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold tabular-nums">{(stats.total_likes ?? 0).toLocaleString()}</div>
+              <p className="text-[10px] text-muted-foreground mt-1">Lượt thích từ người xem</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-semibold text-muted-foreground tracking-wider uppercase">Quà tặng</CardTitle>
+              <GiftIcon className="size-4 text-amber-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold tabular-nums">{(stats.total_gifts ?? 0).toLocaleString()}</div>
+              <p className="text-[10px] text-muted-foreground mt-1">Tổng quà tặng gửi đến live</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-semibold text-muted-foreground tracking-wider uppercase">Follower mới</CardTitle>
+              <UserPlusIcon className="size-4 text-emerald-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold tabular-nums">{(stats.total_follows ?? 0).toLocaleString()}</div>
+              <p className="text-[10px] text-muted-foreground mt-1">Lượt theo dõi trong phiên live</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-semibold text-muted-foreground tracking-wider uppercase">Chia sẻ</CardTitle>
+              <Share2Icon className="size-4 text-blue-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold tabular-nums">{(stats.total_shares ?? 0).toLocaleString()}</div>
+              <p className="text-[10px] text-muted-foreground mt-1">Số lượt chia sẻ livestream</p>
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="grid gap-4 md:grid-cols-2 min-h-full">
           {/* Activity Timeline */}
           <Card className="md:col-span-2 flex flex-col">
@@ -1480,7 +1532,7 @@ export default function LivesShow({ session: initialSession, stats: initialStats
                   <div className="p-2.5 text-center">
                     <div className="text-lg font-bold">{stats.total_views.toLocaleString()}</div>
                     <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                      <EyeIcon className="size-3" />Lượt xem
+                      <EyeIcon className="size-3" />Tổng lượt xem
                     </p>
                   </div>
                   <div className="p-2.5 text-center">

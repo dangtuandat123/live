@@ -535,9 +535,14 @@ class LiveSessionController extends Controller
                     : now();
 
                 try {
-                    // M1: Hash nội dung để dedup chính xác (cùng user, cùng giây, khác nội dung → khác hash)
-                    $commentText = $event['data']['comment'] ?? '';
-                    $dataHash = md5($commentText);
+                    // M1: Hash nội dung động theo loại event để dedup chính xác không bị nuốt tương tác
+                    $eventType = $event['type'] ?? 'unknown';
+                    $dataHash = match ($eventType) {
+                        'comment' => md5($event['data']['comment'] ?? ''),
+                        'gift' => md5(($event['data']['gift_id'] ?? '') . '_' . ($event['data']['repeat_count'] ?? 1)),
+                        'like' => md5('like_' . ($event['data']['count'] ?? 1)),
+                        default => md5($eventType . '_' . ($event['timestamp'] ?? '')),
+                    };
 
                     LiveEvent::create([
                         'live_session_id' => $session->id,
