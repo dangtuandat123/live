@@ -25,7 +25,6 @@ os.environ["SSL_CERT_FILE"] = certifi.where()
 
 import asyncio
 import base64
-import os
 import subprocess
 import sys
 import tempfile
