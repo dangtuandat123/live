@@ -41,6 +41,11 @@ class CaptureThumbnailJob implements ShouldQueue, ShouldBeUnique
             return;
         }
 
+        if (in_array($session->status, ['ended', 'error'])) {
+            Log::info("CaptureThumbnailJob skipped for session {$this->liveSessionId} because its status is: {$session->status}");
+            return;
+        }
+
         // Cách 1: Tải trực tiếp từ coverUrl nhận từ TikTok API
         if ($this->coverUrl) {
             try {
@@ -103,9 +108,8 @@ class CaptureThumbnailJob implements ShouldQueue, ShouldBeUnique
         // Xóa ảnh cũ nếu có để tránh đầy đĩa host (rất quan trọng với gói host 1GB)
         if (!empty($session->thumbnail)) {
             try {
-                $baseUrl = $disk->url('');
-                $oldPath = str_replace($baseUrl, '', $session->thumbnail);
-                $oldPath = ltrim($oldPath, '/');
+                $filename = basename($session->thumbnail);
+                $oldPath = 'thumbnails/' . $filename;
                 if ($disk->exists($oldPath)) {
                     $disk->delete($oldPath);
                 }

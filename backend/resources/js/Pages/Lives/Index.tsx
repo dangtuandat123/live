@@ -54,6 +54,7 @@ interface Session {
   status: string
   comments: number
   views: number
+  viewer_count: number
   leads: number
   sentiment: number
   duration: string
@@ -177,7 +178,7 @@ export default function LivesIndex({ sessions, kpi, filters }: Props) {
             <CardContent>
               <div className="text-2xl font-bold text-red-500">{kpi.live_count}</div>
               <p className="text-xs text-muted-foreground">
-                {kpi.live_count > 0 ? `${kpi.live_views.toLocaleString()} lượt xem` : "—"}
+                {kpi.live_count > 0 ? `${kpi.live_views.toLocaleString()} người xem` : "—"}
               </p>
             </CardContent>
           </Card>
@@ -281,10 +282,17 @@ export default function LivesIndex({ sessions, kpi, filters }: Props) {
                       {session.name}
                     </h3>
                     <div className="flex items-center gap-2.5 text-[11px] text-white/80">
-                      <span className="flex items-center gap-1">
-                        <EyeIcon className="size-3" />
-                        {session.views.toLocaleString()}
-                      </span>
+                      {session.status === "live" ? (
+                        <span className="flex items-center gap-1 text-red-400 font-semibold">
+                          <EyeIcon className="size-3 text-red-500 animate-pulse" />
+                          {(session.viewer_count ?? 0).toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <EyeIcon className="size-3" />
+                          {session.views.toLocaleString()}
+                        </span>
+                      )}
                       <span className="flex items-center gap-1">
                         <MessageSquareIcon className="size-3" />
                         {session.comments.toLocaleString()}

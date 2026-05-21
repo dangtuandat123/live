@@ -49,6 +49,7 @@ class LiveSessionController extends Controller
                 'status' => $session->status,
                 'comments' => $session->stats?->total_comments ?? $session->comments_count ?? 0,
                 'views' => $session->stats?->total_views ?? 0,
+                'viewer_count' => $session->stats?->viewer_count ?? 0,
                 'leads' => $session->stats?->leads_count ?? 0,
                 'sentiment' => LiveStat::sentimentScore($session->stats),
                 'duration' => $session->duration_formatted,
@@ -66,7 +67,7 @@ class LiveSessionController extends Controller
         $liveViews = LiveStat::whereIn(
             'live_session_id',
             (clone $allSessions)->live()->select('id')
-        )->sum('total_views');
+        )->sum('viewer_count');
 
         return Inertia::render('Lives/Index', [
             'sessions' => $sessions,
