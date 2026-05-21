@@ -1,4 +1,5 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout"
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty"
 import { Head, router, usePage } from "@inertiajs/react"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
@@ -58,6 +59,7 @@ interface CommentData {
   id: number
   user: string
   unique_id: string | null
+  avatar_url: string | null
   text: string
   time: string
   event_at: string | null
@@ -438,19 +440,71 @@ function CommentsPanel() {
       </CardHeader>
       <FadeScrollArea>
           <div className="divide-y px-4">
-            {visible.map((comment) => {
+            {visible.length === 0 ? (
+              <Empty className="py-12">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    {filter === "order" ? <ShoppingCartIcon /> :
+                     filter === "question" ? <HelpCircleIcon /> :
+                     filter === "support" ? <BellRingIcon /> :
+                     filter === "pinned" ? <PinIcon /> :
+                     filter === "positive" ? <SmileIcon /> :
+                     filter === "negative" ? <HeartCrackIcon /> :
+                     search ? <SearchIcon /> :
+                     <MessageSquareIcon />}
+                  </EmptyMedia>
+                  <EmptyTitle>
+                    {filter === "order" ? "Chưa có đơn hàng" :
+                     filter === "question" ? "Chưa có câu hỏi" :
+                     filter === "support" ? "Chưa có phản hồi" :
+                     filter === "pinned" ? "Chưa ghim bình luận nào" :
+                     filter === "positive" ? "Chưa có bình luận tích cực" :
+                     filter === "negative" ? "Không có bình luận tiêu cực" :
+                     search ? "Không tìm thấy kết quả" :
+                     "Chưa có bình luận"}
+                  </EmptyTitle>
+                  <EmptyDescription>
+                    {filter === "order" ? "Khi có người xem chốt đơn, đơn hàng sẽ hiển thị tại đây." :
+                     filter === "question" ? "Khi có người hỏi về sản phẩm, câu hỏi sẽ xuất hiện tại đây." :
+                     filter === "support" ? "Chưa có ai phản hồi hoặc yêu cầu hỗ trợ." :
+                     filter === "pinned" ? "Nhấn vào icon ghim trên bình luận để ghim lại." :
+                     filter === "positive" ? "Bình luận tích cực về sản phẩm sẽ hiển thị tại đây." :
+                     filter === "negative" ? "Tuyệt vời! Phiên live không có phản hồi tiêu cực. 🎉" :
+                     search ? `Không có bình luận nào khớp với "${search}"` :
+                     "Bình luận sẽ xuất hiện realtime khi phiên live đang diễn ra."}
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : visible.map((comment) => {
               const isPinned = pinnedIds.has(comment.id)
               const isOrder = markedOrderIds.has(comment.id) || comment.intent_tag === "Chốt đơn"
               const sentimentColor = isPinned ? "border-l-yellow-500 bg-yellow-500/5" : comment.sentiment === "positive" ? "border-l-emerald-500" : comment.sentiment === "negative" ? "border-l-red-500" : "border-l-muted-foreground/30"
               return (
                 <div key={comment.id} className={`group relative flex items-start gap-2.5 border-l-2 py-2.5 pl-3 transition-colors ${sentimentColor}`}>
-                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                    {comment.user.charAt(0)}
-                  </div>
+                  <a
+                    href={comment.unique_id ? `https://www.tiktok.com/@${comment.unique_id}` : '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0"
+                    title={comment.unique_id ? `@${comment.unique_id}` : comment.user}
+                  >
+                    {comment.avatar_url ? (
+                      <img src={comment.avatar_url} alt={comment.user} className="size-7 rounded-full object-cover ring-1 ring-border" loading="lazy" />
+                    ) : (
+                      <div className="flex size-7 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                        {comment.user.charAt(0)}
+                      </div>
+                    )}
+                  </a>
                   <div className="flex-1 min-w-0 space-y-0.5">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                        <span className="text-sm font-medium">{comment.user}</span>
+                        <a
+                          href={comment.unique_id ? `https://www.tiktok.com/@${comment.unique_id}` : '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium hover:underline hover:text-primary transition-colors"
+                        >{comment.user}</a>
                         <SentimentBadge sentiment={comment.sentiment} />
                         {comment.has_phone && (
                           <Badge variant="outline" className="gap-1 text-[10px] px-1.5 py-0"><PhoneIcon className="size-2.5" />SĐT</Badge>
@@ -562,7 +616,17 @@ function ProductsPanel() {
               <col className="w-[14%]" />
             </colgroup>
             <tbody className="[&_tr:last-child]:border-0">
-              {topProducts.map((product, i) => (
+              {topProducts.length === 0 ? (
+                <tr><td colSpan={5}>
+                  <Empty className="py-12">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon"><PackageIcon /></EmptyMedia>
+                      <EmptyTitle>Chưa có sản phẩm</EmptyTitle>
+                      <EmptyDescription>Khi người xem nhắc đến sản phẩm, thống kê sẽ hiển thị tại đây.</EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
+                </td></tr>
+              ) : topProducts.map((product, i) => (
                 <tr key={product.name} className="border-b transition-colors hover:bg-muted/50">
                   <td className="p-2 font-bold text-muted-foreground">{i + 1}</td>
                   <td className="p-2">
@@ -638,7 +702,17 @@ function QuestionsPanel() {
               <col className="w-[36%]" />
             </colgroup>
             <tbody className="[&_tr:last-child]:border-0">
-              {topQuestions.map((q, i) => (
+              {topQuestions.length === 0 ? (
+                <tr><td colSpan={5}>
+                  <Empty className="py-12">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon"><HelpCircleIcon /></EmptyMedia>
+                      <EmptyTitle>Chưa có câu hỏi</EmptyTitle>
+                      <EmptyDescription>Khi người xem đặt câu hỏi về sản phẩm, AI sẽ phân loại và hiển thị tại đây.</EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
+                </td></tr>
+              ) : topQuestions.map((q, i) => (
                 <tr key={q.question} className="border-b transition-colors hover:bg-muted/50">
                   <td className="p-2 font-bold text-muted-foreground">{i + 1}</td>
                   <td className="p-2 font-medium truncate">{q.question}</td>
@@ -754,7 +828,19 @@ function CustomersPanel() {
               <col className="w-[14%]" />
             </colgroup>
             <tbody className="[&_tr:last-child]:border-0">
-              {filtered.map((c, i) => {
+              {filtered.length === 0 ? (
+                <tr><td colSpan={6}>
+                  <Empty className="py-12">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon"><UsersIcon /></EmptyMedia>
+                      <EmptyTitle>{search ? "Không tìm thấy khách hàng" : "Chưa có khách tiềm năng"}</EmptyTitle>
+                      <EmptyDescription>
+                        {search ? `Không có khách hàng nào khớp với "${search}"` : "Khi người xem để lại SĐT hoặc có ý định mua hàng, thông tin sẽ hiển thị tại đây."}
+                      </EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
+                </td></tr>
+              ) : filtered.map((c, i) => {
                 const order = orders[i]
                 return (
                   <tr key={i} className="border-b transition-colors hover:bg-muted/50">
@@ -1371,30 +1457,44 @@ export default function LivesShow({ session: initialSession, stats: initialStats
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-3">
-                <div className="flex items-start gap-3">
-                  <div>
-                    <div className="text-2xl font-bold text-green-500">{sentimentPositivePct}%</div>
-                  </div>
-                  <div className="flex-1 space-y-1 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-green-500" />Tích cực</span>
-                      <span className="font-medium">{sentimentPositivePct}%</span>
+                {sentimentTotal === 0 ? (
+                  <div className="text-xs text-muted-foreground text-center py-2">Chưa có dữ liệu cảm xúc</div>
+                ) : (
+                  <>
+                    <div className="flex items-start gap-3">
+                      <div className="text-center">
+                        <div className={`text-2xl font-bold ${sentimentNegativePct > 30 ? 'text-red-500' : sentimentPositivePct >= 20 ? 'text-green-500' : 'text-amber-500'}`}>
+                          {sentimentNegativePct > 30 ? '😟' : sentimentPositivePct >= 20 ? '😊' : '😐'}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                          {sentimentNegativePct > 30 ? 'Cần chú ý' : sentimentNegativePct === 0 && sentimentPositivePct > 0 ? 'Rất tốt!' : sentimentNegativePct === 0 ? 'Ổn định' : 'Tích cực'}
+                        </div>
+                      </div>
+                      <div className="flex-1 space-y-1 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-green-500" />Tích cực</span>
+                          <span className="font-medium">{sentimentPositivePct}% <span className="text-muted-foreground">({stats.sentiment_positive})</span></span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-amber-500" />Bình thường</span>
+                          <span className="font-medium">{sentimentNeutralPct}% <span className="text-muted-foreground">({stats.sentiment_neutral})</span></span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-red-500" />Tiêu cực</span>
+                          <span className="font-medium">{sentimentNegativePct}% <span className="text-muted-foreground">({stats.sentiment_negative})</span></span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-amber-500" />Trung lập</span>
-                      <span className="font-medium">{sentimentNeutralPct}%</span>
+                    <div className="mt-2 flex h-2 w-full overflow-hidden rounded-full bg-muted/30">
+                      <div className="bg-green-500 transition-all duration-500" style={{ width: `${sentimentPositivePct}%` }} />
+                      <div className="bg-amber-500 transition-all duration-500" style={{ width: `${sentimentNeutralPct}%` }} />
+                      <div className="bg-red-500 transition-all duration-500" style={{ width: `${sentimentNegativePct}%` }} />
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-red-500" />Tiêu cực</span>
-                      <span className="font-medium">{sentimentNegativePct}%</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-2 flex h-2 w-full overflow-hidden rounded-full">
-                  <div className="bg-green-500" style={{ width: `${sentimentPositivePct}%` }} />
-                  <div className="bg-amber-500" style={{ width: `${sentimentNeutralPct}%` }} />
-                  <div className="bg-red-500" style={{ width: `${sentimentNegativePct}%` }} />
-                </div>
+                    {sentimentNegativePct === 0 && sentimentTotal > 0 && (
+                      <div className="mt-1.5 text-[10px] text-green-600 dark:text-green-400">✨ Không có phản hồi tiêu cực — phiên live đang diễn ra tốt!</div>
+                    )}
+                  </>
+                )}
               </CardContent>
             </Card>
 

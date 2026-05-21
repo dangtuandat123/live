@@ -188,10 +188,20 @@ sessions: dict[str, SessionInfo] = {}
 def extract_user(event) -> dict:
     """Trích xuất user info từ event TikTok."""
     user = getattr(event, "user", None) or getattr(event, "user_info", None) or getattr(event, "from_user", None)
+
+    # Lấy avatar URL từ avatar_thumb (ImageModel có m_urls: list[str])
+    avatar_url = ""
+    avatar_thumb = getattr(user, "avatar_thumb", None)
+    if avatar_thumb:
+        urls = getattr(avatar_thumb, "m_urls", [])
+        if urls:
+            avatar_url = urls[0]
+
     return {
         "nickname": getattr(user, "nickname", "Unknown"),
         "unique_id": getattr(user, "unique_id", ""),
         "user_id": str(getattr(user, "user_id", "") or getattr(user, "id", "")),
+        "avatar_url": avatar_url,
     }
 
 
@@ -229,7 +239,7 @@ def setup_tiktok_client(session: SessionInfo) -> TikTokLiveClient:
     async def on_comment(event):
         u = extract_user(event)
         session.stats["total_comments"] += 1
-        session.add_event("comment", nickname=u["nickname"], unique_id=u["unique_id"], user_id=u["user_id"], data={"comment": event.comment})
+        session.add_event("comment", nickname=u["nickname"], unique_id=u["unique_id"], user_id=u["user_id"], data={"comment": event.comment, "avatar_url": u["avatar_url"]})
 
     @client.on(GiftEvent)
     async def on_gift(event):
