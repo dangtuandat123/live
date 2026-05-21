@@ -49,13 +49,14 @@ class LiveStat extends Model
      */
     public static function sentimentScore(?self $stats): int
     {
-        if (!$stats) {
+        if (! $stats) {
             return 0;
         }
         $total = $stats->sentiment_positive + $stats->sentiment_neutral + $stats->sentiment_negative;
         if ($total === 0) {
             return 0;
         }
+
         return (int) round(($stats->sentiment_positive / $total) * 100);
     }
 }

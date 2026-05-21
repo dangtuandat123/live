@@ -10,7 +10,9 @@ use Illuminate\Support\Facades\Log;
 class TikTokService
 {
     private string $baseUrl;
+
     private string $apiKey;
+
     private int $timeout;
 
     public function __construct()
@@ -33,13 +35,12 @@ class TikTokService
         if ($sessionId) {
             $payload['session_id'] = $sessionId;
         }
+
         return $this->post('/sessions/start', $payload);
     }
 
     /**
      * Lấy thông tin session + events từ Python service.
-     *
-     * @return array|null
      */
     public function getSession(string $sessionId, bool $includeEvents = true, int $limit = 200, float $since = 0): ?array
     {
@@ -56,8 +57,6 @@ class TikTokService
 
     /**
      * Lấy thống kê session.
-     *
-     * @return array|null
      */
     public function getStats(string $sessionId): ?array
     {
@@ -66,8 +65,6 @@ class TikTokService
 
     /**
      * Dừng theo dõi session.
-     *
-     * @return array|null
      */
     public function stopSession(string $sessionId): ?array
     {
@@ -80,10 +77,12 @@ class TikTokService
     public function healthCheck(): bool
     {
         try {
-            $response = $this->client()->get($this->baseUrl . '/health');
+            $response = $this->client()->get($this->baseUrl.'/health');
+
             return $response->successful();
         } catch (ConnectionException $e) {
             Log::warning('TikTok service health check failed', ['error' => $e->getMessage()]);
+
             return false;
         }
     }
@@ -99,19 +98,21 @@ class TikTokService
             // Timeout cao hơn vì FFmpeg capture mất vài giây
             $response = Http::timeout(20)
                 ->withHeaders(['X-Service-Key' => $this->apiKey])
-                ->get($this->baseUrl . "/sessions/{$sessionId}/snapshot");
+                ->get($this->baseUrl."/sessions/{$sessionId}/snapshot");
 
             if ($response->failed()) {
                 Log::warning('TikTok snapshot failed', [
                     'session_id' => $sessionId,
                     'status' => $response->status(),
                 ]);
+
                 return null;
             }
 
             return $response->json();
         } catch (ConnectionException $e) {
             Log::warning('TikTok snapshot connection failed', ['error' => $e->getMessage()]);
+
             return null;
         }
     }
@@ -129,11 +130,11 @@ class TikTokService
     private function get(string $path, array $query = []): ?array
     {
         try {
-            $response = $this->client()->get($this->baseUrl . $path, $query);
+            $response = $this->client()->get($this->baseUrl.$path, $query);
 
             if ($response->failed()) {
                 if ($response->status() === 404) {
-                    throw new TikTokSessionNotFoundException("TikTok session not found on service");
+                    throw new TikTokSessionNotFoundException('TikTok session not found on service');
                 }
 
                 Log::error('TikTok service GET failed', [
@@ -141,6 +142,7 @@ class TikTokService
                     'status' => $response->status(),
                     'body' => $response->body(),
                 ]);
+
                 return null;
             }
 
@@ -150,6 +152,7 @@ class TikTokService
                 'path' => $path,
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -157,11 +160,11 @@ class TikTokService
     private function post(string $path, array $data = []): ?array
     {
         try {
-            $response = $this->client()->post($this->baseUrl . $path, $data);
+            $response = $this->client()->post($this->baseUrl.$path, $data);
 
             if ($response->failed()) {
                 if ($response->status() === 404) {
-                    throw new TikTokSessionNotFoundException("TikTok session not found on service");
+                    throw new TikTokSessionNotFoundException('TikTok session not found on service');
                 }
 
                 Log::error('TikTok service POST failed', [
@@ -169,6 +172,7 @@ class TikTokService
                     'status' => $response->status(),
                     'body' => $response->body(),
                 ]);
+
                 return null;
             }
 
@@ -178,6 +182,7 @@ class TikTokService
                 'path' => $path,
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }

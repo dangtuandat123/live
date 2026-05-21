@@ -17,6 +17,8 @@ import {
   UsersIcon,
   SettingsIcon,
   ArrowLeftIcon,
+  PackageIcon,
+  CreditCardIcon,
 } from "lucide-react"
 
 export function AdminSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -50,13 +52,25 @@ export function AdminSidebar({ ...props }: React.ComponentProps<typeof Sidebar>)
       isActive: route().current("admin.users.*"),
     },
     {
+      title: "Quản lý gói dịch vụ",
+      url: route("admin.packages.index"),
+      icon: <PackageIcon />,
+      isActive: route().current("admin.packages.*"),
+    },
+    {
+      title: "Cấu hình thanh toán",
+      url: route("admin.payments.index"),
+      icon: <CreditCardIcon />,
+      isActive: route().current("admin.payments.*"),
+    },
+    {
       title: "Cài đặt hệ thống",
       url: route("admin.settings.index"),
       icon: <SettingsIcon />,
       isActive: route().current("admin.settings.*"),
     },
     {
-      title: "← Quay lại Dashboard",
+      title: "Quay lại Dashboard",
       url: route("dashboard"),
       icon: <ArrowLeftIcon />,
       isActive: false,

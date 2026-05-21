@@ -91,8 +91,8 @@ class ReportController extends Controller
             ],
             [
                 'title' => 'TB cảm xúc tích cực',
-                'value' => $curSentimentPct . '%',
-                'prev' => $prevSentimentPct . '%',
+                'value' => $curSentimentPct.'%',
+                'prev' => $prevSentimentPct.'%',
             ],
         ];
 
@@ -103,7 +103,7 @@ class ReportController extends Controller
             $days[$date] = ['date' => $date, 'views' => 0, 'comments' => 0, 'leads' => 0];
         }
 
-        if (!empty($sessionsInPeriod)) {
+        if (! empty($sessionsInPeriod)) {
             $trendQuery = \DB::table('live_sessions')
                 ->join('live_stats', 'live_sessions.id', '=', 'live_stats.live_session_id')
                 ->whereIn('live_sessions.id', $sessionsInPeriod)
@@ -123,13 +123,13 @@ class ReportController extends Controller
 
         // 4. So sánh phiên Live (Top 5)
         $sessionCompareData = [];
-        if (!empty($sessionsInPeriod)) {
+        if (! empty($sessionsInPeriod)) {
             $sessionCompareData = LiveSession::forUser($userId)
                 ->whereIn('id', $sessionsInPeriod)
                 ->with('stats')
                 ->get()
                 ->map(fn ($s) => [
-                    'name' => strlen($s->name) > 18 ? mb_substr($s->name, 0, 15) . '...' : $s->name,
+                    'name' => strlen($s->name) > 18 ? mb_substr($s->name, 0, 15).'...' : $s->name,
                     'views' => $s->stats?->total_views ?? 0,
                     'comments' => $s->stats?->total_comments ?? 0,
                 ])
@@ -141,7 +141,7 @@ class ReportController extends Controller
 
         // 5. Từ khóa nổi bật trong kỳ
         $hotKeywords = [];
-        if (!empty($sessionsInPeriod)) {
+        if (! empty($sessionsInPeriod)) {
             $hotKeywords = \DB::table('live_events')
                 ->whereIn('live_session_id', $sessionsInPeriod)
                 ->where('event_type', 'comment')
@@ -159,7 +159,7 @@ class ReportController extends Controller
                 ])->toArray();
 
             // Tính trend thực tế bằng so sánh với kỳ trước
-            if (!empty($hotKeywords) && !empty($sessionsInPrevPeriod)) {
+            if (! empty($hotKeywords) && ! empty($sessionsInPrevPeriod)) {
                 $prevKeywords = \DB::table('live_events')
                     ->whereIn('live_session_id', $sessionsInPrevPeriod)
                     ->where('event_type', 'comment')
@@ -173,6 +173,7 @@ class ReportController extends Controller
                 $hotKeywords = array_map(function ($k) use ($prevKeywords) {
                     $prevCount = (int) ($prevKeywords[$k['keyword']] ?? 0);
                     $k['trend'] = $k['count'] >= $prevCount ? 'up' : 'down';
+
                     return $k;
                 }, $hotKeywords);
             }
@@ -184,7 +185,7 @@ class ReportController extends Controller
 
         // 6. Phiên live gần đây trong kỳ
         $recentSessions = [];
-        if (!empty($sessionsInPeriod)) {
+        if (! empty($sessionsInPeriod)) {
             $recentSessions = LiveSession::forUser($userId)
                 ->whereIn('id', $sessionsInPeriod)
                 ->with('stats')
@@ -205,7 +206,7 @@ class ReportController extends Controller
 
         // 7. Gợi ý từ AI dựa trên dữ liệu
         $mostMentionedProduct = null;
-        if (!empty($sessionsInPeriod)) {
+        if (! empty($sessionsInPeriod)) {
             $mostMentionedProduct = \DB::table('live_events')
                 ->whereIn('live_session_id', $sessionsInPeriod)
                 ->where('event_type', 'comment')
@@ -217,15 +218,15 @@ class ReportController extends Controller
                 ->value('product_tag');
         }
 
-        $recommendation = "Dựa trên phân tích AI: ";
+        $recommendation = 'Dựa trên phân tích AI: ';
         if ($mostMentionedProduct) {
             $recommendation .= "Sản phẩm \"{$mostMentionedProduct}\" được nhắc đến nhiều nhất trong các bình luận. Bạn nên tăng thời lượng giới thiệu sản phẩm này. ";
         } else {
-            $recommendation .= "Chưa xác định được sản phẩm tâm điểm trong kỳ này. Hãy thử giới thiệu rõ SKU sản phẩm khi livestream. ";
+            $recommendation .= 'Chưa xác định được sản phẩm tâm điểm trong kỳ này. Hãy thử giới thiệu rõ SKU sản phẩm khi livestream. ';
         }
 
         $bestHour = null;
-        if (!empty($sessionsInPeriod)) {
+        if (! empty($sessionsInPeriod)) {
             $bestHourQuery = LiveSession::forUser($userId)
                 ->whereIn('id', $sessionsInPeriod)
                 ->selectRaw('HOUR(created_at) as hr, COUNT(*) as cnt')
@@ -240,7 +241,7 @@ class ReportController extends Controller
         if ($bestHour !== null) {
             $recommendation .= "Khung giờ vàng thu hút tương tác tốt nhất của bạn là khoảng {$bestHour}h. Hãy tập trung live vào khung giờ này và chèn thêm các mini-game hoặc Q&A để tăng tỷ lệ chốt đơn.";
         } else {
-            $recommendation .= "Hãy tiến hành thêm các phiên live và bật tính năng AI quét tự động để tối ưu hóa thời gian phát sóng.";
+            $recommendation .= 'Hãy tiến hành thêm các phiên live và bật tính năng AI quét tự động để tối ưu hóa thời gian phát sóng.';
         }
 
         return Inertia::render('Reports/Index', [
@@ -255,5 +256,4 @@ class ReportController extends Controller
             ],
         ]);
     }
-
 }

@@ -7,7 +7,6 @@ use App\Models\LiveSession;
 use App\Services\RunwareAiService;
 use App\Services\TikTokService;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -20,14 +19,18 @@ class AnalyzeCommentsJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 2;
+
     public int $timeout = 120;
+
     public array $backoff = [10, 30];
 
     /**
      * Giá trị hợp lệ cho các AI fields — validation trước khi lưu DB.
      */
     private const VALID_SENTIMENTS = ['positive', 'neutral', 'negative'];
+
     private const VALID_INTENTS = ['Chốt đơn', 'Hỏi thông tin', 'Phản hồi SP', 'Yêu cầu hỗ trợ'];
+
     private const VALID_QUESTIONS = [
         'Hỏi giá', 'Hỏi size', 'Hỏi ship', 'Hỏi chất liệu',
         'Hỏi màu', 'Hỏi tồn kho', 'Hỏi giảm giá', 'Hỏi bảo hành',
@@ -40,14 +43,14 @@ class AnalyzeCommentsJob implements ShouldQueue
 
     public function uniqueId(): string
     {
-        return 'analyze-comments-' . $this->liveSessionId;
+        return 'analyze-comments-'.$this->liveSessionId;
     }
 
     public function handle(RunwareAiService $runware, TikTokService $tiktokService): void
     {
-        $lockKey = 'analyze-comments-lock-' . $this->liveSessionId;
+        $lockKey = 'analyze-comments-lock-'.$this->liveSessionId;
         $lock = cache()->lock($lockKey, 120);
-        if (!$lock->get()) {
+        if (! $lock->get()) {
             return;
         }
 
@@ -55,12 +58,12 @@ class AnalyzeCommentsJob implements ShouldQueue
 
         try {
             $session = LiveSession::with(['products', 'keywords', 'stats'])->find($this->liveSessionId);
-            if (!$session) {
+            if (! $session) {
                 return;
             }
 
             // Chỉ xử lý AI cho phiên live đang hoạt động
-            if (!in_array($session->status, ['live', 'connecting'])) {
+            if (! in_array($session->status, ['live', 'connecting'])) {
                 return;
             }
 
@@ -79,12 +82,12 @@ class AnalyzeCommentsJob implements ShouldQueue
             // Build compact input: "ID|text"
             $commentsText = $unprocessed
                 ->map(fn ($e) => ['id' => $e->id, 'text' => $e->data['comment'] ?? ''])
-                ->filter(fn ($c) => !empty($c['text']));
+                ->filter(fn ($c) => ! empty($c['text']));
 
             if ($commentsText->isEmpty()) {
                 LiveEvent::whereIn('id', $unprocessed->pluck('id'))
                     ->update(['ai_processed' => true, 'sentiment' => 'neutral']);
-                
+
                 // Check if there are more unprocessed comments to continue the pipeline
                 $hasMoreUnprocessed = LiveEvent::where('live_session_id', $this->liveSessionId)
                     ->where('event_type', 'comment')
@@ -96,6 +99,7 @@ class AnalyzeCommentsJob implements ShouldQueue
                     $dispatchedNext = true;
                     self::dispatch($this->liveSessionId)->delay(now()->addSeconds(2));
                 }
+
                 return;
             }
 
@@ -160,7 +164,7 @@ class AnalyzeCommentsJob implements ShouldQueue
                     'session_id' => $this->liveSessionId,
                     'comments_count' => $commentsText->count(),
                     'has_audio' => $hasAudio,
-                    'has_memory' => !empty($memoryContext),
+                    'has_memory' => ! empty($memoryContext),
                 ]);
 
                 $response = $runware->chatMultimodal(
@@ -170,7 +174,7 @@ class AnalyzeCommentsJob implements ShouldQueue
                     maxTokens: 4096,
                 );
 
-                if (!$response) {
+                if (! $response) {
                     throw new \RuntimeException('Runware AI returned null response');
                 }
 
@@ -178,12 +182,12 @@ class AnalyzeCommentsJob implements ShouldQueue
                 $results = $response['results'] ?? $response;
 
                 // Đảm bảo là array
-                if (!is_array($results) || empty($results)) {
+                if (! is_array($results) || empty($results)) {
                     throw new \RuntimeException('AI response is empty or not an array');
                 }
 
                 // Nếu không phải là list tuần tự (associative array), kiểm tra xem có phải single object không
-                if (!array_is_list($results)) {
+                if (! array_is_list($results)) {
                     if (isset($results['id'])) {
                         $results = [$results];
                     } else {
@@ -192,7 +196,7 @@ class AnalyzeCommentsJob implements ShouldQueue
                 }
 
                 // Debug log
-                if (!empty($results) && config('app.debug')) {
+                if (! empty($results) && config('app.debug')) {
                     Log::info('AI analysis batch', [
                         'session_id' => $this->liveSessionId,
                         'input_count' => $commentsText->count(),
@@ -220,7 +224,7 @@ class AnalyzeCommentsJob implements ShouldQueue
 
                     foreach ($results as $result) {
                         $eventId = $result['id'] ?? null;
-                        if (!$eventId) {
+                        if (! $eventId) {
                             continue;
                         }
 
@@ -261,7 +265,7 @@ class AnalyzeCommentsJob implements ShouldQueue
                     // Calculate the new leads count before executing the bulk comments update query
                     $chotDonUsers = array_values(array_unique($chotDonUsers));
                     $newLeadsCount = 0;
-                    if (!empty($chotDonUsers)) {
+                    if (! empty($chotDonUsers)) {
                         $existingLeads = LiveEvent::where('live_session_id', $this->liveSessionId)
                             ->where('event_type', 'comment')
                             ->where('ai_processed', true)
@@ -287,11 +291,11 @@ class AnalyzeCommentsJob implements ShouldQueue
 
                     // Đánh dấu comments không có trong results (AI bỏ sót)
                     $missingIds = $unprocessed->pluck('id')->diff($processedIds)->toArray();
-                    if (!empty($missingIds)) {
+                    if (! empty($missingIds)) {
                         LiveEvent::whereIn('id', $missingIds)
                             ->where('live_session_id', $this->liveSessionId)
                             ->update(['ai_processed' => true, 'sentiment' => 'neutral']);
-                        
+
                         $neutral += count($missingIds);
                     }
 
@@ -343,9 +347,9 @@ class AnalyzeCommentsJob implements ShouldQueue
                 // nếu lỗi không thể tự phục hồi (JSON parse, null response) hoặc đã đạt số lần thử tối đa.
                 $isLastAttempt = $this->attempts() >= $this->tries;
                 $errMsg = strtolower($e->getMessage());
-                $isUnrecoverable = !str_contains($errMsg, 'rate limit') && 
-                                   !str_contains($errMsg, 'timeout') && 
-                                   !str_contains($errMsg, 'connection');
+                $isUnrecoverable = ! str_contains($errMsg, 'rate limit') &&
+                                   ! str_contains($errMsg, 'timeout') &&
+                                   ! str_contains($errMsg, 'connection');
 
                 if ($isLastAttempt || $isUnrecoverable) {
                     try {
@@ -378,6 +382,7 @@ class AnalyzeCommentsJob implements ShouldQueue
                 // Không retry nếu lỗi auth
                 if (str_contains($e->getMessage(), 'API key') || str_contains($e->getMessage(), '401') || str_contains($e->getMessage(), 'auth')) {
                     $this->fail($e);
+
                     return;
                 }
 
@@ -385,7 +390,7 @@ class AnalyzeCommentsJob implements ShouldQueue
                 throw $e;
             }
         } finally {
-            if (isset($lock) && !$dispatchedNext) {
+            if (isset($lock) && ! $dispatchedNext) {
                 $lock->release();
             }
         }
@@ -406,8 +411,9 @@ class AnalyzeCommentsJob implements ShouldQueue
     ): string {
         $productContext = collect($products)
             ->map(function ($p) {
-                $kws = !empty($p['keywords']) ? ' (từ khóa: ' . implode(', ', $p['keywords']) . ')' : '';
-                return $p['name'] . $kws;
+                $kws = ! empty($p['keywords']) ? ' (từ khóa: '.implode(', ', $p['keywords']).')' : '';
+
+                return $p['name'].$kws;
             })
             ->join('; ');
 
@@ -420,7 +426,7 @@ class AnalyzeCommentsJob implements ShouldQueue
 
         // Memory section — ngữ cảnh từ batch phân tích trước
         $memorySection = '';
-        if (!empty($memoryContext)) {
+        if (! empty($memoryContext)) {
             $memorySection = <<<MEM
 
 === BỘ NHỚ PHIÊN LIVE ===
@@ -432,7 +438,7 @@ MEM;
         // Audio section — hướng dẫn AI sử dụng audio nếu có
         $audioSection = '';
         if ($hasAudio) {
-            $audioSection = <<<AUDIO
+            $audioSection = <<<'AUDIO'
 
 === AUDIO LIVESTREAM ===
 Bạn cũng nhận được đoạn audio 3 giây gần nhất từ livestream. Hãy nghe để hiểu:
@@ -487,17 +493,17 @@ PROMPT;
     private function validateResult(array $result, array $productNames): array
     {
         $sentiment = $result['sentiment'] ?? 'neutral';
-        if (!in_array($sentiment, self::VALID_SENTIMENTS)) {
+        if (! in_array($sentiment, self::VALID_SENTIMENTS)) {
             $sentiment = 'neutral';
         }
 
         $intentTag = $result['intent_tag'] ?? null;
-        if ($intentTag !== null && !in_array($intentTag, self::VALID_INTENTS)) {
+        if ($intentTag !== null && ! in_array($intentTag, self::VALID_INTENTS)) {
             $intentTag = null;
         }
 
         $questionTag = $result['question_tag'] ?? null;
-        if ($questionTag !== null && !in_array($questionTag, self::VALID_QUESTIONS)) {
+        if ($questionTag !== null && ! in_array($questionTag, self::VALID_QUESTIONS)) {
             $questionTag = null;
         }
 
@@ -560,7 +566,7 @@ PROMPT;
         $newLeadsCount = $batchStats['new_leads_count'] ?? 0;
 
         $statsModel = $session->stats;
-        if (!$statsModel) {
+        if (! $statsModel) {
             // Create stats record if not exists
             $session->stats()->create([
                 'sentiment_positive' => $batchStats['positive'],

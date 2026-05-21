@@ -34,6 +34,7 @@ class CreateAdminCommand extends Command
 
         if ($user->isAdmin()) {
             $this->warn("User {$email} đã là admin rồi.");
+
             return self::SUCCESS;
         }
 
@@ -51,6 +52,7 @@ class CreateAdminCommand extends Command
 
         if (User::where('email', $email)->exists()) {
             $this->error("Email {$email} đã tồn tại. Dùng lệnh không có --new để nâng cấp.");
+
             return self::FAILURE;
         }
 

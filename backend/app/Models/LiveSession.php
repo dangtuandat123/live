@@ -73,14 +73,15 @@ class LiveSession extends Model
     {
         $seconds = $this->duration_seconds;
         if ($seconds < 60) {
-            return $seconds . 's';
+            return $seconds.'s';
         }
         $hours = intdiv($seconds, 3600);
         $minutes = intdiv($seconds % 3600, 60);
         if ($hours > 0) {
-            return $hours . 'h ' . str_pad((string) $minutes, 2, '0', STR_PAD_LEFT) . 'm';
+            return $hours.'h '.str_pad((string) $minutes, 2, '0', STR_PAD_LEFT).'m';
         }
-        return $minutes . 'm';
+
+        return $minutes.'m';
     }
 
     // --- Scopes ---

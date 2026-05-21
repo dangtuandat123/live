@@ -1,19 +1,27 @@
 # Project Context
 
-## Target Files
-The target files for Solution G (Text + Audio + Memory) TikTok Livestream Comment Analysis Pipeline are:
-- `backend/app/Jobs/AnalyzeCommentsJob.php`
-- `backend/app/Models/LiveSession.php`
-- `backend/database/migrations/2026_05_21_202200_add_ai_context_summary_to_live_sessions.php`
-- `backend/tests/Feature/AnalyzeCommentsJobTest.php`
+## Target Scope
+The scope covers:
+- Subscription Packages and User Subscriptions models and migrations.
+- Payment Configurations and Transactions models and migrations.
+- Active Packages listing, checkout, and webhook callback APIs.
+- Outbound Webhook forwarding for payment configs.
+- Admin management CRUD panels for packages and payment configs.
+- User packages listing & checkout UI (VietQR dynamic rendering).
+- Feature test cases verifying checkout/callback/webhook forward/CRUD configurations.
 
-## Outputs
-- **Audit Report path**: `C:\Users\ADMIN\.gemini\antigravity\brain\9e05c9cd-c52d-4900-bfb1-3c02aa45407d\evidence_deep_audit_report.md`
+## Target Directories
+- `backend/app/Models/`
+- `backend/database/migrations/`
+- `backend/app/Http/Controllers/`
+- `backend/routes/api.php`
+- `backend/routes/web.php`
+- `backend/resources/js/` (Inertia React pages/components)
+- `backend/tests/Feature/SubscriptionPaymentTest.php`
 
 ## Verification Command
 - Automated test command: `php artisan test` in `backend` directory.
 
 ## Constraints
-- Do not modify or create source code files.
+- Never write, modify, or create source code files directly.
 - All testing and file generation must be performed by subagents.
-- Audit report must follow the 18-pass workflow structure specified in `RULE[strict-evidence-audit-v3-12k.md]`.

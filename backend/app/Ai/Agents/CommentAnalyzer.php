@@ -2,14 +2,14 @@
 
 namespace App\Ai\Agents;
 
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Ai\Attributes\MaxTokens;
 use Laravel\Ai\Attributes\Model;
 use Laravel\Ai\Attributes\Provider;
 use Laravel\Ai\Attributes\Temperature;
-use Laravel\Ai\Attributes\MaxTokens;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\HasStructuredOutput;
 use Laravel\Ai\Promptable;
-use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 #[Provider('deepseek')]
 #[Model('deepseek-v4-flash')]
@@ -28,12 +28,14 @@ class CommentAnalyzer implements Agent, HasStructuredOutput
     public function withProducts(array $products): static
     {
         $this->products = $products;
+
         return $this;
     }
 
     public function withKeywords(array $keywords): static
     {
         $this->trackingKeywords = $keywords;
+
         return $this;
     }
 
@@ -41,8 +43,9 @@ class CommentAnalyzer implements Agent, HasStructuredOutput
     {
         $productContext = collect($this->products)
             ->map(function ($p) {
-                $kws = !empty($p['keywords']) ? ' (từ khóa: ' . implode(', ', $p['keywords']) . ')' : '';
-                return $p['name'] . $kws;
+                $kws = ! empty($p['keywords']) ? ' (từ khóa: '.implode(', ', $p['keywords']).')' : '';
+
+                return $p['name'].$kws;
             })
             ->join('; ');
 

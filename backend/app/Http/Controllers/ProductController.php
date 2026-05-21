@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\LiveSession;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -16,8 +17,8 @@ class ProductController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('sku', 'like', "%{$search}%")
-                  ->orWhere('category', 'like', "%{$search}%");
+                    ->orWhere('sku', 'like', "%{$search}%")
+                    ->orWhere('category', 'like', "%{$search}%");
             });
         }
 
@@ -25,13 +26,13 @@ class ProductController extends Controller
             $query->where('category', $category);
         }
 
-        $activeSessionIds = \App\Models\LiveSession::where('user_id', $request->user()->id)
+        $activeSessionIds = LiveSession::where('user_id', $request->user()->id)
             ->where('status', 'live')
             ->pluck('id')
             ->toArray();
 
         // Preload: sản phẩm nào đang live (1 query thay vì N)
-        $liveProductIds = !empty($activeSessionIds)
+        $liveProductIds = ! empty($activeSessionIds)
             ? \DB::table('live_session_products')
                 ->whereIn('live_session_id', $activeSessionIds)
                 ->pluck('product_id')
@@ -41,7 +42,7 @@ class ProductController extends Controller
 
         // Preload: đếm mentions theo product name (1 query thay vì N)
         $allProductNames = $query->clone()->pluck('name')->toArray();
-        $mentionsCounts = !empty($allProductNames)
+        $mentionsCounts = ! empty($allProductNames)
             ? \DB::table('live_events')
                 ->join('live_sessions', 'live_events.live_session_id', '=', 'live_sessions.id')
                 ->where('live_sessions.user_id', $request->user()->id)
@@ -53,7 +54,7 @@ class ProductController extends Controller
             : collect();
 
         // Preload: đếm mentions kỳ trước (1 query thay vì N)
-        $prevMentionsCounts = !empty($allProductNames)
+        $prevMentionsCounts = ! empty($allProductNames)
             ? \DB::table('live_events')
                 ->join('live_sessions', 'live_events.live_session_id', '=', 'live_sessions.id')
                 ->where('live_sessions.user_id', $request->user()->id)
@@ -100,7 +101,7 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'sku' => ['required', 'string', 'max:50', 'unique:products,sku,NULL,id,user_id,' . $request->user()->id],
+            'sku' => ['required', 'string', 'max:50', 'unique:products,sku,NULL,id,user_id,'.$request->user()->id],
             'price' => ['required', 'integer', 'min:0'],
             'category' => ['nullable', 'string', 'max:100'],
             'image' => ['nullable', 'string', 'max:500'],
@@ -124,7 +125,7 @@ class ProductController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'sku' => ['required', 'string', 'max:50', 'unique:products,sku,' . $product->id . ',id,user_id,' . $request->user()->id],
+            'sku' => ['required', 'string', 'max:50', 'unique:products,sku,'.$product->id.',id,user_id,'.$request->user()->id],
             'price' => ['required', 'integer', 'min:0'],
             'category' => ['nullable', 'string', 'max:100'],
             'image' => ['nullable', 'string', 'max:500'],

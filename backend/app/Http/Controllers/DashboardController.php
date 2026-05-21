@@ -105,19 +105,19 @@ class DashboardController extends Controller
             [
                 'title' => 'Tổng bình luận',
                 'value' => number_format($totalComments),
-                'change' => ($commentsChange >= 0 ? '+' : '') . $commentsChange . '% so với tuần trước',
+                'change' => ($commentsChange >= 0 ? '+' : '').$commentsChange.'% so với tuần trước',
                 'trend' => $commentsChange >= 0 ? 'up' : 'down',
             ],
             [
                 'title' => 'Tổng lượt xem',
                 'value' => number_format($totalViews),
-                'change' => ($viewsChange >= 0 ? '+' : '') . $viewsChange . '% so với tuần trước',
+                'change' => ($viewsChange >= 0 ? '+' : '').$viewsChange.'% so với tuần trước',
                 'trend' => $viewsChange >= 0 ? 'up' : 'down',
             ],
             [
                 'title' => 'Cảm xúc tích cực',
-                'value' => $positivePercentage . '%',
-                'change' => ($sentimentDiff >= 0 ? '+' : '') . $sentimentDiff . '% so với tuần trước',
+                'value' => $positivePercentage.'%',
+                'change' => ($sentimentDiff >= 0 ? '+' : '').$sentimentDiff.'% so với tuần trước',
                 'trend' => $sentimentDiff >= 0 ? 'up' : 'down',
             ],
         ];
@@ -129,7 +129,7 @@ class DashboardController extends Controller
             $days[$date] = ['date' => $date, 'views' => 0, 'comments' => 0];
         }
 
-        if (!empty($allSessions)) {
+        if (! empty($allSessions)) {
             $trendQuery = \DB::table('live_sessions')
                 ->join('live_stats', 'live_sessions.id', '=', 'live_stats.live_session_id')
                 ->whereIn('live_sessions.id', $allSessions)
@@ -149,7 +149,7 @@ class DashboardController extends Controller
 
         // 4. Từ khóa nổi bật
         $hotKeywords = [];
-        if (!empty($allSessions)) {
+        if (! empty($allSessions)) {
             $hotKeywords = \DB::table('live_events')
                 ->whereIn('live_session_id', $allSessions)
                 ->where('event_type', 'comment')
@@ -167,7 +167,7 @@ class DashboardController extends Controller
                 ])->toArray();
 
             // Tính trend thực tế bằng so sánh với tuần trước
-            if (!empty($hotKeywords) && !empty($sessionsPrevWeek)) {
+            if (! empty($hotKeywords) && ! empty($sessionsPrevWeek)) {
                 $prevKeywords = \DB::table('live_events')
                     ->whereIn('live_session_id', $sessionsPrevWeek)
                     ->where('event_type', 'comment')
@@ -181,6 +181,7 @@ class DashboardController extends Controller
                 $hotKeywords = array_map(function ($k) use ($prevKeywords) {
                     $prevCount = (int) ($prevKeywords[$k['keyword']] ?? 0);
                     $k['trend'] = $k['count'] >= $prevCount ? 'up' : 'down';
+
                     return $k;
                 }, $hotKeywords);
             }
@@ -193,7 +194,7 @@ class DashboardController extends Controller
 
         // 5. Top sản phẩm
         $topProducts = [];
-        if (!empty($allSessions)) {
+        if (! empty($allSessions)) {
             $topProducts = \DB::table('live_events')
                 ->whereIn('live_session_id', $allSessions)
                 ->where('event_type', 'comment')
@@ -247,7 +248,7 @@ class DashboardController extends Controller
         if ($previous === 0) {
             return $current > 0 ? 100 : 0;
         }
+
         return (int) round((($current - $previous) / $previous) * 100);
     }
-
 }

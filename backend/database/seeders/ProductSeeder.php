@@ -12,7 +12,7 @@ class ProductSeeder extends Seeder
     {
         // Lấy user đầu tiên (hoặc tạo mới)
         $user = User::first();
-        if (!$user) {
+        if (! $user) {
             return;
         }
 

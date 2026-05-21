@@ -20,10 +20,13 @@ use Illuminate\Support\Facades\Log;
 class RunwareAiService
 {
     private const BASE_URL = 'https://api.runware.ai/v1';
+
     private const DEFAULT_MODEL = 'google:gemini@3.1-flash-lite';
+
     private const DEFAULT_TIMEOUT = 30;
 
     private string $apiKey;
+
     private string $model;
 
     public function __construct()
@@ -35,10 +38,10 @@ class RunwareAiService
     /**
      * Text-only: Gửi system prompt + user text, parse JSON response.
      *
-     * @param string $systemPrompt System instructions cho AI
-     * @param string $userMessage Input text cần xử lý
-     * @param float $temperature 0 = deterministic, 1 = creative
-     * @param int $maxTokens Token limit cho response
+     * @param  string  $systemPrompt  System instructions cho AI
+     * @param  string  $userMessage  Input text cần xử lý
+     * @param  float  $temperature  0 = deterministic, 1 = creative
+     * @param  int  $maxTokens  Token limit cho response
      * @return array|null Parsed JSON response, hoặc null nếu lỗi
      *
      * @throws \RuntimeException Khi API trả lỗi nghiêm trọng (auth, rate limit)
@@ -66,10 +69,10 @@ class RunwareAiService
      * - Image base64: ['type' => 'image_url', 'image_url' => ['url' => 'data:image/jpeg;base64,...']]
      * - Audio URL: ['type' => 'input_audio', 'input_audio' => ['data' => base64, 'format' => 'mp3']]
      *
-     * @param string $systemPrompt System instructions
-     * @param array $parts Array of content parts (text + image + audio)
-     * @param float $temperature Mức sáng tạo
-     * @param int $maxTokens Token limit
+     * @param  string  $systemPrompt  System instructions
+     * @param  array  $parts  Array of content parts (text + image + audio)
+     * @param  float  $temperature  Mức sáng tạo
+     * @param  int  $maxTokens  Token limit
      * @return array|null Parsed JSON response
      *
      * @throws \RuntimeException Khi API lỗi nghiêm trọng
@@ -91,9 +94,9 @@ class RunwareAiService
     /**
      * Raw chat: Full control — tự build messages array.
      *
-     * @param array $messages Array of message objects [{role, content}, ...]
-     * @param float $temperature Mức sáng tạo
-     * @param int $maxTokens Token limit
+     * @param  array  $messages  Array of message objects [{role, content}, ...]
+     * @param  float  $temperature  Mức sáng tạo
+     * @param  int  $maxTokens  Token limit
      * @return string|null Raw text content từ AI
      *
      * @throws \RuntimeException Khi API lỗi nghiêm trọng
@@ -105,7 +108,7 @@ class RunwareAiService
     ): ?string {
         $response = $this->sendRequest($messages, $temperature, $maxTokens);
 
-        if (!$response) {
+        if (! $response) {
             return null;
         }
 
@@ -193,16 +196,17 @@ class RunwareAiService
     ): ?array {
         $data = $this->sendRequest($messages, $temperature, $maxTokens);
 
-        if (!$data) {
+        if (! $data) {
             return null;
         }
 
         $content = $data['choices'][0]['message']['content'] ?? null;
 
-        if (!$content) {
+        if (! $content) {
             Log::warning('Runware API empty content', [
                 'response' => $data,
             ]);
+
             return null;
         }
 
@@ -213,6 +217,7 @@ class RunwareAiService
      * Gửi HTTP request tới Runware Chat Completions API.
      *
      * @return array|null Raw JSON response data
+     *
      * @throws \RuntimeException Khi lỗi auth/rate limit
      */
     private function sendRequest(
@@ -222,6 +227,7 @@ class RunwareAiService
     ): ?array {
         if (empty($this->apiKey)) {
             Log::error('Runware API key is empty. Set RUNWARE_API_KEY in .env');
+
             return null;
         }
 
@@ -230,7 +236,7 @@ class RunwareAiService
                 'Authorization' => "Bearer {$this->apiKey}",
                 'Content-Type' => 'application/json',
             ])
-            ->post(self::BASE_URL . '/chat/completions', [
+            ->post(self::BASE_URL.'/chat/completions', [
                 'model' => $this->model,
                 'temperature' => $temperature,
                 'max_tokens' => $maxTokens,
@@ -240,14 +246,14 @@ class RunwareAiService
         // Lỗi auth → throw để caller xử lý (job fail, retry)
         if ($response->status() === 401 || $response->status() === 403) {
             throw new \RuntimeException(
-                "Runware API auth error: HTTP {$response->status()} - " . mb_substr($response->body(), 0, 300)
+                "Runware API auth error: HTTP {$response->status()} - ".mb_substr($response->body(), 0, 300)
             );
         }
 
         // Rate limit → throw để job retry sau backoff
         if ($response->status() === 429) {
             throw new \RuntimeException(
-                "Runware API rate limit exceeded: " . mb_substr($response->body(), 0, 300)
+                'Runware API rate limit exceeded: '.mb_substr($response->body(), 0, 300)
             );
         }
 
@@ -256,6 +262,7 @@ class RunwareAiService
                 'status' => $response->status(),
                 'body' => mb_substr($response->body(), 0, 500),
             ]);
+
             return null;
         }
 

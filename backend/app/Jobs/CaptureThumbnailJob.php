@@ -10,23 +10,26 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Cache;
 
-class CaptureThumbnailJob implements ShouldQueue, ShouldBeUnique
+class CaptureThumbnailJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
+
     public int $timeout = 60;
+
     public array $backoff = [10, 30];
+
     public int $uniqueFor = 60; // Khóa unique trong 60 giây
 
     public function uniqueId(): string
     {
-        return 'capture-thumbnail-' . $this->liveSessionId;
+        return 'capture-thumbnail-'.$this->liveSessionId;
     }
 
     public function __construct(
@@ -37,12 +40,13 @@ class CaptureThumbnailJob implements ShouldQueue, ShouldBeUnique
     public function handle(TikTokService $tiktokService): void
     {
         $session = LiveSession::find($this->liveSessionId);
-        if (!$session) {
+        if (! $session) {
             return;
         }
 
         if (in_array($session->status, ['ended', 'error'])) {
             Log::info("CaptureThumbnailJob skipped for session {$this->liveSessionId} because its status is: {$session->status}");
+
             return;
         }
 
@@ -51,14 +55,15 @@ class CaptureThumbnailJob implements ShouldQueue, ShouldBeUnique
             try {
                 Log::info("Capturing snapshot from live stream for session {$this->liveSessionId}");
                 $snapshot = $tiktokService->getSnapshot($session->tiktok_session_id);
-                if ($snapshot && !empty($snapshot['image_b64'])) {
+                if ($snapshot && ! empty($snapshot['image_b64'])) {
                     $imageData = base64_decode($snapshot['image_b64']);
                     $this->updateThumbnail($session, $imageData);
                     Log::info("Successfully captured live stream thumbnail for session {$this->liveSessionId}");
+
                     return;
                 }
             } catch (\Exception $e) {
-                Log::error("Failed to capture live stream thumbnail: " . $e->getMessage());
+                Log::error('Failed to capture live stream thumbnail: '.$e->getMessage());
             }
         }
 
@@ -70,10 +75,11 @@ class CaptureThumbnailJob implements ShouldQueue, ShouldBeUnique
                 if ($response->successful() && $response->header('Content-Type') !== 'text/html') {
                     $this->updateThumbnail($session, $response->body());
                     Log::info("Successfully saved cover image thumbnail fallback for session {$this->liveSessionId}");
+
                     return;
                 }
             } catch (\Exception $e) {
-                Log::warning("Failed to download cover image fallback from URL: " . $e->getMessage());
+                Log::warning('Failed to download cover image fallback from URL: '.$e->getMessage());
             }
         }
 
@@ -88,11 +94,12 @@ class CaptureThumbnailJob implements ShouldQueue, ShouldBeUnique
                     if ($response->successful()) {
                         $this->updateThumbnail($session, $response->body());
                         Log::info("Successfully saved avatar thumbnail fallback for session {$this->liveSessionId}");
+
                         return;
                     }
                 }
             } catch (\Exception $e) {
-                Log::warning("Failed to fallback to streamer avatar: " . $e->getMessage());
+                Log::warning('Failed to fallback to streamer avatar: '.$e->getMessage());
             }
         }
     }
@@ -106,24 +113,24 @@ class CaptureThumbnailJob implements ShouldQueue, ShouldBeUnique
         $disk = Storage::disk('public');
 
         // Xóa ảnh cũ nếu có để tránh đầy đĩa host (rất quan trọng với gói host 1GB)
-        if (!empty($session->thumbnail)) {
+        if (! empty($session->thumbnail)) {
             try {
                 $filename = basename($session->thumbnail);
-                $oldPath = 'thumbnails/' . $filename;
+                $oldPath = 'thumbnails/'.$filename;
                 if ($disk->exists($oldPath)) {
                     $disk->delete($oldPath);
                 }
             } catch (\Exception $e) {
-                Log::warning("Failed to delete old thumbnail: " . $e->getMessage());
+                Log::warning('Failed to delete old thumbnail: '.$e->getMessage());
             }
         }
 
         // Lưu ảnh mới
-        $filename = 'thumbnails/' . $this->liveSessionId . '_' . time() . '.jpg';
+        $filename = 'thumbnails/'.$this->liveSessionId.'_'.time().'.jpg';
         $disk->put($filename, $imageData);
 
         $session->update([
-            'thumbnail' => '/storage/' . $filename,
+            'thumbnail' => '/storage/'.$filename,
         ]);
 
         // Cập nhật Cache Lock: 1 phút (60 giây) để cập nhật ảnh chụp màn hình từ video live thường xuyên

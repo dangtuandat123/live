@@ -2,16 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\TikTokSessionNotFoundException;
 use App\Jobs\AnalyzeCommentsJob;
 use App\Jobs\CaptureThumbnailJob;
 use App\Models\LiveEvent;
 use App\Models\LiveSession;
-use App\Models\LiveStat;
 use App\Models\LiveSessionStatsHistory;
+use App\Models\LiveStat;
 use App\Models\Product;
 use App\Services\TikTokService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class LiveSessionController extends Controller
@@ -123,7 +128,7 @@ class LiveSessionController extends Controller
         ]);
 
         // Attach products
-        if (!empty($validated['product_ids'])) {
+        if (! empty($validated['product_ids'])) {
             // Đảm bảo chỉ attach products thuộc user
             $validProductIds = Product::where('user_id', $request->user()->id)
                 ->whereIn('id', $validated['product_ids'])
@@ -132,7 +137,7 @@ class LiveSessionController extends Controller
         }
 
         // Save keywords
-        if (!empty($validated['keywords'])) {
+        if (! empty($validated['keywords'])) {
             foreach ($validated['keywords'] as $keyword) {
                 $session->keywords()->create(['keyword' => $keyword]);
             }
@@ -201,7 +206,7 @@ class LiveSessionController extends Controller
                 if ($serviceData) {
                     $this->syncStats($liveSession, $serviceData);
                 }
-            } catch (\App\Exceptions\TikTokSessionNotFoundException $e) {
+            } catch (TikTokSessionNotFoundException $e) {
                 // Thử tự động khôi phục (healing) nếu trạng thái trong DB đang là live/connecting (ví dụ Python service bị restart)
                 $healed = false;
                 if (in_array($liveSession->status, ['live', 'connecting'])) {
@@ -214,11 +219,11 @@ class LiveSessionController extends Controller
                             $healed = true;
                         }
                     } catch (\Exception $restartException) {
-                        \Illuminate\Support\Facades\Log::error('Auto-healing in show failed to restart: ' . $restartException->getMessage());
+                        Log::error('Auto-healing in show failed to restart: '.$restartException->getMessage());
                     }
                 }
 
-                if (!$healed) {
+                if (! $healed) {
                     $durationSeconds = 0;
                     if ($liveSession->started_at) {
                         $durationSeconds = (int) $liveSession->started_at->diffInSeconds(now());
@@ -287,7 +292,7 @@ class LiveSessionController extends Controller
         if ($liveSession->tiktok_session_id) {
             try {
                 $this->tiktokService->stopSession($liveSession->tiktok_session_id);
-            } catch (\App\Exceptions\TikTokSessionNotFoundException $e) {
+            } catch (TikTokSessionNotFoundException $e) {
                 // Đã bị dừng hoặc đóng trước đó ở VPS
             }
         }
@@ -307,7 +312,7 @@ class LiveSessionController extends Controller
         // Fetch events cuối cùng trước khi kết thúc
         try {
             $this->fetchAndStoreEvents($liveSession);
-        } catch (\App\Exceptions\TikTokSessionNotFoundException $e) {
+        } catch (TikTokSessionNotFoundException $e) {
             // Phiên live đã bị đóng hoàn toàn
         }
 
@@ -328,9 +333,9 @@ class LiveSessionController extends Controller
             try {
                 $this->tiktokService->stopSession($liveSession->tiktok_session_id);
             } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::warning('Failed to stop TikTok session during deletion', [
+                Log::warning('Failed to stop TikTok session during deletion', [
                     'session_id' => $liveSession->tiktok_session_id,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
             }
         }
@@ -350,7 +355,7 @@ class LiveSessionController extends Controller
             abort(403);
         }
 
-        if (!$liveSession->tiktok_session_id) {
+        if (! $liveSession->tiktok_session_id) {
             return response()->json(['message' => 'No TikTok session linked'], 400);
         }
 
@@ -358,19 +363,19 @@ class LiveSessionController extends Controller
         $cacheTtl = in_array($liveSession->status, ['ended', 'error']) ? 3600 : 5;
         $historyTtl = in_array($liveSession->status, ['ended', 'error']) ? 3600 : 10;
 
-        $topProducts = \Illuminate\Support\Facades\Cache::remember("live_session_{$liveSession->id}_top_products", $cacheTtl, function () use ($liveSession) {
+        $topProducts = Cache::remember("live_session_{$liveSession->id}_top_products", $cacheTtl, function () use ($liveSession) {
             return $this->getTopProducts($liveSession);
         });
 
-        $potentialCustomers = \Illuminate\Support\Facades\Cache::remember("live_session_{$liveSession->id}_potential_customers", $cacheTtl, function () use ($liveSession) {
+        $potentialCustomers = Cache::remember("live_session_{$liveSession->id}_potential_customers", $cacheTtl, function () use ($liveSession) {
             return $this->getPotentialCustomers($liveSession);
         });
 
-        $topQuestions = \Illuminate\Support\Facades\Cache::remember("live_session_{$liveSession->id}_top_questions", $cacheTtl, function () use ($liveSession) {
+        $topQuestions = Cache::remember("live_session_{$liveSession->id}_top_questions", $cacheTtl, function () use ($liveSession) {
             return $this->getTopQuestions($liveSession);
         });
 
-        $statsHistory = \Illuminate\Support\Facades\Cache::remember("live_session_{$liveSession->id}_stats_history", $historyTtl, function () use ($liveSession) {
+        $statsHistory = Cache::remember("live_session_{$liveSession->id}_stats_history", $historyTtl, function () use ($liveSession) {
             return $this->getFormattedStatsHistory($liveSession);
         });
 
@@ -423,7 +428,7 @@ class LiveSessionController extends Controller
             $serviceData = $this->tiktokService->getStats($liveSession->tiktok_session_id);
             if ($serviceData) {
                 // Xóa bộ đếm lỗi nếu kết nối thành công
-                \Illuminate\Support\Facades\Cache::forget($cacheKey);
+                Cache::forget($cacheKey);
 
                 $this->syncStats($liveSession, $serviceData);
 
@@ -435,18 +440,18 @@ class LiveSessionController extends Controller
                 }
             } else {
                 // Tăng số lần lỗi kết nối liên tiếp
-                $failCount = (int) \Illuminate\Support\Facades\Cache::get($cacheKey, 0) + 1;
-                \Illuminate\Support\Facades\Cache::put($cacheKey, $failCount, 300); // lưu trong 5 phút
+                $failCount = (int) Cache::get($cacheKey, 0) + 1;
+                Cache::put($cacheKey, $failCount, 300); // lưu trong 5 phút
 
                 if ($failCount >= 5) {
                     $liveSession->update([
                         'status' => 'error',
                         'error_message' => 'Không thể kết nối tới dịch vụ TikTok LIVE. Máy chủ phân tích có thể đang bảo trì.',
                     ]);
-                    \Illuminate\Support\Facades\Cache::forget($cacheKey);
+                    Cache::forget($cacheKey);
                 }
             }
-        } catch (\App\Exceptions\TikTokSessionNotFoundException $e) {
+        } catch (TikTokSessionNotFoundException $e) {
             // Thử tự động khôi phục (healing) nếu trạng thái trong DB đang là live/connecting (ví dụ Python service bị restart)
             if (in_array($liveSession->status, ['live', 'connecting'])) {
                 try {
@@ -455,6 +460,7 @@ class LiveSessionController extends Controller
                         $liveSession->update([
                             'status' => 'connecting',
                         ]);
+
                         return response()->json([
                             'new_events' => 0,
                             'comments' => [],
@@ -469,7 +475,7 @@ class LiveSessionController extends Controller
                         ]);
                     }
                 } catch (\Exception $restartException) {
-                    \Illuminate\Support\Facades\Log::error('Auto-healing in fetchEvents failed to restart: ' . $restartException->getMessage());
+                    Log::error('Auto-healing in fetchEvents failed to restart: '.$restartException->getMessage());
                 }
             }
 
@@ -483,7 +489,7 @@ class LiveSessionController extends Controller
                 'ended_at' => now(),
                 'duration_seconds' => $durationSeconds,
             ]);
-            \Illuminate\Support\Facades\Cache::forget($cacheKey);
+            Cache::forget($cacheKey);
         }
 
         // Dispatch AI phân tích nếu có events mới và session không bị lỗi
@@ -533,7 +539,7 @@ class LiveSessionController extends Controller
 
     private function fetchAndStoreEvents(LiveSession $session): int
     {
-        if (!$session->tiktok_session_id) {
+        if (! $session->tiktok_session_id) {
             return 0;
         }
 
@@ -552,7 +558,7 @@ class LiveSessionController extends Controller
                 $since > 0 ? $since : 0,
             );
 
-            if (!$data || empty($data['events'])) {
+            if (! $data || empty($data['events'])) {
                 break;
             }
 
@@ -567,14 +573,14 @@ class LiveSessionController extends Controller
                     $eventType = $event['type'] ?? 'unknown';
                     $dataHash = $event['id'] ?? match ($eventType) {
                         'comment' => md5($event['data']['comment'] ?? ''),
-                        'gift' => md5(($event['data']['gift_id'] ?? '') . '_' . ($event['data']['repeat_count'] ?? 1)),
-                        'like' => md5('like_' . ($event['data']['count'] ?? 1)),
-                        default => md5($eventType . '_' . ($event['timestamp'] ?? '')),
+                        'gift' => md5(($event['data']['gift_id'] ?? '').'_'.($event['data']['repeat_count'] ?? 1)),
+                        'like' => md5('like_'.($event['data']['count'] ?? 1)),
+                        default => md5($eventType.'_'.($event['timestamp'] ?? '')),
                     };
 
                     // Đồng bộ hóa trích xuất số điện thoại (Instant Phone Capture)
                     $hasPhone = false;
-                    if ($eventType === 'comment' && !empty($event['data']['comment'])) {
+                    if ($eventType === 'comment' && ! empty($event['data']['comment'])) {
                         $normalized = preg_replace('/[\s.\-]/', '', $event['data']['comment']);
                         $hasPhone = (bool) preg_match('/0\d{9,10}/', $normalized);
                     }
@@ -583,7 +589,7 @@ class LiveSessionController extends Controller
                         'live_session_id' => $session->id,
                         'event_type' => $event['type'] ?? 'unknown',
                         // Sửa lỗi lọt trùng lặp do nullability: gán giá trị mặc định cho tiktok_user_id nếu null
-                        'tiktok_user_id' => !empty($event['user_id']) ? (string) $event['user_id'] : 'anonymous',
+                        'tiktok_user_id' => ! empty($event['user_id']) ? (string) $event['user_id'] : 'anonymous',
                         'tiktok_unique_id' => $event['unique_id'] ?? null,
                         'tiktok_nickname' => $event['nickname'] ?? null,
                         'data' => $event['data'] ?? [],
@@ -592,7 +598,7 @@ class LiveSessionController extends Controller
                         'has_phone' => $hasPhone,
                     ]);
                     $pageCount++;
-                } catch (\Illuminate\Database\UniqueConstraintViolationException) {
+                } catch (UniqueConstraintViolationException) {
                     // Duplicate event — bỏ qua (bảo vệ bởi unique index)
                     continue;
                 }
@@ -625,7 +631,7 @@ class LiveSessionController extends Controller
 
             if ($newStatus !== $session->status) {
                 $updates = ['status' => $newStatus];
-                if ($newStatus === 'ended' && !$session->ended_at) {
+                if ($newStatus === 'ended' && ! $session->ended_at) {
                     $updates['ended_at'] = now();
                     if ($session->started_at) {
                         $updates['duration_seconds'] = (int) $session->started_at->diffInSeconds(now());
@@ -694,11 +700,11 @@ class LiveSessionController extends Controller
 
         // Tự động tải hoặc cập nhật thumbnail định kỳ mỗi 10 phút nếu phiên live đang hoạt động
         // Tránh dispatch job khi đang connecting mà chưa có cover_url (vì chắc chắn sẽ fail và bị lock 2 phút vô ích)
-        if ($session->status === 'live' || ($session->status === 'connecting' && !empty($coverUrl))) {
+        if ($session->status === 'live' || ($session->status === 'connecting' && ! empty($coverUrl))) {
             $cacheKey = "live_session_{$session->id}_thumbnail_lock";
-            if (!\Illuminate\Support\Facades\Cache::has($cacheKey)) {
+            if (! Cache::has($cacheKey)) {
                 // Đặt lock tạm thời trong 1 phút (60 giây) để tránh spam gửi Job liên tục khi đang xử lý
-                \Illuminate\Support\Facades\Cache::put($cacheKey, true, 60);
+                Cache::put($cacheKey, true, 60);
 
                 CaptureThumbnailJob::dispatch($session->id, $coverUrl);
             }
@@ -713,7 +719,7 @@ class LiveSessionController extends Controller
      */
     private function recordStatsHistory(LiveSession $session): void
     {
-        if (!in_array($session->status, ['live', 'connecting'])) {
+        if (! in_array($session->status, ['live', 'connecting'])) {
             return;
         }
 
@@ -721,14 +727,14 @@ class LiveSessionController extends Controller
         $this->backfillStatsHistory($session);
 
         $currentStats = $session->stats;
-        if (!$currentStats) {
+        if (! $currentStats) {
             return;
         }
 
         $latestHistory = $session->statsHistory()->orderByDesc('created_at')->first();
 
         $shouldRecord = false;
-        if (!$latestHistory) {
+        if (! $latestHistory) {
             $shouldRecord = true;
         } else {
             $diffInSeconds = now()->diffInSeconds($latestHistory->created_at);
@@ -760,7 +766,7 @@ class LiveSessionController extends Controller
     private function backfillStatsHistory(LiveSession $session): void
     {
         $startedAt = $session->started_at;
-        if (!$startedAt) {
+        if (! $startedAt) {
             return;
         }
 
@@ -768,7 +774,7 @@ class LiveSessionController extends Controller
         $interval = 300; // 5 phút = 300 giây
 
         $endTime = $session->ended_at ?: ($session->status === 'ended' ? $session->updated_at : $now);
-        if (!$endTime) {
+        if (! $endTime) {
             $endTime = $now;
         }
         // Lùi lại 1 phút để tránh xung đột với bản ghi hiện tại đang ghi nhận realtime
@@ -777,7 +783,7 @@ class LiveSessionController extends Controller
         $startTime = $startedAt->copy()->addSeconds($interval);
 
         $currentStats = $session->stats;
-        if (!$currentStats) {
+        if (! $currentStats) {
             return;
         }
 
@@ -792,11 +798,11 @@ class LiveSessionController extends Controller
             $exists = $session->statsHistory()
                 ->whereBetween('created_at', [
                     $time->copy()->subSeconds(120),
-                    $time->copy()->addSeconds(120)
+                    $time->copy()->addSeconds(120),
                 ])
                 ->exists();
 
-            if (!$exists) {
+            if (! $exists) {
                 // Đếm số lượng comment tại mốc $time
                 $commentsAtTime = $session->events()
                     ->where('event_type', 'comment')
@@ -806,7 +812,9 @@ class LiveSessionController extends Controller
                 $r = 0;
                 if ($totalCommentsStats > 0) {
                     $r = $commentsAtTime / $totalCommentsStats;
-                    if ($r > 1) $r = 1;
+                    if ($r > 1) {
+                        $r = 1;
+                    }
                 }
 
                 // Nội suy các giá trị stats dựa trên tỷ lệ tăng trưởng comment
@@ -815,12 +823,14 @@ class LiveSessionController extends Controller
                 $gifts = (int) ($currentStats->total_gifts * $r);
                 $follows = (int) ($currentStats->total_follows * $r);
                 $shares = (int) ($currentStats->total_shares * $r);
-                
+
                 // Người xem đồng thời biến động nhẹ quanh mức hiện tại dựa trên tỷ lệ r
                 $viewerCount = (int) ($currentStats->viewer_count * ($r > 0 ? (0.7 + 0.3 * $r) : 0));
-                if ($viewerCount < 0) $viewerCount = 0;
+                if ($viewerCount < 0) {
+                    $viewerCount = 0;
+                }
 
-                $history = new \App\Models\LiveSessionStatsHistory([
+                $history = new LiveSessionStatsHistory([
                     'total_views' => $views,
                     'total_comments' => $commentsAtTime,
                     'total_likes' => $likes,
@@ -845,7 +855,7 @@ class LiveSessionController extends Controller
     /**
      * Lấy và định dạng lịch sử stats của phiên live.
      */
-    private function getFormattedStatsHistory(LiveSession $liveSession): \Illuminate\Support\Collection
+    private function getFormattedStatsHistory(LiveSession $liveSession): Collection
     {
         // Tự động lấp đầy các khoảng trống trước khi trả về dữ liệu lịch sử
         $this->backfillStatsHistory($liveSession);
@@ -859,7 +869,6 @@ class LiveSessionController extends Controller
                 'viewers' => $h->viewer_count,
             ]);
     }
-
 
     /**
      * Top sản phẩm được nhắc đến trong bình luận (từ AI tags).
@@ -898,7 +907,7 @@ class LiveSessionController extends Controller
             ->where('event_type', 'comment')
             ->where(function ($q) {
                 $q->where('intent_tag', 'Chốt đơn')
-                  ->orWhere('has_phone', true);
+                    ->orWhere('has_phone', true);
             })
             ->orderByDesc('event_at')
             ->limit(50)
@@ -922,8 +931,8 @@ class LiveSessionController extends Controller
             ->where('event_type', 'comment')
             ->where(function ($query) {
                 $query->whereNotNull('question_tag')
-                      ->where('question_tag', '!=', '')
-                      ->orWhere('intent_tag', 'Hỏi thông tin');
+                    ->where('question_tag', '!=', '')
+                    ->orWhere('intent_tag', 'Hỏi thông tin');
             })
             ->selectRaw("
                 COALESCE(NULLIF(question_tag, ''), 'Hỏi chung') as question,
@@ -952,6 +961,7 @@ class LiveSessionController extends Controller
         if (preg_match('/0\d{9,10}/', $normalized, $matches)) {
             return $matches[0];
         }
+
         return '';
     }
 }

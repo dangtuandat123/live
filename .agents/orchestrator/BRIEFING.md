@@ -1,22 +1,22 @@
-# BRIEFING — 2026-05-21T14:14:48Z
+# BRIEFING — 2026-05-21T14:43:00Z
 
 ## Mission
-Fix all High and Medium severity bugs and performance bottlenecks in the AI comment analysis pipeline.
+Complete subscription, payment, and admin configuration features for the livestream analysis SaaS web application.
 
 ## 🔒 My Identity
 - Archetype: orchestrator
 - Roles: orchestrator, user_liaison, human_reporter, successor
 - Working directory: d:\Workspace\livestream\.agents\orchestrator
 - Original parent: main agent
-- Original parent conversation ID: 897fcde0-2607-444c-b8ef-830005b150bc
+- Original parent conversation ID: dd47f107-91bf-4be0-b256-536f6a804e17
 
 ## 🔒 My Workflow
 - **Pattern**: Project
 - **Scope document**: d:\Workspace\livestream\PROJECT.md
-1. **Decompose**: Decompose the bug fixes and verification tasks.
+1. **Decompose**: Decompose requirements into milestones (Schema/Models, Backend APIs, Admin UI, User Checkout UI, Verification).
 2. **Dispatch & Execute**:
    - **Direct (iteration loop)**: Explorer → Worker → Reviewer → Challenger → Auditor → gate
-   - **Delegate (sub-orchestrator)**: None (task scope fits single loop)
+   - **Delegate (sub-orchestrator)**: Spawn sub-orchestrators for milestones or tracks.
 3. **On failure** (in this order):
    - Retry: nudge stuck agent or re-send task
    - Replace: spawn fresh agent with partial progress
@@ -26,15 +26,16 @@ Fix all High and Medium severity bugs and performance bottlenecks in the AI comm
    - Escalate: report to parent (sub-orchestrators only, last resort)
 4. **Succession**: At 16 spawns, write handoff.md, spawn successor.
 - **Work items**:
-  1. Exploration & Plan Verification [pending]
-  2. Dispatch Explorer for fix strategies [pending]
-  3. Dispatch Worker to implement fixes [pending]
-  4. Dispatch Reviewers to review changes [pending]
-  5. Dispatch Challengers to run adversarial checks [pending]
-  6. Dispatch Forensic Auditor to check integrity [pending]
-  7. Final verification of tests & Sentinel sign-off [pending]
+  1. Codebase exploration and baseline test run [pending]
+  2. Plan & Decompose Milestones [pending]
+  3. Create test suite (E2E Track) [pending]
+  4. Implement Database Schemas & Models [pending]
+  5. Implement Backend APIs & Webhook Callback [pending]
+  6. Implement Admin Panel UI [pending]
+  7. Implement User Frontend Checkout UI [pending]
+  8. Final Verification & Coverage Hardening [pending]
 - **Current phase**: 1
-- **Current focus**: Exploration & Plan Verification
+- **Current focus**: Codebase exploration and baseline test run
 
 ## 🔒 Key Constraints
 - NEVER write, modify, or create source code files directly.
@@ -43,44 +44,37 @@ Fix all High and Medium severity bugs and performance bottlenecks in the AI comm
 - Never reuse a subagent after it has delivered its handoff — always spawn fresh
 
 ## Current Parent
-- Conversation ID: 897fcde0-2607-444c-b8ef-830005b150bc
-- Updated: 2026-05-21T14:14:48Z
+- Conversation ID: dd47f107-91bf-4be0-b256-536f6a804e17
+- Updated: 2026-05-21T14:43:00Z
 
 ## Key Decisions Made
-- Use Project pattern with single direct execution loop (Explorer -> Worker -> Reviewer -> Challenger -> Auditor -> gate).
+- Use Project pattern with Dual Track (Implementation Track + E2E Testing Track) in parallel.
 
 ## Team Roster
 | Agent | Type | Work Item | Status | Conv ID |
 |-------|------|-----------|--------|---------|
-| explorer_2_1 | teamwork_preview_explorer | Explore & propose fixes | completed | 1ae6f410-b6bc-45b7-be8d-3858ff590539 |
-| explorer_2_2 | teamwork_preview_explorer | Explore & propose fixes | completed | 813b51f7-47d2-420c-8ebc-e3d823dd5b98 |
-| explorer_2_3 | teamwork_preview_explorer | Explore & propose fixes | completed | eaa0403a-3a12-4acf-ae69-024a874f73b0 |
-| worker_5 | teamwork_preview_worker | Implement fixes & tests | completed | 1b7aab23-6e18-43a8-8702-d2b27d2145ba |
-| reviewer_2_1 | teamwork_preview_reviewer | Review fixes & tests | completed | 49b3caf4-e8de-4e68-bb42-d1e5159bee29 |
-| reviewer_2_2 | teamwork_preview_reviewer | Review fixes & tests | completed | 878595d6-445b-41d0-9ef1-cc2f37283c91 |
-| challenger_2_1 | teamwork_preview_challenger | Run adversarial checks | completed | 34ddfff4-b06e-430d-b570-ad9c905c9936 |
-| challenger_2_2 | teamwork_preview_challenger | Run adversarial checks | completed | c51710d6-44af-47fe-8aa4-734fa7104a37 |
-| auditor_2_1 | teamwork_preview_auditor | Verify code integrity | completed | 3711d1a9-3b51-40c2-858a-8f5a326c932d |
-| git_explorer | teamwork_preview_explorer | Find adversarial test code | completed | 51a55361-9bc0-4139-983c-44593d14476e |
-| worker_6 | teamwork_preview_worker | Fix locks, case-sens, trans | completed | 788bfc85-a079-498b-aab8-729788e495ff |
-| reviewer_3_1 | teamwork_preview_reviewer | Verify updated code | completed | 56ad4bf1-8013-4180-8e11-1cb05a8ce341 |
-| reviewer_3_2 | teamwork_preview_reviewer | Verify updated code | failed (rate limit) | 135286d7-1186-46e9-a6aa-4c47d8f8b962 |
-| challenger_3_1 | teamwork_preview_challenger | Verify adversarial fixes | completed | 8e7ef7ba-961c-421b-a941-285cf5b0c3db |
-| challenger_3_2 | teamwork_preview_challenger | Verify adversarial fixes | failed (rate limit) | f4aa8000-3881-43ea-a1b0-c684568094ff |
-| auditor_3_1 | teamwork_preview_auditor | Check updated integrity | failed (rate limit) | 32556f33-d686-49dc-9f52-2832ce2b5586 |
-| auditor_3_2 | teamwork_preview_auditor | Check updated integrity | completed | 34adc665-23eb-4610-96cb-6b929aea48ba |
+| explorer_subscription_1 | teamwork_preview_explorer | Explore codebase & run baseline tests | completed | ba06731b-c828-491b-baf8-239b3b02f659 |
+| worker_setup_1 | teamwork_preview_worker | Copy PROJECT_PROPOSED.md to root | completed | 71b9f8d8-6c88-4c71-b6f3-acf25ae821a2 |
+| sub_orch_e2e | self | E2E Testing Track Orchestrator | failed | 931b3814-2df6-49b4-b5c3-7e2a7a4729a1 |
+| sub_orch_impl | self | Implementation Track Orchestrator | failed | 08a5612d-4abd-469d-ac1b-1289c23f20f3 |
+| sub_orch_impl_2 | self | Implementation Track Orchestrator | failed | ec027ffc-50b0-42d6-b466-7e9df6c630ca |
+| sub_orch_e2e_2 | self | E2E Testing Track Orchestrator | failed | 8900ccf3-df4d-4c9a-b74e-8a4a120ca6bb |
+| sub_orch_e2e_3 | self | E2E Testing Track Orchestrator | failed | 4bdf6a82-2fff-4e87-b8ab-48a347552b13 |
+| sub_orch_e2e_4 | self | E2E Testing Track Orchestrator | failed | 671886e7-b1b2-46b8-a288-cd83887c640d |
+| sub_orch_e2e_5 | self | E2E Testing Track Orchestrator | in-progress | a000644b-5230-476a-88f5-4c1ab68f2986 |
 
 ## Succession Status
-- Succession required: yes
-- Spawn count: 16 / 16
-- Pending subagents: none
+- Succession required: no
+- Spawn count: 9 / 16
+- Pending subagents: a000644b-5230-476a-88f5-4c1ab68f2986
 - Predecessor: none
-- Successor: b427fa22-06a7-4c68-b112-7bbf6606f110
-- Successor generation: gen1
+- Successor: not yet spawned
 
 ## Active Timers
-- Heartbeat cron: a88491d0-5eb1-46f2-88b4-738be87777f3/task-29
-- Safety timer: a88491d0-5eb1-46f2-88b4-738be87777f3/task-352
+- Heartbeat cron: f04a9bfb-5c74-4442-b790-3fcf823056ff/task-43
+- Safety timer: none
+- On succession: kill all timers before spawning successor
+- On context truncation: run `manage_task(Action="list")` — re-create if missing
 
 ## Artifact Index
 - d:\Workspace\livestream\PROJECT.md — Global index: architecture, milestones, interfaces, code layout

@@ -2,12 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Ai\Agents\CommentAnalyzer;
 use App\Jobs\AnalyzeCommentsJob;
 use App\Models\LiveEvent;
 use App\Models\LiveSession;
+use App\Models\User;
 use App\Services\RunwareAiService;
 use App\Services\TikTokService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class AnalyzeCommentsJobTest extends TestCase
@@ -17,7 +20,7 @@ class AnalyzeCommentsJobTest extends TestCase
     public function test_it_analyzes_comments_and_saves_ai_tags(): void
     {
         // 1. Setup session and comments
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
 
         $session = LiveSession::create([
             'user_id' => $user->id,
@@ -103,14 +106,14 @@ class AnalyzeCommentsJobTest extends TestCase
     public function test_system_prompts_contain_key_instructions(): void
     {
         // 1. Check CommentAnalyzer agent instructions (unchanged — used by Laravel AI SDK agent)
-        $analyzer = new \App\Ai\Agents\CommentAnalyzer();
+        $analyzer = new CommentAnalyzer;
         $instructions = $analyzer->instructions();
 
         $this->assertStringContainsString('Chốt đơn', $instructions);
         $this->assertStringContainsString('cú pháp đặt hàng', $instructions);
 
         // 2. Check AnalyzeCommentsJob system prompt includes session_note + audio section
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $session = LiveSession::create([
             'user_id' => $user->id,
             'name' => 'Test Session',
@@ -134,6 +137,7 @@ class AnalyzeCommentsJobTest extends TestCase
                     $hasChotDon = str_contains($systemPrompt, 'Chốt đơn');
                     $hasCuPhap = str_contains($systemPrompt, 'cú pháp đặt hàng');
                     $hasSessionNote = str_contains($systemPrompt, 'session_note');
+
                     return $hasChotDon && $hasCuPhap && $hasSessionNote;
                 })
                 ->andReturn([
@@ -145,7 +149,7 @@ class AnalyzeCommentsJobTest extends TestCase
                             'question_tag' => null,
                             'product_tag' => null,
                             'has_phone' => false,
-                        ]
+                        ],
                     ],
                     'session_note' => 'Batch đầu tiên, có 1 chốt đơn.',
                 ]);
@@ -166,7 +170,7 @@ class AnalyzeCommentsJobTest extends TestCase
     public function test_audio_fallback_to_text_only(): void
     {
         // When TikTokService::getSnapshot throws exception, job should still work (text-only fallback)
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
 
         $session = LiveSession::create([
             'user_id' => $user->id,
@@ -200,7 +204,8 @@ class AnalyzeCommentsJobTest extends TestCase
                     $hasAudioSection = str_contains($systemPrompt, 'AUDIO LIVESTREAM');
                     // Parts should only contain text, no audio
                     $hasOnlyTextPart = count($parts) === 1 && $parts[0]['type'] === 'text';
-                    return !$hasAudioSection && $hasOnlyTextPart;
+
+                    return ! $hasAudioSection && $hasOnlyTextPart;
                 })
                 ->andReturn([
                     'results' => [
@@ -211,7 +216,7 @@ class AnalyzeCommentsJobTest extends TestCase
                             'question_tag' => 'Hỏi giá',
                             'product_tag' => null,
                             'has_phone' => false,
-                        ]
+                        ],
                     ],
                     'session_note' => 'Có khách hỏi giá.',
                 ]);
@@ -230,7 +235,7 @@ class AnalyzeCommentsJobTest extends TestCase
 
     public function test_memory_is_saved_and_loaded(): void
     {
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
 
         $session = LiveSession::create([
             'user_id' => $user->id,
@@ -329,7 +334,7 @@ class AnalyzeCommentsJobTest extends TestCase
 
     public function test_audio_present_adds_audio_section_and_part(): void
     {
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
 
         $session = LiveSession::create([
             'user_id' => $user->id,
@@ -368,6 +373,7 @@ class AnalyzeCommentsJobTest extends TestCase
                     // Parts MUST have 2 elements: text + audio
                     $hasTwoParts = count($parts) === 2;
                     $hasAudioPart = $parts[1]['type'] === 'input_audio';
+
                     return $hasAudioSection && $hasTwoParts && $hasAudioPart;
                 })
                 ->andReturn([
@@ -397,7 +403,7 @@ class AnalyzeCommentsJobTest extends TestCase
 
     public function test_session_note_is_truncated_to_500_chars(): void
     {
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
 
         $session = LiveSession::create([
             'user_id' => $user->id,
@@ -446,7 +452,7 @@ class AnalyzeCommentsJobTest extends TestCase
 
     public function test_non_string_session_note_is_skipped(): void
     {
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
 
         $session = LiveSession::create([
             'user_id' => $user->id,
@@ -493,9 +499,9 @@ class AnalyzeCommentsJobTest extends TestCase
 
     public function test_text_less_comment_batch_does_not_stall_pipeline(): void
     {
-        \Illuminate\Support\Facades\Queue::fake([AnalyzeCommentsJob::class]);
+        Queue::fake([AnalyzeCommentsJob::class]);
 
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $session = LiveSession::create([
             'user_id' => $user->id,
             'name' => 'Text-less Test Session',
@@ -538,23 +544,23 @@ class AnalyzeCommentsJobTest extends TestCase
         // Assert the empty comments were marked processed (neutral)
         foreach ($emptyComments as $emptyComment) {
             $emptyComment->refresh();
-            $this->assertTrue((bool)$emptyComment->ai_processed);
+            $this->assertTrue((bool) $emptyComment->ai_processed);
             $this->assertEquals('neutral', $emptyComment->sentiment);
         }
 
         // Assert the valid comment is still unprocessed
         $validComment->refresh();
-        $this->assertFalse((bool)$validComment->ai_processed);
+        $this->assertFalse((bool) $validComment->ai_processed);
 
         // Assert next job was dispatched to continue pipeline
-        \Illuminate\Support\Facades\Queue::assertPushed(AnalyzeCommentsJob::class, function ($job) use ($session) {
-            return $job->uniqueId() === 'analyze-comments-' . $session->id;
+        Queue::assertPushed(AnalyzeCommentsJob::class, function ($job) use ($session) {
+            return $job->uniqueId() === 'analyze-comments-'.$session->id;
         });
     }
 
     public function test_stats_are_incremented_and_leads_calculated_correctly(): void
     {
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $session = LiveSession::create([
             'user_id' => $user->id,
             'name' => 'Stats Test Session',
@@ -691,9 +697,9 @@ class AnalyzeCommentsJobTest extends TestCase
 
     public function test_ai_response_exception_does_not_stall_pipeline(): void
     {
-        \Illuminate\Support\Facades\Queue::fake([AnalyzeCommentsJob::class]);
+        Queue::fake([AnalyzeCommentsJob::class]);
 
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $session = LiveSession::create([
             'user_id' => $user->id,
             'name' => 'Exception Test Session',
@@ -709,7 +715,7 @@ class AnalyzeCommentsJobTest extends TestCase
                 'event_type' => 'comment',
                 'event_at' => now()->subMinutes(60)->addSeconds($i),
                 'tiktok_user_id' => 'user_1',
-                'data' => ['comment' => 'Hỏng rồi ' . $i],
+                'data' => ['comment' => 'Hỏng rồi '.$i],
                 'ai_processed' => false,
             ]);
         }
@@ -732,7 +738,7 @@ class AnalyzeCommentsJobTest extends TestCase
         });
 
         $job = new AnalyzeCommentsJob($session->id);
-        
+
         $thrown = false;
         try {
             app()->call([$job, 'handle']);
@@ -746,17 +752,17 @@ class AnalyzeCommentsJobTest extends TestCase
         // Assert failed comments are marked processed & neutral
         foreach ($failedComments as $failedComment) {
             $failedComment->refresh();
-            $this->assertTrue((bool)$failedComment->ai_processed);
+            $this->assertTrue((bool) $failedComment->ai_processed);
             $this->assertEquals('neutral', $failedComment->sentiment);
         }
 
         // Assert next comment is still unprocessed
         $nextComment->refresh();
-        $this->assertFalse((bool)$nextComment->ai_processed);
+        $this->assertFalse((bool) $nextComment->ai_processed);
 
         // Assert next job was dispatched to process subsequent comments
-        \Illuminate\Support\Facades\Queue::assertPushed(AnalyzeCommentsJob::class, function ($job) use ($session) {
-            return $job->uniqueId() === 'analyze-comments-' . $session->id;
+        Queue::assertPushed(AnalyzeCommentsJob::class, function ($job) use ($session) {
+            return $job->uniqueId() === 'analyze-comments-'.$session->id;
         });
     }
 }

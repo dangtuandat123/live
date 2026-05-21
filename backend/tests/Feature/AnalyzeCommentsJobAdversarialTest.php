@@ -6,11 +6,13 @@ use App\Jobs\AnalyzeCommentsJob;
 use App\Models\LiveEvent;
 use App\Models\LiveSession;
 use App\Models\LiveStat;
+use App\Models\User;
 use App\Services\RunwareAiService;
 use App\Services\TikTokService;
+use Illuminate\Cache\Lock;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class AnalyzeCommentsJobAdversarialTest extends TestCase
@@ -35,7 +37,7 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
      */
     public function test_unique_lock_lifecycle(): void
     {
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $session = LiveSession::create([
             'user_id' => $user->id,
             'name' => 'Lock Test Session',
@@ -43,22 +45,22 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
             'tiktok_username' => 'tester',
         ]);
 
-        $lockKey = 'analyze-comments-lock-' . $session->id;
+        $lockKey = 'analyze-comments-lock-'.$session->id;
         $lock = cache()->lock($lockKey, 120);
 
         // 1. First acquire should succeed
-        $this->assertTrue((bool)$lock->get());
+        $this->assertTrue((bool) $lock->get());
 
         // 2. Second acquire for the same unique ID should fail
         $lock2 = cache()->lock($lockKey, 120);
-        $this->assertFalse((bool)$lock2->get());
+        $this->assertFalse((bool) $lock2->get());
 
         // 3. Release the lock
         $lock->release();
 
         // 4. Third acquire should succeed again
         $lock3 = cache()->lock($lockKey, 120);
-        $this->assertTrue((bool)$lock3->get());
+        $this->assertTrue((bool) $lock3->get());
 
         // Cleanup
         $lock3->release();
@@ -72,7 +74,7 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
     {
         Queue::fake([AnalyzeCommentsJob::class]);
 
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $session = LiveSession::create([
             'user_id' => $user->id,
             'name' => 'Retryable Test Session',
@@ -97,7 +99,7 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
         });
 
         $job = new AnalyzeCommentsJob($session->id);
-        
+
         $thrown = false;
         try {
             app()->call([$job, 'handle']);
@@ -110,7 +112,7 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
 
         // Assert the comment remains unprocessed (no poison pill applied because it's retryable)
         $comment->refresh();
-        $this->assertFalse((bool)$comment->ai_processed);
+        $this->assertFalse((bool) $comment->ai_processed);
 
         // Assert next job was NOT dispatched (no recursive loop on retryable failure)
         Queue::assertNotPushed(AnalyzeCommentsJob::class);
@@ -124,7 +126,7 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
     {
         Queue::fake([AnalyzeCommentsJob::class]);
 
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $session = LiveSession::create([
             'user_id' => $user->id,
             'name' => 'Case Sensitivity Test',
@@ -162,14 +164,14 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
 
         // Assert the comment remains unprocessed (no poison pill applied because it's retryable)
         $comment->refresh();
-        $this->assertFalse((bool)$comment->ai_processed);
+        $this->assertFalse((bool) $comment->ai_processed);
     }
 
     public function test_unrecoverable_exception_triggers_poison_pill(): void
     {
         Queue::fake([AnalyzeCommentsJob::class]);
 
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $session = LiveSession::create([
             'user_id' => $user->id,
             'name' => 'Unrecoverable Test Session',
@@ -184,8 +186,8 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
                 'live_session_id' => $session->id,
                 'event_type' => 'comment',
                 'event_at' => now()->addSeconds($i),
-                'tiktok_user_id' => 'user_' . $i,
-                'data' => ['comment' => 'Bình luận ' . $i],
+                'tiktok_user_id' => 'user_'.$i,
+                'data' => ['comment' => 'Bình luận '.$i],
                 'ai_processed' => false,
             ]);
         }
@@ -208,12 +210,12 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
         });
 
         $job = new AnalyzeCommentsJob($session->id);
-        
-        $lockKey = 'analyze-comments-lock-' . $session->id;
+
+        $lockKey = 'analyze-comments-lock-'.$session->id;
         $lock = cache()->lock($lockKey, 120);
-        
+
         $a1 = $lock->get();
-        dump('Lock acquired initially: ' . ($a1 ? 'true' : 'false'));
+        dump('Lock acquired initially: '.($a1 ? 'true' : 'false'));
         $this->assertTrue($a1);
         $lock->release(); // Release so handle() can acquire it
 
@@ -227,21 +229,21 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
         $this->assertTrue($thrown);
 
         $a2 = $lock->get();
-        dump('Lock acquired after job run: ' . ($a2 ? 'true' : 'false'));
+        dump('Lock acquired after job run: '.($a2 ? 'true' : 'false'));
         $this->assertTrue($a2);
 
         // Assert first batch comments were marked processed & neutral (poison pill applied)
         $comments[0]->refresh();
-        $this->assertTrue((bool)$comments[0]->ai_processed);
+        $this->assertTrue((bool) $comments[0]->ai_processed);
         $this->assertEquals('neutral', $comments[0]->sentiment);
 
         // Assert the 51st comment (which was not in the batch) is still unprocessed
         $nextComment->refresh();
-        $this->assertFalse((bool)$nextComment->ai_processed);
+        $this->assertFalse((bool) $nextComment->ai_processed);
 
         // Assert next job was dispatched to process subsequent comments
         Queue::assertPushed(AnalyzeCommentsJob::class, function ($queuedJob) use ($session) {
-            return $queuedJob->uniqueId() === 'analyze-comments-' . $session->id;
+            return $queuedJob->uniqueId() === 'analyze-comments-'.$session->id;
         });
 
         // Cleanup
@@ -255,7 +257,7 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
     {
         Queue::fake([AnalyzeCommentsJob::class]);
 
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $session = LiveSession::create([
             'user_id' => $user->id,
             'name' => 'Limit Test Session',
@@ -270,8 +272,8 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
                 'live_session_id' => $session->id,
                 'event_type' => 'comment',
                 'event_at' => now()->addSeconds($i),
-                'tiktok_user_id' => 'user_' . $i,
-                'data' => ['comment' => 'Bình luận ' . $i],
+                'tiktok_user_id' => 'user_'.$i,
+                'data' => ['comment' => 'Bình luận '.$i],
                 'ai_processed' => false,
             ]);
         }
@@ -283,6 +285,7 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
                 ->withArgs(function ($systemPrompt, $parts) {
                     $userMessage = $parts[0]['text'];
                     $lines = explode("\n", trim($userMessage));
+
                     // Assert exactly 50 lines (comments) are sent to AI
                     return count($lines) === 50;
                 })
@@ -307,13 +310,13 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
         // Assert the first 50 comments are processed
         for ($i = 0; $i < 50; $i++) {
             $comments[$i]->refresh();
-            $this->assertTrue((bool)$comments[$i]->ai_processed);
+            $this->assertTrue((bool) $comments[$i]->ai_processed);
         }
 
         // Assert the remaining 10 comments are still unprocessed
         for ($i = 50; $i < 60; $i++) {
             $comments[$i]->refresh();
-            $this->assertFalse((bool)$comments[$i]->ai_processed);
+            $this->assertFalse((bool) $comments[$i]->ai_processed);
         }
 
         // Assert next job was dispatched
@@ -325,7 +328,7 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
      */
     public function test_stats_aggregation_accuracy_atomic_increments(): void
     {
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $session = LiveSession::create([
             'user_id' => $user->id,
             'name' => 'Stats Increment Session',
@@ -435,7 +438,7 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
      */
     public function test_stats_out_of_sync_on_stats_update_failure(): void
     {
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $session = LiveSession::create([
             'user_id' => $user->id,
             'name' => 'Sync failure session',
@@ -462,7 +465,7 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
                         'question_tag' => null,
                         'product_tag' => null,
                         'has_phone' => false,
-                    ]
+                    ],
                 ],
                 'session_note' => 'Sync failure test.',
             ]);
@@ -488,7 +491,7 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
 
         // 1. The comments transaction is rolled back, comments remain unprocessed
         $comment->refresh();
-        $this->assertFalse((bool)$comment->ai_processed);
+        $this->assertFalse((bool) $comment->ai_processed);
 
         // 2. The stats record is not created/updated
         $this->assertDatabaseMissing('live_stats', [
@@ -503,7 +506,7 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
     {
         Queue::fake([AnalyzeCommentsJob::class]);
 
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $session = LiveSession::create([
             'user_id' => $user->id,
             'name' => 'Lock Release Test Session',
@@ -518,8 +521,8 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
                 'live_session_id' => $session->id,
                 'event_type' => 'comment',
                 'event_at' => now()->addSeconds($i),
-                'tiktok_user_id' => 'user_' . $i,
-                'data' => ['comment' => 'Comment ' . $i],
+                'tiktok_user_id' => 'user_'.$i,
+                'data' => ['comment' => 'Comment '.$i],
                 'ai_processed' => false,
             ]);
         }
@@ -542,12 +545,12 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
         });
 
         // Mock the Cache lock to verify it is released exactly once
-        $mockLock = \Mockery::mock(\Illuminate\Cache\Lock::class);
+        $mockLock = \Mockery::mock(Lock::class);
         $mockLock->shouldReceive('get')->once()->andReturn(true);
         $mockLock->shouldReceive('release')->once()->andReturn(true);
 
-        \Illuminate\Support\Facades\Cache::shouldReceive('lock')
-            ->with('analyze-comments-lock-' . $session->id, 120)
+        Cache::shouldReceive('lock')
+            ->with('analyze-comments-lock-'.$session->id, 120)
             ->andReturn($mockLock);
 
         $job = new AnalyzeCommentsJob($session->id);
@@ -563,7 +566,7 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
      */
     public function test_concurrent_stats_leads_count_race_condition(): void
     {
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $session = LiveSession::create([
             'user_id' => $user->id,
             'name' => 'Leads Count Concurrency Session',
@@ -610,7 +613,7 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
                         'question_tag' => null,
                         'product_tag' => null,
                         'has_phone' => false,
-                    ]
+                    ],
                 ],
                 'session_note' => 'Job 1 summary.',
             ]);
@@ -631,7 +634,7 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
                         'question_tag' => null,
                         'product_tag' => null,
                         'has_phone' => false,
-                    ]
+                    ],
                 ],
                 'session_note' => 'Job 2 summary.',
             ]);
@@ -642,6 +645,6 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
 
         // Refresh stats and assert leads_count is exactly 1 (since both are from user_A)
         $stats->refresh();
-        $this->assertEquals(1, $stats->leads_count, "Leads count should be exactly 1 despite multiple orders from user_A.");
+        $this->assertEquals(1, $stats->leads_count, 'Leads count should be exactly 1 despite multiple orders from user_A.');
     }
 }

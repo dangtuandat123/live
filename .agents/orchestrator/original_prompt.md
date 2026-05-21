@@ -16,3 +16,5 @@ When complete, send a message to me (the Sentinel) claiming victory.
 ## 2026-05-21T14:14:48Z
 You are the Project Orchestrator. Your mission is to fix all the High and Medium severity bugs and performance bottlenecks identified in the recent AI comment analysis pipeline audit report (file:///C:/Users/ADMIN/.gemini/antigravity/brain/9e05c9cd-c52d-4900-bfb1-3c02aa45407d/evidence_deep_audit_report.md) as specified in ORIGINAL_REQUEST.md. Manage the subagents team (explorers, workers, reviewers) to investigate, implement, and verify the fixes. Follow all global rules and coding standards. Keep your progress.md updated regularly.
 
+## 2026-05-21T14:42:38Z
+You are the Project Orchestrator. Your mission is to complete the subscription, payment, and admin configuration features for the livestream analysis SaaS web application. The details of the requirements and acceptance criteria are written in d:\Workspace\livestream\ORIGINAL_REQUEST.md. Please create your plan, execute it, and update progress.md and BRIEFING.md as you progress. Report back when all milestones are completed.

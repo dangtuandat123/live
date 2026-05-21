@@ -4,7 +4,11 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LiveSessionController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingsController;
+use App\Models\LiveSession;
+use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -41,7 +45,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/lives/{liveSession}', [LiveSessionController::class, 'destroy'])->name('lives.destroy');
 
     // Reports
-    Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 
     // Settings
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
@@ -62,27 +66,27 @@ Route::middleware('auth')->group(function () {
 */
 Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(function () {
     Route::get('/dashboard', function () {
-        $totalUsers = \App\Models\User::count();
-        $totalSessions = \App\Models\LiveSession::count();
-        
+        $totalUsers = User::count();
+        $totalSessions = LiveSession::count();
+
         // Hoạt động 7 ngày qua
-        $activeUsers = \App\Models\LiveSession::where('created_at', '>=', now()->subDays(7))
+        $activeUsers = LiveSession::where('created_at', '>=', now()->subDays(7))
             ->distinct('user_id')
             ->count('user_id');
-            
+
         // Doanh thu ước tính (M)
         $revenueVal = round(($totalUsers * 299000) / 1000000, 1);
-        $estimatedRevenue = $revenueVal . 'M';
+        $estimatedRevenue = $revenueVal.'M';
 
         // Biểu đồ 5 tháng gần đây
         $revenueData = [];
         for ($i = 4; $i >= 0; $i--) {
             $monthDate = now()->subMonths($i);
-            $monthLabel = 'T' . $monthDate->format('m');
-            
+            $monthLabel = 'T'.$monthDate->format('m');
+
             // Tính số lượng user đăng ký trước hoặc bằng ngày cuối tháng này
-            $usersCount = \App\Models\User::where('created_at', '<=', $monthDate->endOfMonth())->count();
-            
+            $usersCount = User::where('created_at', '<=', $monthDate->endOfMonth())->count();
+
             $revenueData[] = [
                 'month' => $monthLabel,
                 'revenue' => $usersCount * 299000,
@@ -91,11 +95,11 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
         }
 
         // Người dùng gần đây
-        $recentUsers = \App\Models\User::orderByDesc('created_at')
+        $recentUsers = User::orderByDesc('created_at')
             ->limit(5)
             ->get()
             ->map(function ($u) {
-                $sessionsCount = \App\Models\LiveSession::where('user_id', $u->id)->count();
+                $sessionsCount = LiveSession::where('user_id', $u->id)->count();
                 // Phân bổ plan giả định dựa trên ID để đa dạng giao diện
                 $plan = 'Free';
                 if ($u->id % 3 === 0) {
@@ -103,6 +107,7 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
                 } elseif ($u->id % 3 === 1) {
                     $plan = 'Business';
                 }
+
                 return [
                     'id' => $u->id,
                     'name' => $u->name,
@@ -119,13 +124,13 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
                 [
                     'title' => 'Tổng người dùng',
                     'value' => number_format($totalUsers),
-                    'change' => '+' . \App\Models\User::where('created_at', '>=', now()->startOfMonth())->count() . ' tháng này',
+                    'change' => '+'.User::where('created_at', '>=', now()->startOfMonth())->count().' tháng này',
                     'trend' => 'up',
                 ],
                 [
                     'title' => 'Tổng phiên Live',
                     'value' => number_format($totalSessions),
-                    'change' => '+' . \App\Models\LiveSession::where('created_at', '>=', now()->startOfMonth())->count() . ' tháng này',
+                    'change' => '+'.LiveSession::where('created_at', '>=', now()->startOfMonth())->count().' tháng này',
                     'trend' => 'up',
                 ],
                 [
@@ -139,21 +144,23 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
                     'value' => number_format($activeUsers),
                     'change' => 'Dựa trên phiên live gần đây',
                     'trend' => 'up',
-                ]
+                ],
             ],
             'revenueData' => $revenueData,
-            'recentUsers' => $recentUsers
+            'recentUsers' => $recentUsers,
         ]);
     })->name('admin.dashboard');
 
     Route::get('/users', function () {
-        $users = \App\Models\User::orderByDesc('created_at')->get();
+        $users = User::orderByDesc('created_at')->get();
+
         return Inertia::render('Admin/Users/Index', ['users' => $users]);
     })->name('admin.users.index');
 
-    Route::put('/users/{user}/role', function (\Illuminate\Http\Request $request, \App\Models\User $user) {
+    Route::put('/users/{user}/role', function (Request $request, User $user) {
         $request->validate(['role' => ['required', 'in:user,admin']]);
         $user->update(['role' => $request->role]);
+
         return back()->with('success', 'Đã cập nhật quyền thành công.');
     })->name('admin.users.update-role');
 
@@ -168,19 +175,19 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
             'notify_new_user' => true,
             'weekly_report' => true,
         ];
-        
+
         $settingsPath = 'system_settings.json';
-        if (!\Storage::disk('local')->exists($settingsPath)) {
-            \Storage::disk('local')->put($settingsPath, json_encode($defaultSettings, JSON_PRETTY_PRINT));
+        if (! Storage::disk('local')->exists($settingsPath)) {
+            Storage::disk('local')->put($settingsPath, json_encode($defaultSettings, JSON_PRETTY_PRINT));
             $settings = $defaultSettings;
         } else {
-            $settings = json_decode(\Storage::disk('local')->get($settingsPath), true) ?? $defaultSettings;
+            $settings = json_decode(Storage::disk('local')->get($settingsPath), true) ?? $defaultSettings;
         }
 
         return Inertia::render('Admin/Settings/Index', ['settings' => $settings]);
     })->name('admin.settings.index');
 
-    Route::put('/settings', function (\Illuminate\Http\Request $request) {
+    Route::put('/settings', function (Request $request) {
         $validated = $request->validate([
             'app_name' => ['required', 'string', 'max:255'],
             'app_url' => ['required', 'url', 'max:255'],
@@ -192,10 +199,100 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
             'weekly_report' => ['required', 'boolean'],
         ]);
 
-        \Storage::disk('local')->put('system_settings.json', json_encode($validated, JSON_PRETTY_PRINT));
+        Storage::disk('local')->put('system_settings.json', json_encode($validated, JSON_PRETTY_PRINT));
 
         return back()->with('success', 'Đã lưu cấu hình hệ thống thành công.');
     })->name('admin.settings.update');
+
+    // Gói dịch vụ (CRUD packages)
+    Route::get('/packages', function () {
+        $packages = \App\Models\SubscriptionPackage::orderBy('price')->get();
+        return Inertia::render('Admin/Packages/Index', ['packages' => $packages]);
+    })->name('admin.packages.index');
+
+    Route::post('/packages', function (\Illuminate\Http\Request $request) {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'price' => ['required', 'integer', 'min:0'],
+            'duration_days' => ['required', 'integer', 'min:1'],
+            'features' => ['nullable', 'array'],
+        ]);
+
+        \App\Models\SubscriptionPackage::create($validated);
+        return back()->with('success', 'Đã tạo gói dịch vụ mới thành công.');
+    })->name('admin.packages.store');
+
+    Route::put('/packages/{package}', function (\Illuminate\Http\Request $request, \App\Models\SubscriptionPackage $package) {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'price' => ['required', 'integer', 'min:0'],
+            'duration_days' => ['required', 'integer', 'min:1'],
+            'features' => ['nullable', 'array'],
+        ]);
+
+        $package->update($validated);
+        return back()->with('success', 'Đã cập nhật gói dịch vụ thành công.');
+    })->name('admin.packages.update');
+
+    Route::delete('/packages/{package}', function (\App\Models\SubscriptionPackage $package) {
+        $hasAssociations = \App\Models\UserSubscription::where('subscription_package_id', $package->id)->exists()
+            || \App\Models\Transaction::where('subscription_package_id', $package->id)->exists();
+        if ($hasAssociations) {
+            return back()->withErrors(['error' => 'Không thể xóa gói dịch vụ đã có lịch sử đăng ký hoặc giao dịch.']);
+        }
+        try {
+            $package->delete();
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => 'Lỗi khi xóa gói dịch vụ: ' . $e->getMessage()]);
+        }
+        return back()->with('success', 'Đã xóa gói dịch vụ thành công.');
+    })->name('admin.packages.destroy');
+
+    // Cấu hình thanh toán & webhook
+    Route::get('/payments', function () {
+        $config = \App\Models\PaymentConfig::where('is_active', true)->first() 
+            ?? \App\Models\PaymentConfig::first() 
+            ?? new \App\Models\PaymentConfig();
+        return Inertia::render('Admin/Payments/Index', ['config' => $config]);
+    })->name('admin.payments.index');
+
+    Route::put('/payments', function (\Illuminate\Http\Request $request) {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'prefix' => ['nullable', 'string', 'max:50'],
+            'suffix' => ['nullable', 'string', 'max:50'],
+            'webhook_url' => ['nullable', 'url', 'max:255'],
+            'method' => ['required', 'in:POST,GET,PUT'],
+            'params_template' => ['nullable', 'array'],
+            'headers_template' => ['nullable', 'array'],
+        ]);
+
+        $config = \App\Models\PaymentConfig::where('is_active', true)->first() ?? \App\Models\PaymentConfig::first();
+        if ($config) {
+            $config->update($validated);
+        } else {
+            $validated['is_active'] = true;
+            \App\Models\PaymentConfig::create($validated);
+        }
+
+        return back()->with('success', 'Đã cập nhật cấu hình thanh toán thành công.');
+    })->name('admin.payments.update');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    // Giao diện mua gói đăng ký và thanh toán của User
+    Route::get('/subscription', function () {
+        $packages = \App\Models\SubscriptionPackage::orderBy('price')->get();
+        $activeSub = auth()->user()->activeSubscription;
+        return Inertia::render('Subscription/Index', [
+            'packages' => $packages,
+            'activeSubscription' => $activeSub ? [
+                'package_id' => $activeSub->subscription_package_id,
+                'expires_at' => $activeSub->expires_at?->format('d/m/Y H:i') ?? 'Vĩnh viễn',
+                'package_name' => $activeSub->package?->name ?? 'Free',
+            ] : null,
+        ]);
+    })->name('subscription.index');
 });
 
 require __DIR__.'/auth.php';
