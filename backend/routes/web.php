@@ -6,6 +6,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SubscriptionController;
 use App\Models\LiveSession;
 use App\Models\PaymentConfig;
 use App\Models\SubscriptionPackage;
@@ -322,6 +323,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'transactions' => $transactions,
         ]);
     })->name('subscription.index');
+
+    Route::get('/api/subscription/status', [SubscriptionController::class, 'status'])->name('subscription.status');
+    Route::post('/api/subscription/checkout', [SubscriptionController::class, 'checkout'])->name('subscription.checkout');
 });
 
 require __DIR__.'/auth.php';

@@ -20,8 +20,4 @@ Route::get('/ping', function () {
 Route::get('/subscription/packages', [SubscriptionController::class, 'index']);
 Route::post('/payments/callback', [PaymentCallbackController::class, 'handleCallback']);
 
-// Protected subscription routes
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/subscription/status', [SubscriptionController::class, 'status']);
-    Route::post('/subscription/checkout', [SubscriptionController::class, 'checkout']);
-});
+// Protected subscription routes are moved to routes/web.php to support Inertia session authentication.

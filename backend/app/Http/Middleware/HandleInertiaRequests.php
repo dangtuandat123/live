@@ -32,7 +32,11 @@ class HandleInertiaRequests extends Middleware
         $user = $request->user();
         $subscription = null;
 
-        if ($user) {
+        // Skip resolving active subscription for non-Inertia JSON requests (e.g. API endpoints under web middleware)
+        // to avoid auto-subscribing users during checkout API calls.
+        $isInertiaRequest = !$request->expectsJson() || $request->hasHeader('X-Inertia');
+
+        if ($user && $isInertiaRequest) {
             $user->resolveActiveSubscription();
             $activeSub = $user->activeSubscription;
 

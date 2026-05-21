@@ -530,8 +530,8 @@ export default function SubscriptionIndex({ packages = [], activeSubscription, t
 
       {/* CHECKOUT MODAL CHO GÓI TRẢ PHÍ */}
       <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
-        <DialogContent className="max-w-md p-6 overflow-hidden">
-          <DialogHeader>
+        <DialogContent className="max-w-md p-0 flex flex-col max-h-[85vh] sm:max-h-[90vh] overflow-hidden gap-0">
+          <DialogHeader className="p-5 pr-10 pb-3 border-b border-border/40 shrink-0">
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <CreditCardIcon className="size-5 text-primary" /> Thanh toán gói dịch vụ
             </DialogTitle>
@@ -540,77 +540,79 @@ export default function SubscriptionIndex({ packages = [], activeSubscription, t
             </DialogDescription>
           </DialogHeader>
 
-          {checkoutData?.vietqr_url && (
-            <div className="flex flex-col items-center gap-4 py-4">
-              {/* VietQR Code Frame */}
-              <div className="relative p-3 bg-white rounded-2xl shadow-md border border-border/40 flex items-center justify-center max-w-[240px] aspect-square overflow-hidden group">
-                <img
-                  src={checkoutData.vietqr_url}
-                  alt="VietQR Code"
-                  className={`w-full h-full object-contain ${timeLeft === 0 ? "filter grayscale opacity-30" : ""}`}
-                />
-              </div>
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            {checkoutData?.vietqr_url && (
+              <div className="flex flex-col items-center gap-3">
+                {/* VietQR Code Frame */}
+                <div className="relative p-2.5 bg-white rounded-2xl shadow-md border border-border/40 flex items-center justify-center max-w-[180px] aspect-square overflow-hidden group">
+                  <img
+                    src={checkoutData.vietqr_url}
+                    alt="VietQR Code"
+                    className={`w-full h-full object-contain ${timeLeft === 0 ? "filter grayscale opacity-30" : ""}`}
+                  />
+                </div>
 
-              {timeLeft > 0 ? (
-                <div className="flex items-center gap-2 text-sm font-semibold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200 animate-pulse">
-                  <Loader2Icon className="size-4 animate-spin text-amber-500" />
-                  <span>Đang chờ chuyển khoản... ({Math.floor(timeLeft / 60).toString().padStart(2, "0")}:{(timeLeft % 60).toString().padStart(2, "0")})</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-sm font-semibold text-red-600 bg-red-50 px-3 py-1.5 rounded-full border border-red-200">
-                  <AlertCircleIcon className="size-4 shrink-0" />
-                  <span>Mã thanh toán đã hết hạn (10 phút). Vui lòng đóng và thực hiện lại giao dịch.</span>
-                </div>
-              )}
+                {timeLeft > 0 ? (
+                  <div className="flex items-center gap-2 text-sm font-semibold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200 animate-pulse">
+                    <Loader2Icon className="size-4 animate-spin text-amber-500" />
+                    <span>Đang chờ chuyển khoản... ({Math.floor(timeLeft / 60).toString().padStart(2, "0")}:{(timeLeft % 60).toString().padStart(2, "0")})</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-sm font-semibold text-red-600 bg-red-50 px-3 py-1.5 rounded-full border border-red-200">
+                    <AlertCircleIcon className="size-4 shrink-0" />
+                    <span>Mã thanh toán đã hết hạn (10 phút). Vui lòng đóng và thực hiện lại giao dịch.</span>
+                  </div>
+                )}
 
-              {/* Thông tin chuyển khoản */}
-              <div className="w-full space-y-3 bg-muted/50 p-4 rounded-xl border border-border/40 text-sm">
-                <div className="flex justify-between items-center py-1 border-b border-border/40">
-                  <span className="text-muted-foreground">Ngân hàng:</span>
-                  <span className="font-semibold text-foreground">MB Bank</span>
-                </div>
-                <div className="flex justify-between items-center py-1 border-b border-border/40">
-                  <span className="text-muted-foreground">Chủ tài khoản:</span>
-                  <span className="font-semibold text-foreground">DANG TUAN DAT</span>
-                </div>
-                <div className="flex justify-between items-center py-1 border-b border-border/40">
-                  <span className="text-muted-foreground">Số tiền:</span>
-                  <span className="font-bold text-primary tabular-nums">{formatMoney(selectedPkg?.price || 0)}</span>
-                </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-muted-foreground">Nội dung chuyển khoản:</span>
-                  <div className="flex items-center gap-1">
-                    <code className="bg-background px-2 py-0.5 rounded border border-border text-xs text-primary font-mono font-bold">
-                      {transferContent}
-                    </code>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="size-7 hover:bg-background/80"
-                      onClick={handleCopyContent}
-                      disabled={timeLeft === 0}
-                    >
-                      {copied ? (
-                        <CheckCircle2Icon className="size-3.5 text-emerald-500" />
-                      ) : (
-                        <CopyIcon className="size-3.5 text-muted-foreground" />
-                      )}
-                    </Button>
+                {/* Thông tin chuyển khoản */}
+                <div className="w-full space-y-2 bg-muted/50 p-3.5 rounded-xl border border-border/40 text-sm">
+                  <div className="flex justify-between items-center py-1 border-b border-border/40">
+                    <span className="text-muted-foreground">Ngân hàng:</span>
+                    <span className="font-semibold text-foreground">MB Bank</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-border/40">
+                    <span className="text-muted-foreground">Chủ tài khoản:</span>
+                    <span className="font-semibold text-foreground">DANG TUAN DAT</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-border/40">
+                    <span className="text-muted-foreground">Số tiền:</span>
+                    <span className="font-bold text-primary tabular-nums">{formatMoney(selectedPkg?.price || 0)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-muted-foreground">Nội dung chuyển khoản:</span>
+                    <div className="flex items-center gap-1">
+                      <code className="bg-background px-2 py-0.5 rounded border border-border text-xs text-primary font-mono font-bold">
+                        {transferContent}
+                      </code>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="size-7 hover:bg-background/80"
+                        onClick={handleCopyContent}
+                        disabled={timeLeft === 0}
+                      >
+                        {copied ? (
+                          <CheckCircle2Icon className="size-3.5 text-emerald-500" />
+                        ) : (
+                          <CopyIcon className="size-3.5 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Hướng dẫn an toàn */}
-              <div className="flex gap-2 text-xs text-muted-foreground bg-amber-500/5 border border-amber-500/20 p-3 rounded-lg">
-                <AlertCircleIcon className="size-4 text-amber-500 shrink-0 mt-0.5" />
-                <p>
-                  <span className="font-semibold text-foreground">Lưu ý quan trọng:</span> Chuyển đúng số tiền và nội dung chuyển khoản ở trên để hệ thống tự động nhận diện giao dịch và kích hoạt gói đăng ký tức thì.
-                </p>
+                {/* Hướng dẫn an toàn */}
+                <div className="flex gap-2 text-xs text-muted-foreground bg-amber-500/5 border border-amber-500/20 p-2.5 rounded-lg">
+                  <AlertCircleIcon className="size-4 text-amber-500 shrink-0 mt-0.5" />
+                  <p>
+                    <span className="font-semibold text-foreground">Lưu ý quan trọng:</span> Chuyển đúng số tiền và nội dung chuyển khoản ở trên để hệ thống tự động nhận diện giao dịch và kích hoạt gói đăng ký tức thì.
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          <DialogFooter className="flex-col sm:flex-row gap-2">
+          <DialogFooter className="m-0 p-5 border-t bg-muted/50 rounded-b-xl flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">
             <Button
               type="button"
               variant="outline"
