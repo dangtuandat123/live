@@ -123,7 +123,7 @@ class CaptureThumbnailJob implements ShouldQueue, ShouldBeUnique
         $disk->put($filename, $imageData);
 
         $session->update([
-            'thumbnail' => $disk->url($filename),
+            'thumbnail' => '/storage/' . $filename,
         ]);
 
         // Cập nhật Cache Lock dài hạn: 10 phút (600 giây)

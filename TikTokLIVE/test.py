@@ -23,7 +23,7 @@ from TikTokLive.events import (
     WebsocketResponseEvent,
 )
 
-client = TikTokLiveClient(unique_id="@rocketleague")
+client = TikTokLiveClient(unique_id="@swatchesbybaobao")
 
 
 @client.on(ConnectEvent)

@@ -261,6 +261,18 @@ export default function LivesIndex({ sessions, kpi, filters }: Props) {
                         </span>
                         LIVE
                       </Badge>
+                    ) : session.status === "connecting" ? (
+                      <Badge variant="secondary" className="gap-1 text-[10px] px-1.5 py-0.5 bg-blue-600 hover:bg-blue-700 text-white border-0 animate-pulse">
+                        Đang kết nối...
+                      </Badge>
+                    ) : session.status === "disconnected" ? (
+                      <Badge className="gap-1 text-[10px] px-1.5 py-0.5 bg-amber-500 hover:bg-amber-600 text-white border-0 animate-pulse">
+                        Mất kết nối
+                      </Badge>
+                    ) : session.status === "error" ? (
+                      <Badge variant="destructive" className="text-[10px] px-1.5 py-0.5 border-0">
+                        Lỗi
+                      </Badge>
                     ) : (
                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-black/50 text-white border-0">
                         Đã kết thúc

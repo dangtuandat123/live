@@ -632,14 +632,16 @@ class LiveSessionController extends Controller
             ],
         );
 
-        // Tự động tải hoặc cập nhật thumbnail định kỳ mỗi 10 phút nếu phiên live đang hoạt động (live/connecting)
-        if (in_array($session->status, ['live', 'connecting'])) {
+        $coverUrl = $serviceData['cover_url'] ?? null;
+
+        // Tự động tải hoặc cập nhật thumbnail định kỳ mỗi 10 phút nếu phiên live đang hoạt động
+        // Tránh dispatch job khi đang connecting mà chưa có cover_url (vì chắc chắn sẽ fail và bị lock 2 phút vô ích)
+        if ($session->status === 'live' || ($session->status === 'connecting' && !empty($coverUrl))) {
             $cacheKey = "live_session_{$session->id}_thumbnail_lock";
             if (!\Illuminate\Support\Facades\Cache::has($cacheKey)) {
                 // Đặt lock tạm thời trong 2 phút để tránh spam gửi Job liên tục khi đang xử lý
                 \Illuminate\Support\Facades\Cache::put($cacheKey, true, 120);
 
-                $coverUrl = $serviceData['cover_url'] ?? null;
                 CaptureThumbnailJob::dispatch($session->id, $coverUrl);
             }
         }

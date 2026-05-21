@@ -1,2 +1,23 @@
 2026-05-21 11:11:08 [INFO] Base dir: D:\Workspace\livestream\TikTokLIVE
 2026-05-21 11:11:08 [INFO] Starting TikTok LIVE Service on 0.0.0.0:50000
+2026-05-21 17:22:36 [INFO] Base dir: D:\Workspace\livestream\TikTokLIVE
+2026-05-21 17:22:36 [INFO] FFmpeg dependency check: OK
+2026-05-21 17:22:36 [INFO] Starting TikTok LIVE Service on 0.0.0.0:50000
+2026-05-21 17:22:47 [INFO] Base dir: D:\Workspace\livestream\TikTokLIVE
+2026-05-21 17:22:47 [INFO] FFmpeg dependency check: OK
+2026-05-21 17:22:47 [INFO] Starting TikTok LIVE Service on 0.0.0.0:50000
+2026-05-21 17:24:39 [INFO] Base dir: D:\Workspace\livestream\TikTokLIVE
+2026-05-21 17:24:39 [INFO] FFmpeg dependency check: OK
+2026-05-21 17:24:39 [INFO] Starting TikTok LIVE Service on 0.0.0.0:50000
+2026-05-21 17:24:58 [INFO] [1ea8384a-cf1f-4fdf-80a3-8cb667b20d37] Starting session for @tuyet_kieu_kieu
+2026-05-21 17:24:58 [INFO] [1ea8384a-cf1f-4fdf-80a3-8cb667b20d37] Starting TikTok client connection for @tuyet_kieu_kieu...
+2026-05-21 17:24:58 [INFO] [1ea8384a-cf1f-4fdf-80a3-8cb667b20d37] Streamer @tuyet_kieu_kieu not found.
+2026-05-21 17:28:03 [INFO] Base dir: D:\Workspace\livestream\TikTokLIVE
+2026-05-21 17:28:03 [INFO] FFmpeg dependency check: OK
+2026-05-21 17:28:03 [INFO] Starting TikTok LIVE Service on 0.0.0.0:50000
+2026-05-21 17:28:12 [INFO] [ad67041b-d6a7-427c-8f1a-6d4a6fb8be27] Starting session for @tuyet_kieu_kieu
+2026-05-21 17:28:12 [INFO] [ad67041b-d6a7-427c-8f1a-6d4a6fb8be27] Starting TikTok client connection for @tuyet_kieu_kieu...
+2026-05-21 17:28:12 [INFO] [ad67041b-d6a7-427c-8f1a-6d4a6fb8be27] Streamer @tuyet_kieu_kieu not found.
+2026-05-21 17:31:52 [INFO] [069555aa-69eb-48c3-842c-712818eb1715] Starting session for @tuyet_kieu_kieu
+2026-05-21 17:31:52 [INFO] [069555aa-69eb-48c3-842c-712818eb1715] Starting TikTok client connection for @tuyet_kieu_kieu...
+2026-05-21 17:31:52 [INFO] [069555aa-69eb-48c3-842c-712818eb1715] Streamer @tuyet_kieu_kieu not found.

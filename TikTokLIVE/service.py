@@ -42,21 +42,26 @@ from fastapi import FastAPI, HTTPException, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from TikTokLive import TikTokLiveClient
-from TikTokLive.events import (
-    ConnectEvent,
-    DisconnectEvent,
-    CommentEvent,
-    GiftEvent,
-    LikeEvent,
-    FollowEvent,
-    JoinEvent,
-    ShareEvent,
-    LiveEndEvent,
-    LivePauseEvent,
-    LiveUnpauseEvent,
-    RoomUserSeqEvent,
+import urllib.parse
+import urllib.request
+import json
+
+from piratetok_live import TikTokLiveClient, EventType, ProfileCache
+from piratetok_live.errors import (
+    HostNotOnlineError,
+    UserNotFoundError,
+    TikTokBlockedError,
+    TikTokApiError,
+    AgeRestrictedError,
 )
+
+# Khởi tạo profile cache toàn cục (TTL mặc định 5 phút)
+profile_cache = ProfileCache()
+
+# ThreadPoolExecutor toàn cục cho việc capture snapshot
+snapshot_executor = ThreadPoolExecutor(max_workers=4)
+
+
 
 # --- Resolve base dir (PyInstaller exe hoặc script) ---
 if getattr(sys, 'frozen', False):
@@ -224,23 +229,51 @@ sessions: dict[str, SessionInfo] = {}
 # ============================================================
 # Helpers
 # ============================================================
-def extract_user(event) -> dict:
-    """Trích xuất user info từ event TikTok."""
-    user = getattr(event, "user", None) or getattr(event, "user_info", None) or getattr(event, "from_user", None)
-
-    # Lấy avatar URL từ avatar_thumb (ImageModel có m_urls: list[str])
+def extract_user(data: dict) -> dict:
+    """Trích xuất user info từ event data dictionary trong piratetok_live."""
+    user = data.get("user", {})
+    if not user:
+        return {"nickname": "Unknown", "unique_id": "", "user_id": "", "avatar_url": ""}
+    
+    # Fallback cho unique_id (camelCase hoặc snake_case)
+    unique_id = user.get("uniqueId") or user.get("unique_id") or ""
+    nickname = user.get("nickname") or "Unknown"
+    user_id = str(user.get("id") or user.get("id_str") or "")
+    
     avatar_url = ""
-    avatar_thumb = getattr(user, "avatar_thumb", None)
+    avatar_thumb = user.get("avatarThumb") or user.get("avatar_thumb") or {}
     if avatar_thumb:
-        urls = getattr(avatar_thumb, "m_urls", [])
+        urls = avatar_thumb.get("urlList") or avatar_thumb.get("url_list") or []
         if urls:
             avatar_url = urls[0]
-
+            
     return {
-        "nickname": getattr(user, "nickname", "Unknown"),
-        "unique_id": getattr(user, "unique_id", ""),
-        "user_id": str(getattr(user, "user_id", "") or getattr(user, "id", "")),
+        "nickname": nickname,
+        "unique_id": unique_id,
+        "user_id": user_id,
         "avatar_url": avatar_url,
+    }
+
+
+def parse_gift_data(data: dict) -> dict:
+    """Trích xuất dữ liệu quà tặng chi tiết với cơ chế fallback."""
+    gift = data.get("gift", {})
+    gift_name = gift.get("name") or gift.get("describe") or "Unknown"
+    gift_id = data.get("giftId") or data.get("gift_id")
+    
+    # Kim cương
+    diamond_count = gift.get("diamondCount") or gift.get("diamond_count") or 0
+    
+    # Số lượng repeat
+    repeat_count = data.get("repeatCount") or data.get("repeat_count") or 1
+    streaking = not (data.get("repeatEnd") or data.get("repeat_end") or False)
+    
+    return {
+        "gift_name": gift_name,
+        "gift_id": gift_id,
+        "diamond_count": diamond_count,
+        "repeat_count": repeat_count,
+        "streaking": streaking,
     }
 
 
@@ -364,12 +397,11 @@ def get_snapshot(session: SessionInfo) -> dict:
 
     logger.info(f"[{session.session_id}] Capturing snapshot from stream...")
 
-    # Capture song song — giảm timing gap giữa image và audio từ ~8s xuống ~3s
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        image_future = executor.submit(capture_image_from_stream, session.stream_url)
-        audio_future = executor.submit(capture_audio_from_stream, session.stream_url, 3)
-        image_b64 = image_future.result()
-        audio_b64 = audio_future.result()
+    # Capture song song qua executor toàn cục để tránh tạo thread liên tục
+    image_future = snapshot_executor.submit(capture_image_from_stream, session.stream_url)
+    audio_future = snapshot_executor.submit(capture_audio_from_stream, session.stream_url, 3)
+    image_b64 = image_future.result()
+    audio_b64 = audio_future.result()
 
     snapshot = {
         "image_b64": image_b64,
@@ -389,144 +421,254 @@ def get_snapshot(session: SessionInfo) -> dict:
     return snapshot
 
 
+def fetch_room_details(client: TikTokLiveClient, room_id: str) -> dict:
+    """Gọi trực tiếp API webcast của TikTok để lấy chi tiết phòng live bao gồm cover_url."""
+    proxy = getattr(client, "_proxy", "")
+    ua = getattr(client, "_user_agent", "") or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    cookies = getattr(client, "_cookies", "") or ""
+    lang = getattr(client, "_language", "") or "en"
+    
+    params = urllib.parse.urlencode({
+        "aid": "1988",
+        "app_name": "tiktok_web",
+        "device_platform": "web_pc",
+        "app_language": lang,
+        "browser_language": f"{lang}-US",
+        "browser_name": "Mozilla",
+        "browser_online": "true",
+        "browser_platform": "Linux x86_64",
+        "cookie_enabled": "true",
+        "screen_height": "1080",
+        "screen_width": "1920",
+        "room_id": room_id,
+    })
+    url = f"https://webcast.tiktok.com/webcast/room/info/?{params}"
+    headers = {
+        "User-Agent": ua,
+        "Referer": "https://www.tiktok.com/",
+    }
+    if cookies:
+        headers["Cookie"] = cookies
+
+    req = urllib.request.Request(url, headers=headers)
+    
+    # Setup proxy
+    handlers = []
+    if proxy:
+        handlers.append(urllib.request.ProxyHandler({"https": proxy, "http": proxy}))
+    opener = urllib.request.build_opener(*handlers)
+    
+    with opener.open(req, timeout=10.0) as resp:
+        body_raw = resp.read().decode("utf-8")
+        
+    body = json.loads(body_raw)
+    data = body.get("data", {})
+    stats = data.get("stats", {})
+    
+    # Lấy cover URL đầu tiên
+    cover_url = ""
+    cover = data.get("cover", {})
+    if cover:
+        urls = cover.get("url_list", [])
+        if urls:
+            cover_url = urls[0]
+            
+    # Lấy stream URL
+    stream_url = ""
+    stream_url_raw = data.get("stream_url")
+    if isinstance(stream_url_raw, dict):
+        flv = stream_url_raw.get("flv_pull_url")
+        if isinstance(flv, dict) and flv:
+            # HD1 -> SD1 -> FULL_HD1 -> SD2
+            stream_url = flv.get("HD1") or flv.get("SD1") or flv.get("FULL_HD1") or flv.get("SD2")
+            
+    return {
+        "title": data.get("title", ""),
+        "viewers": data.get("user_count", 0),
+        "cover_url": cover_url,
+        "likes": stats.get("like_count", 0),
+        "total_user": stats.get("total_user", 0),
+        "stream_url": stream_url,
+    }
+
+
+async def fetch_session_metadata_task(session: SessionInfo, client: TikTokLiveClient, room_id: str):
+    """Bất đồng bộ gọi API phòng live và profile streamer để cập nhật SessionInfo mà không block event loop."""
+    loop = asyncio.get_running_loop()
+    username = session.tiktok_username.replace("@", "").strip()
+    
+    # 1. Lấy chi tiết phòng live (chứa cover_url và stream_url)
+    try:
+        details = await loop.run_in_executor(None, fetch_room_details, client, room_id)
+        session.title = details["title"]
+        session.stats["viewer_count"] = details["viewers"]
+        session.stats["total_likes"] = details["likes"]
+        session.stats["total_views"] = details["total_user"]
+        session.cover_url = details["cover_url"]
+        
+        if details["stream_url"]:
+            session.stream_url = details["stream_url"]
+            logger.info(f"[{session.session_id}] Stream URL captured: {session.stream_url[:80]}...")
+            
+        session.add_event("connected", data={"room_id": room_id, "title": session.title})
+        logger.info(f"[{session.session_id}] Connected to Room {room_id} (Title: {session.title})")
+    except Exception as e:
+        logger.warning(f"[{session.session_id}] Failed to fetch room details: {e}")
+        # Fallback dùng info từ client.fetch_room_info
+        try:
+            info = await loop.run_in_executor(None, client.fetch_room_info, room_id)
+            session.title = info.title
+            session.stats["viewer_count"] = info.viewers
+            session.stats["total_likes"] = info.likes
+            session.stats["total_views"] = info.total_user
+            if info.stream_url:
+                session.stream_url = info.stream_url.flv_hd or info.stream_url.flv_sd or info.stream_url.flv_origin or info.stream_url.flv_ld
+            session.add_event("connected", data={"room_id": room_id, "title": session.title})
+        except Exception as e2:
+            logger.warning(f"[{session.session_id}] Failed to fetch room info fallback: {e2}")
+
+    # 2. Lấy profile của streamer (chứa avatar và followers)
+    try:
+        profile = await loop.run_in_executor(None, profile_cache.fetch, username)
+        session.streamer_nickname = profile.nickname or username
+        session.streamer_username = profile.unique_id or username
+        session.streamer_avatar = profile.avatar_large or profile.avatar_medium or profile.avatar_thumb
+        session.streamer_followers = profile.follower_count
+        logger.info(f"[{session.session_id}] Streamer profile loaded: followers={profile.follower_count}")
+    except Exception as e:
+        logger.warning(f"[{session.session_id}] Failed to fetch streamer profile: {e}")
+        # Fallback gán username
+        session.streamer_nickname = username
+        session.streamer_username = username
+
+
 # ============================================================
 # TikTok Client Setup
 # ============================================================
+def ensure_live(session: SessionInfo):
+    """Tự động khôi phục trạng thái LIVE và reset retries khi có sự kiện thời gian thực."""
+    if session.status in ("disconnected", "connecting"):
+        logger.info(f"[{session.session_id}] Connection restored, status set back to live")
+        session.status = "live"
+        session.retries = 0
+
+
 def setup_tiktok_client(session: SessionInfo) -> TikTokLiveClient:
     """Tạo TikTokLiveClient và gắn event handlers cho một session."""
+    username = session.tiktok_username.replace("@", "").strip()
+    client = TikTokLiveClient(username)
+    client.max_retries(20)
 
-    client = TikTokLiveClient(unique_id=session.tiktok_username)
-
-    @client.on(ConnectEvent)
-    async def on_connect(event):
+    @client.on(EventType.connected)
+    def on_connect(event):
+        room_id = event.room_id
         session.status = "live"
         session.retries = 0  # Reset số lần reconnect khi kết nối thành công
         session.connected_at = datetime.now(timezone.utc).isoformat()
-        session.room_id = str(client.room_id)
+        session.room_id = room_id
 
-        if client.room_info:
-            owner = client.room_info.get("owner", {})
-            stats = client.room_info.get("stats", {})
-            stream_url_info = client.room_info.get("stream_url", {})
+        # Khởi chạy background task lấy metadata đồng thời và non-blocking
+        asyncio.create_task(fetch_session_metadata_task(session, client, room_id))
 
-            session.title = client.room_info.get("title", "")
-            session.stats["viewer_count"] = client.room_info.get("user_count", 0)
-            session.stats["total_views"] = int(stats.get("total_user_str", "0") or "0")
-            session.stats["total_likes"] = int(stats.get("like_count", 0) or 0)
-
-            session.streamer_nickname = owner.get("nickname", "")
-            session.streamer_username = owner.get("display_id", "")
-            session.streamer_followers = owner.get("follower_count", 0)
-
-            # Lấy cover image URL
-            cover = client.room_info.get("cover", {})
-            if cover:
-                urls = cover.get("url_list", [])
-                if urls:
-                    session.cover_url = urls[0]
-
-            # Lấy streamer avatar URL
-            avatar_thumb = owner.get("avatar_thumb", {})
-            if avatar_thumb:
-                urls = avatar_thumb.get("url_list", [])
-                if urls:
-                    session.streamer_avatar = urls[0]
-
-            # Lấy HLS stream URL cho snapshot capture
-            hls_url = stream_url_info.get("hls_pull_url", "")
-            if hls_url:
-                session.stream_url = hls_url
-                logger.info(f"[{session.session_id}] Stream URL captured: {hls_url[:80]}...")
-            else:
-                # Fallback: FLV HD
-                flv_urls = stream_url_info.get("flv_pull_url", {})
-                if isinstance(flv_urls, dict):
-                    session.stream_url = flv_urls.get("HD1", "") or flv_urls.get("SD1", "")
-                elif isinstance(flv_urls, str):
-                    session.stream_url = flv_urls
-
-        logger.info(f"[{session.session_id}] Connected: {session.title} (Room {session.room_id})")
-        session.add_event("connected", data={"room_id": session.room_id, "title": session.title})
-
-    @client.on(CommentEvent)
-    async def on_comment(event):
-        u = extract_user(event)
+    @client.on(EventType.chat)
+    def on_chat(event):
+        ensure_live(session)
+        data = event.data
+        u = extract_user(data)
+        content = data.get("content", "")
         session.stats["total_comments"] += 1
-        session.add_event("comment", nickname=u["nickname"], unique_id=u["unique_id"], user_id=u["user_id"], data={"comment": event.comment, "avatar_url": u["avatar_url"]})
+        session.add_event(
+            "comment", 
+            nickname=u["nickname"], 
+            unique_id=u["unique_id"], 
+            user_id=u["user_id"], 
+            data={"comment": content, "avatar_url": u["avatar_url"]}
+        )
 
-    @client.on(GiftEvent)
-    async def on_gift(event):
-        u = extract_user(event)
-        gift_name = getattr(event.gift, "name", "Unknown")
-        gift_id = getattr(event.gift, "id", None)
-        diamond_count = getattr(event.gift, "diamond_count", 0)
-        repeat_count = getattr(event, "repeat_count", 1)
-        streaking = getattr(event, "streaking", False)
+    @client.on(EventType.gift)
+    def on_gift(event):
+        ensure_live(session)
+        data = event.data
+        u = extract_user(data)
+        gift_info = parse_gift_data(data)
         session.stats["total_gifts"] += 1
-        session.add_event("gift", nickname=u["nickname"], unique_id=u["unique_id"], user_id=u["user_id"], data={
-            "gift_name": gift_name,
-            "gift_id": gift_id,
-            "diamond_count": diamond_count,
-            "repeat_count": repeat_count,
-            "streaking": streaking,
-        })
+        session.add_event(
+            "gift", 
+            nickname=u["nickname"], 
+            unique_id=u["unique_id"], 
+            user_id=u["user_id"], 
+            data=gift_info
+        )
 
-    @client.on(LikeEvent)
-    async def on_like(event):
-        u = extract_user(event)
-        count = getattr(event, "count", 1)
+    @client.on(EventType.like)
+    def on_like(event):
+        ensure_live(session)
+        data = event.data
+        u = extract_user(data)
+        count = data.get("count", 1)
         session.stats["total_likes"] += count
-        session.add_event("like", nickname=u["nickname"], unique_id=u["unique_id"], user_id=u["user_id"], data={"count": count})
+        session.add_event(
+            "like", 
+            nickname=u["nickname"], 
+            unique_id=u["unique_id"], 
+            user_id=u["user_id"], 
+            data={"count": count}
+        )
 
-    @client.on(FollowEvent)
-    async def on_follow(event):
-        u = extract_user(event)
+    @client.on(EventType.follow)
+    def on_follow(event):
+        ensure_live(session)
+        data = event.data
+        u = extract_user(data)
         session.stats["total_follows"] += 1
         session.add_event("follow", nickname=u["nickname"], unique_id=u["unique_id"], user_id=u["user_id"])
 
-    @client.on(JoinEvent)
-    async def on_join(event):
-        session.stats["total_joins"] += 1
-        # Không lưu event join vì quá nhiều, chỉ đếm
-
-    @client.on(ShareEvent)
-    async def on_share(event):
-        u = extract_user(event)
+    @client.on(EventType.share)
+    def on_share(event):
+        ensure_live(session)
+        data = event.data
+        u = extract_user(data)
         session.stats["total_shares"] += 1
         session.add_event("share", nickname=u["nickname"], unique_id=u["unique_id"], user_id=u["user_id"])
 
-    @client.on(LiveEndEvent)
-    async def on_live_end(event):
+    @client.on(EventType.join)
+    def on_join(event):
+        ensure_live(session)
+        session.stats["total_joins"] += 1
+
+    @client.on(EventType.live_ended)
+    def on_live_end(event):
         session.status = "ended"
         session.ended_at = datetime.now(timezone.utc).isoformat()
         session.add_event("live_ended")
         logger.info(f"[{session.session_id}] Live ended")
 
-    @client.on(LivePauseEvent)
-    async def on_pause(event):
-        session.add_event("live_paused")
+    @client.on(EventType.reconnecting)
+    def on_reconnecting(event):
+        data = event.data or {}
+        attempt = data.get("attempt", 1)
+        delay = data.get("delay", 2)
+        session.status = "disconnected"
+        session.retries = attempt
+        session.add_event("reconnecting", data={"attempt": attempt, "delay": delay})
+        logger.info(f"[{session.session_id}] Reconnecting: attempt {attempt}, delay {delay}s")
 
-    @client.on(LiveUnpauseEvent)
-    async def on_unpause(event):
-        session.add_event("live_unpaused")
-
-    @client.on(DisconnectEvent)
-    async def on_disconnect(event):
-        # Khi mất mạng đột ngột mà không có LiveEndEvent trước đó, chuyển trạng thái thành disconnected để kích hoạt reconnect
+    @client.on(EventType.disconnected)
+    def on_disconnect(event):
         if session.status == "live":
             session.status = "disconnected"
             session.add_event("disconnected")
-            logger.info(f"[{session.session_id}] Disconnected (temporary). Will try to reconnect.")
+            logger.info(f"[{session.session_id}] Disconnected")
 
-    @client.on(RoomUserSeqEvent)
-    async def on_viewer_update(event):
-        # viewer_count là số người xem đồng thời hiện tại (concurrent viewers)
-        viewer_count = getattr(event, 'total', None)
+    @client.on(EventType.room_user_seq)
+    def on_viewer_update(event):
+        ensure_live(session)
+        data = event.data or {}
+        viewer_count = data.get("viewerCount") or data.get("viewer_count")
         if viewer_count is not None:
             session.stats["viewer_count"] = viewer_count
 
-        # total_user là tổng số người xem tích lũy (total unique viewers)
-        total_user = getattr(event, 'total_user', None)
+        total_user = data.get("totalUser") or data.get("total_user")
         if total_user is not None:
             session.stats["total_views"] = max(session.stats["total_views"], total_user)
 
@@ -534,71 +676,42 @@ def setup_tiktok_client(session: SessionInfo) -> TikTokLiveClient:
 
 
 async def run_client(session: SessionInfo):
-    """Chạy TikTokLiveClient trong background task với cơ chế tự động kết nối lại (Auto Reconnect)."""
-    while session.status in ("connecting", "live", "disconnected"):
-        try:
-            # Khởi tạo đối tượng client mới cho mỗi lượt kết nối để làm sạch state bên trong
-            client = setup_tiktok_client(session)
-            session._client = client
-            
-            logger.info(f"[{session.session_id}] Starting TikTok client connection for {session.tiktok_username}...")
-            await client.start(fetch_room_info=True, fetch_gift_info=True)
-            
-            # Nếu start() kết thúc bình thường (không ném ngoại lệ) mà status vẫn là live,
-            # coi như stream bị đứt websocket ngầm mà không bắn event Disconnect.
-            if session.status == "live":
-                session.status = "disconnected"
-                session.add_event("disconnected")
-                
-        except asyncio.CancelledError:
-            logger.info(f"[{session.session_id}] Task cancelled by user stop.")
+    """Chạy TikTokLiveClient trong background task."""
+    try:
+        client = setup_tiktok_client(session)
+        session._client = client
+
+        logger.info(f"[{session.session_id}] Starting TikTok client connection for {session.tiktok_username}...")
+        await client.connect()
+
+        if session.status in ("live", "connecting", "disconnected"):
             session.status = "ended"
-            break
-        except asyncio.TimeoutError:
-            logger.error(f"[{session.session_id}] Connection timeout")
-            if session.status == "connecting":
-                # Lần đầu tiên kết nối mà bị timeout -> coi như user không live
-                session.status = "error"
-                session.error = "Connection timeout — user có thể không đang live"
-                session.ended_at = datetime.now(timezone.utc).isoformat()
-                break
-            else:
-                session.status = "disconnected"
-                session.add_event("disconnected")
-        except Exception as e:
-            error_msg = str(e).lower()
-            logger.error(f"[{session.session_id}] Connection exception: {e}")
-            
-            if session.status == "connecting":
-                # Lần đầu tiên kết nối thất bại
-                if "offline" in error_msg or "not found" in error_msg or "not live" in error_msg:
-                    session.status = "error"
-                    session.error = f"User không đang live: {e}"
-                else:
-                    session.status = "error"
-                    session.error = str(e)
-                session.ended_at = datetime.now(timezone.utc).isoformat()
-                break
-            else:
-                session.status = "disconnected"
-                session.add_event("disconnected")
-        
-        # Xử lý Reconnect khi trạng thái là disconnected
-        if session.status == "disconnected":
-            session.retries += 1
-            if session.retries > 10:
-                logger.warning(f"[{session.session_id}] Reconnect limit exceeded (10 attempts). Ending session.")
-                session.status = "ended"
-                session.error = "Mất kết nối quá lâu (vượt quá 10 lần thử lại). Phiên live đã tự động kết thúc."
-                session.ended_at = datetime.now(timezone.utc).isoformat()
-                session.add_event("reconnect_failed")
-                break
-            
-            # Tính thời gian chờ (exponential backoff) tăng dần: 5s, 10s, 15s, ..., tối đa 30s
-            delay = min(5 * session.retries, 30)
-            logger.info(f"[{session.session_id}] Reconnecting in {delay} seconds (Attempt {session.retries}/10)...")
-            session.add_event("reconnecting", data={"attempt": session.retries, "delay": delay})
-            await asyncio.sleep(delay)
+            session.ended_at = datetime.now(timezone.utc).isoformat()
+
+    except asyncio.CancelledError:
+        logger.info(f"[{session.session_id}] Task cancelled by user stop.")
+        session.status = "ended"
+        session.ended_at = datetime.now(timezone.utc).isoformat()
+    except HostNotOnlineError:
+        logger.info(f"[{session.session_id}] Streamer {session.tiktok_username} is offline.")
+        session.status = "error"
+        session.error = "User hiện không phát livestream."
+        session.ended_at = datetime.now(timezone.utc).isoformat()
+    except UserNotFoundError:
+        logger.info(f"[{session.session_id}] Streamer {session.tiktok_username} not found.")
+        session.status = "error"
+        session.error = "Không tìm thấy người dùng này trên TikTok."
+        session.ended_at = datetime.now(timezone.utc).isoformat()
+    except TikTokBlockedError as e:
+        logger.error(f"[{session.session_id}] Request blocked by TikTok (anti-bot / rate limit): {e}")
+        session.status = "error"
+        session.error = "Yêu cầu bị chặn bởi TikTok (lỗi chống bot/rate limit)."
+        session.ended_at = datetime.now(timezone.utc).isoformat()
+    except Exception as e:
+        logger.error(f"[{session.session_id}] Connection error: {e}")
+        session.status = "error"
+        session.error = str(e)
+        session.ended_at = datetime.now(timezone.utc).isoformat()
 
 
 # ============================================================
@@ -752,7 +865,7 @@ async def stop_session(session_id: str, x_service_key: str = Header(None)):
     # Disconnect TikTok client
     if session._client:
         try:
-            await session._client.disconnect()
+            session._client.disconnect()
         except Exception:
             pass
 
