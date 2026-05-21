@@ -326,4 +326,170 @@ class AnalyzeCommentsJobTest extends TestCase
             'ai_processed' => true,
         ]);
     }
+
+    public function test_audio_present_adds_audio_section_and_part(): void
+    {
+        $user = \App\Models\User::factory()->create();
+
+        $session = LiveSession::create([
+            'user_id' => $user->id,
+            'name' => 'Audio Present Test',
+            'status' => 'live',
+            'tiktok_username' => 'testuser',
+            'tiktok_session_id' => 'real-session-id',
+        ]);
+
+        $comment = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now(),
+            'tiktok_user_id' => 'user_1',
+            'data' => ['comment' => 'cái này bao nhiêu'],
+            'ai_processed' => false,
+        ]);
+
+        // Mock TikTokService returns actual audio
+        $this->mock(TikTokService::class, function ($mock) {
+            $mock->shouldReceive('getSnapshot')
+                ->once()
+                ->andReturn([
+                    'audio_b64' => base64_encode('fake-audio-data'),
+                    'image_b64' => null,
+                    'title' => 'Test Live',
+                ]);
+        });
+
+        $this->mock(RunwareAiService::class, function ($mock) use ($comment) {
+            $mock->shouldReceive('chatMultimodal')
+                ->once()
+                ->withArgs(function ($systemPrompt, $parts) {
+                    // Prompt MUST have audio section
+                    $hasAudioSection = str_contains($systemPrompt, 'AUDIO LIVESTREAM');
+                    // Parts MUST have 2 elements: text + audio
+                    $hasTwoParts = count($parts) === 2;
+                    $hasAudioPart = $parts[1]['type'] === 'input_audio';
+                    return $hasAudioSection && $hasTwoParts && $hasAudioPart;
+                })
+                ->andReturn([
+                    'results' => [
+                        [
+                            'id' => $comment->id,
+                            'sentiment' => 'neutral',
+                            'intent_tag' => 'Hỏi thông tin',
+                            'question_tag' => 'Hỏi giá',
+                            'product_tag' => null,
+                            'has_phone' => false,
+                        ],
+                    ],
+                    'session_note' => 'Streamer đang giới thiệu sản phẩm.',
+                ]);
+        });
+
+        $job = new AnalyzeCommentsJob($session->id);
+        app()->call([$job, 'handle']);
+
+        $this->assertDatabaseHas('live_events', [
+            'id' => $comment->id,
+            'ai_processed' => true,
+            'intent_tag' => 'Hỏi thông tin',
+        ]);
+    }
+
+    public function test_session_note_is_truncated_to_500_chars(): void
+    {
+        $user = \App\Models\User::factory()->create();
+
+        $session = LiveSession::create([
+            'user_id' => $user->id,
+            'name' => 'Truncation Test',
+            'status' => 'live',
+            'tiktok_username' => 'testuser',
+        ]);
+
+        $comment = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now(),
+            'tiktok_user_id' => 'user_1',
+            'data' => ['comment' => 'test'],
+            'ai_processed' => false,
+        ]);
+
+        $longNote = str_repeat('A', 1000); // 1000 chars
+
+        $this->mock(TikTokService::class);
+
+        $this->mock(RunwareAiService::class, function ($mock) use ($comment, $longNote) {
+            $mock->shouldReceive('chatMultimodal')
+                ->once()
+                ->andReturn([
+                    'results' => [
+                        [
+                            'id' => $comment->id,
+                            'sentiment' => 'neutral',
+                            'intent_tag' => null,
+                            'question_tag' => null,
+                            'product_tag' => null,
+                            'has_phone' => false,
+                        ],
+                    ],
+                    'session_note' => $longNote,
+                ]);
+        });
+
+        $job = new AnalyzeCommentsJob($session->id);
+        app()->call([$job, 'handle']);
+
+        $session->refresh();
+        $this->assertEquals(500, mb_strlen($session->ai_context_summary));
+    }
+
+    public function test_non_string_session_note_is_skipped(): void
+    {
+        $user = \App\Models\User::factory()->create();
+
+        $session = LiveSession::create([
+            'user_id' => $user->id,
+            'name' => 'Non-string Note Test',
+            'status' => 'live',
+            'tiktok_username' => 'testuser',
+        ]);
+
+        $comment = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now(),
+            'tiktok_user_id' => 'user_1',
+            'data' => ['comment' => 'hello'],
+            'ai_processed' => false,
+        ]);
+
+        $this->mock(TikTokService::class);
+
+        $this->mock(RunwareAiService::class, function ($mock) use ($comment) {
+            $mock->shouldReceive('chatMultimodal')
+                ->once()
+                ->andReturn([
+                    'results' => [
+                        [
+                            'id' => $comment->id,
+                            'sentiment' => 'neutral',
+                            'intent_tag' => null,
+                            'question_tag' => null,
+                            'product_tag' => null,
+                            'has_phone' => false,
+                        ],
+                    ],
+                    // AI hallucinate: session_note is array instead of string
+                    'session_note' => ['key' => 'value'],
+                ]);
+        });
+
+        $job = new AnalyzeCommentsJob($session->id);
+        app()->call([$job, 'handle']);
+
+        // Memory should NOT be updated with non-string value
+        $session->refresh();
+        $this->assertNull($session->ai_context_summary);
+    }
 }

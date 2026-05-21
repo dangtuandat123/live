@@ -20,7 +20,7 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 2;
-    public int $timeout = 90;
+    public int $timeout = 120;
     public array $backoff = [10, 30];
 
     /**
@@ -51,7 +51,7 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
 
     public function handle(RunwareAiService $runware, TikTokService $tiktokService): void
     {
-        $session = LiveSession::with(['products', 'keywords'])->find($this->liveSessionId);
+        $session = LiveSession::with(['products', 'keywords', 'stats'])->find($this->liveSessionId);
         if (!$session) {
             return;
         }
