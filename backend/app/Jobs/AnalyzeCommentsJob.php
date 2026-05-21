@@ -360,16 +360,15 @@ Mỗi bình luận (format: ID|nội dung), trả về:
    - Nếu không rõ đang chê hay đang hỏi → mặc định "neutral"
 
 2. **intent_tag** — ý định hành động:
-   - "Chốt đơn": Người dùng THỰC SỰ muốn mua — CÓ KÈM ít nhất 1 trong: tên sản phẩm cụ thể, số lượng, size/màu, SĐT, địa chỉ, yêu cầu ship/COD
-   - "Hỏi thông tin": Hỏi giá, hỏi size, hỏi ship, hỏi tồn kho, hỏi chi tiết sản phẩm
+   - "Chốt đơn": Người dùng THỰC SỰ muốn mua — CÓ KÈM ít nhất 1 trong: tên sản phẩm cụ thể, số lượng, size/màu, SĐT, địa chỉ, yêu cầu ship/COD, HOẶC bình luận chứa mã sản phẩm/mã chốt đơn dạng "Mã + chữ/số" (ví dụ: "Mã 2", "Mã 2 ạ", "mã A", "Mã A ạ").
+   - "Hỏi thông tin": Hỏi giá, hỏi size, hỏi ship, hỏi tồn kho, hỏi chi tiết sản phẩm. Lưu ý: KHÔNG phân loại các bình luận chỉ chứa mã đơn lẻ hoặc kèm kính ngữ như "Mã 2 ạ" thành "Hỏi thông tin", hãy phân loại là "Chốt đơn".
    - "Phản hồi SP": Chia sẻ trải nghiệm dùng sản phẩm (khen hoặc chê)
    - "Yêu cầu hỗ trợ": Báo lỗi, yêu cầu đổi trả, huỷ đơn, khiếu nại
    - null: Không thuộc nhóm nào (tương tác, chào hỏi, spam, emoticon, nói chuyện phiếm)
 
-   ⚠️ QUAN TRỌNG — "đã mua" / "mua" / "chốt" ĐƠN LẺ:
-   Trong TikTok Live VN, viewer spam "đã mua"/"ĐÃ MUA"/"mua mua"/"chốt" để tham gia mini-game hoặc tương tác host.
-   → Nếu KHÔNG kèm thông tin cụ thể (SP, SL, size, SĐT) → intent_tag = null, sentiment = "neutral"
-   → Chỉ = "Chốt đơn" khi có chi tiết mua hàng thực sự
+   ⚠️ QUAN TRỌNG:
+   - Bình luận chỉ gồm "đã mua" / "mua" / "chốt" đơn lẻ: Trong TikTok Live VN, viewer spam "đã mua"/"ĐÃ MUA"/"mua mua"/"chốt" để tham gia mini-game hoặc tương tác host. Nếu KHÔNG kèm thông tin cụ thể (SP, SL, size, SĐT) → intent_tag = null, sentiment = "neutral".
+   - Bình luận chứa mã sản phẩm/mã đơn hàng (ví dụ: "Mã 2", "mã 2 ạ", "Mã 12", "mã A", "Mã A ạ"): Đây là cú pháp chốt đơn đặc trưng của livestream VN. Ngay cả khi không kèm SĐT hay từ khóa mua khác, và kể cả khi tên mã này không có trong danh sách sản phẩm mẫu → intent_tag = "Chốt đơn", sentiment = "neutral".
 
 3. **question_tag** — loại câu hỏi (null nếu không phải câu hỏi):
    "Hỏi giá" / "Hỏi size" / "Hỏi ship" / "Hỏi chất liệu" / "Hỏi màu" / "Hỏi tồn kho" / "Hỏi giảm giá" / "Hỏi bảo hành" / "Hỏi thanh toán" / "Hỏi mùi hương" / "Hỏi công dụng"
@@ -425,6 +424,14 @@ Output: {"id":111,"sentiment":"neutral","intent_tag":"Hỏi thông tin","questio
 
 Input: 112|Huỷ đơn
 Output: {"id":112,"sentiment":"negative","intent_tag":"Yêu cầu hỗ trợ","question_tag":null,"product_tag":null,"has_phone":false}
+
+Input: 113|Mã 2
+Output: {"id":113,"sentiment":"neutral","intent_tag":"Chốt đơn","question_tag":null,"product_tag":null,"has_phone":false}
+→ Lý do: "Mã 2" là cú pháp chốt đơn theo mã sản phẩm trên livestream Việt Nam.
+
+Input: 114|Mã 2 ạ
+Output: {"id":114,"sentiment":"neutral","intent_tag":"Chốt đơn","question_tag":null,"product_tag":null,"has_phone":false}
+→ Lý do: "Mã 2 ạ" tương tự "Mã 2", chữ "ạ" là kính ngữ lịch sự, không làm thay đổi ý định chốt đơn thành câu hỏi thông tin.
 
 === LƯU Ý VIẾT TẮT VN ===
 sp=sản phẩm, sz=size, prm/prx=Pro Max, pr=Pro, bn/bnh/bnhiu=bao nhiêu, k/ko/kg=không, hcm=HCM, hn=Hà Nội, cod=thanh toán khi nhận hàng
