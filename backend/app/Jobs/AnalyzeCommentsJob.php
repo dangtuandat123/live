@@ -110,9 +110,16 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
             // Build user message: "ID|text" per line
             $userMessage = $commentsText->map(fn ($c) => "{$c['id']}|{$c['text']}")->join("\n");
 
-            // Gọi Runware AI — multimodal nếu có snapshot, text-only nếu không
-            $hasImage = !empty($snapshot['image_b64']);
-            $hasAudio = !empty($snapshot['audio_b64']);
+            // --- Timing-aware snapshot decision ---
+            // Comments được query oldest-first, nên có thể cũ hơn snapshot hiện tại.
+            // Nếu comments quá cũ (>90s), snapshot không phản ánh đúng context
+            // → chỉ dùng metadata (title, streamer) mà không gửi image/audio.
+            $oldestEventAt = $unprocessed->min('event_at');
+            $commentAgeSeconds = $oldestEventAt ? (int) $oldestEventAt->diffInSeconds(now()) : 0;
+            $snapshotRelevant = $commentAgeSeconds <= 90;
+
+            $hasImage = $snapshotRelevant && !empty($snapshot['image_b64']);
+            $hasAudio = $snapshotRelevant && !empty($snapshot['audio_b64']);
 
             if ($hasImage || $hasAudio) {
                 // Multimodal: text + image + audio
@@ -131,8 +138,14 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
                     );
                 }
 
+                // Thêm time context để AI biết mối quan hệ thời gian
+                $timeNote = '';
+                if ($commentAgeSeconds > 30) {
+                    $timeNote = "⏱️ Lưu ý: Ảnh/audio là trạng thái HIỆN TẠI. Một số comments đã từ {$commentAgeSeconds}s trước — sản phẩm trong ảnh có thể khác lúc comments được viết. Ưu tiên TEXT bình luận để xác định product_tag.\n\n";
+                }
+
                 $parts[] = RunwareAiService::text(
-                    "Bình luận cần phân tích (format: ID|nội_dung):\n" . $userMessage
+                    $timeNote . "Bình luận cần phân tích (format: ID|nội_dung):\n" . $userMessage
                 );
 
                 Log::info('AI multimodal analysis', [
@@ -140,6 +153,7 @@ class AnalyzeCommentsJob implements ShouldQueue, ShouldBeUnique
                     'has_image' => $hasImage,
                     'has_audio' => $hasAudio,
                     'comments_count' => $commentsText->count(),
+                    'comment_age_seconds' => $commentAgeSeconds,
                 ]);
 
                 $response = $runware->chatMultimodal(
@@ -290,6 +304,10 @@ Bạn CÓ THỂ nhận được hình ảnh chụp màn hình livestream và đo
 → Dùng thông tin này để HIỂU NGỮ CẢNH tốt hơn khi phân loại bình luận.
 → VÍ DỤ: Nếu host đang giới thiệu "kem dưỡng da" và viewer hỏi "bao nhiêu" → product_tag = kem dưỡng da, question_tag = "Hỏi giá".
 → Nếu KHÔNG có hình/audio, phân tích dựa trên text bình luận.
+
+⚠️ TIMING: Ảnh/audio là trạng thái HIỆN TẠI của livestream. Một số bình luận có thể đã cũ (từ lúc host giới thiệu sản phẩm khác).
+→ Nếu bình luận ĐỀ CẬP RÕ tên sản phẩm ("con 15prm", "cái kem") → dùng TEXT để xác định product_tag, KHÔNG dùng ảnh.
+→ Chỉ dùng ảnh/audio để gán product_tag khi bình luận KHÔNG đề cập sản phẩm cụ thể (VD: "bao nhiêu", "còn không", "ship tỉnh k").
 NOTE;
 
         return <<<PROMPT

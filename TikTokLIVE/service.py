@@ -32,6 +32,7 @@ import time
 import uuid
 import logging
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -327,8 +328,12 @@ def get_snapshot(session: SessionInfo) -> dict:
 
     logger.info(f"[{session.session_id}] Capturing snapshot from stream...")
 
-    image_b64 = capture_image_from_stream(session.stream_url)
-    audio_b64 = capture_audio_from_stream(session.stream_url, duration=3)
+    # Capture song song — giảm timing gap giữa image và audio từ ~8s xuống ~3s
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        image_future = executor.submit(capture_image_from_stream, session.stream_url)
+        audio_future = executor.submit(capture_audio_from_stream, session.stream_url, 3)
+        image_b64 = image_future.result()
+        audio_b64 = audio_future.result()
 
     snapshot = {
         "image_b64": image_b64,
