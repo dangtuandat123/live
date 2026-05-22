@@ -610,3 +610,43 @@ Integrity mode: development
 ### Kiểm thử & Tương thích
 - [ ] Các tính năng cũ (phân tích comment đơn lẻ, chốt đơn, ghim bình luận) hoạt động bình thường, không bị ảnh hưởng.
 - [ ] Unit/Integration tests chạy pass (`php artisan test`).
+
+## 2026-05-22T13:23:22Z
+
+Đánh giá và tối ưu hóa hệ thống prompt AI của dự án (trong `CommentAnalyzer` và `LiveSessionAnalyzer`). Chuyển đổi system prompt sang tiếng Anh với kỹ thuật Chain-of-Thought (CoT) và cấu trúc XML để tối ưu hóa khả năng suy luận của LLM, đồng thời vẫn đảm bảo kết quả trả về bằng tiếng Việt chuẩn xác và đúng JSON schema.
+
+Working directory: d:/Workspace/livestream/backend
+Integrity mode: development
+
+## Requirements
+
+### R1. Tối ưu hóa Prompt cho CommentAnalyzer
+- Đọc và phân tích `CommentAnalyzer.php`.
+- Chuyển đổi system prompt (`instructions()`) sang tiếng Anh.
+- Áp dụng cấu trúc prompt rõ ràng (sử dụng các thẻ XML để phân chia Context, Rules, Reasoning Steps, Output Format).
+- Tích hợp kỹ thuật Chain-of-Thought hoặc Few-shot examples để hướng dẫn LLM cách phân tích kỹ các sắc thái của bình luận tiếng Việt (phân biệt câu hỏi bình thường, phàn nàn thật sự, cú pháp chốt đơn).
+- Giữ nguyên cấu trúc JSON Schema đầu ra (chỉ chứa tiếng Việt/các enum định nghĩa sẵn).
+
+### R2. Tối ưu hóa Prompt cho LiveSessionAnalyzer
+- Đọc và phân tích `LiveSessionAnalyzer.php`.
+- Chuyển đổi system prompt (`instructions()`) sang tiếng Anh.
+- Cải thiện prompt để bắt AI suy luận đa chiều: phân tích không khí phiên live từ comment, các hành vi spam/bất thường, thái độ người mua dựa trên dữ liệu thống kê, và đưa ra gợi ý vận hành thực tế.
+- Sử dụng các thẻ XML để định nghĩa đầu vào và cấu trúc suy luận trước khi tạo JSON.
+- Đảm bảo đầu ra khớp với JSON Schema gồm: `summary` (tiếng Việt), `alerts` (tiếng Việt).
+
+### R3. Xác thực & Test
+- Tạo các unit test để kiểm tra độ chính xác của LLM khi chạy qua các prompt mới.
+- Đảm bảo đầu ra JSON của cả hai analyzer được parse thành công, không bị lỗi cú pháp.
+- Đảm bảo hệ thống build/typecheck pass và không có lỗi PHP syntax.
+
+## Acceptance Criteria
+
+### Prompt & Code Quality
+- [ ] File `CommentAnalyzer.php` có system prompt được viết lại hoàn toàn bằng tiếng Anh chuyên nghiệp, sử dụng XML tags và CoT/Few-shot.
+- [ ] File `LiveSessionAnalyzer.php` có system prompt được viết lại bằng tiếng Anh, tối ưu hóa suy luận vận hành.
+- [ ] Cả hai file đều giữ nguyên PHP class structure và JsonSchema định nghĩa cũ, đảm bảo backward compatibility với frontend và database.
+
+### Verification & Tests
+- [ ] Chạy thành công các unit test cũ và mới liên quan đến phân tích AI.
+- [ ] Toàn bộ PHP syntax kiểm tra không có lỗi.
+- [ ] Build dự án thành công (`npm run build` không lỗi).

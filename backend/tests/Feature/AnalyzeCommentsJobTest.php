@@ -319,7 +319,7 @@ class AnalyzeCommentsJobTest extends TestCase
                 ->withArgs(function ($systemPrompt, $parts) {
                     // Prompt should contain memory from batch 1
                     return str_contains($systemPrompt, 'Đang bán áo thun, nhiều người hỏi size M.')
-                        && str_contains($systemPrompt, 'BỘ NHỚ PHIÊN LIVE');
+                        && str_contains($systemPrompt, 'SESSION MEMORY');
                 })
                 ->andReturn([
                     'results' => [

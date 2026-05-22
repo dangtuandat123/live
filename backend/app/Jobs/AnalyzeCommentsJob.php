@@ -585,7 +585,7 @@ class AnalyzeCommentsJob implements ShouldQueue
 
         $liveContext = '';
         if ($liveTitle || $streamerName) {
-            $liveContext = "\n- Live: {$liveTitle} | Host: {$streamerName} | Viewer: {$viewerCount}";
+            $liveContext = "\n- Livestream info: Title = \"{$liveTitle}\", Host = \"{$streamerName}\", Current active viewers = {$viewerCount}";
         }
 
         // Memory section — ngữ cảnh từ batch phân tích trước
@@ -593,8 +593,7 @@ class AnalyzeCommentsJob implements ShouldQueue
         if (! empty($memoryContext)) {
             $memorySection = <<<MEM
 
-=== BỘ NHỚ PHIÊN LIVE ===
-Ghi chú từ lần phân tích trước (dùng để hiểu ngữ cảnh liên tục):
+=== SESSION MEMORY (CONTEXT FROM PREVIOUS BATCH) ===
 {$memoryContext}
 MEM;
         }
@@ -605,51 +604,132 @@ MEM;
             $audioSection = <<<'AUDIO'
 
 === AUDIO LIVESTREAM ===
-Bạn cũng nhận được đoạn audio 3 giây gần nhất từ livestream. Hãy nghe để hiểu:
-- Streamer đang giới thiệu hoặc bán sản phẩm nào → dùng để xác định product_tag chính xác hơn.
-- Đang chạy minigame/đoán số/chơi trò chơi → các comment chứa số hoặc nội dung ngắn có thể là tham gia trò chơi, không phải mã đơn hàng.
-- Giọng nói và nội dung streamer đang nói → giúp hiểu ngữ cảnh bình luận của người xem.
-Nếu audio nhiễu hoặc không rõ, hãy bỏ qua và phân tích dựa trên text.
+You are also provided with a 3-second audio clip from the livestream. Listen to it to identify:
+- Which product the host/streamer is currently describing or holding (use this to match product_tag accurately).
+- Whether a minigame, number guessing game, or giveaway is running (comments containing digits or short text during this time may just be game participation, not purchase orders).
+- The tone, vocal context, and words spoken by the host to better interpret viewer comments.
+If the audio is noisy or unclear, ignore it and analyze based on raw text.
 AUDIO;
         }
 
         return <<<PROMPT
-Bạn là chuyên gia phân tích hành vi khách hàng trên Livestream bán hàng Việt Nam. Nhiệm vụ: đọc danh sách bình luận và phân loại từng bình luận.
+You are a senior analyst specializing in customer behavior on Vietnamese e-commerce livestreams. Your task is to read a batch of comments from a TikTok live chat, listen to the short live audio (if available), look at the history, and classify each comment while extracting keywords and session notes.
 
-Trả về JSON duy nhất: {"results": [{"id": int, "sentiment": "positive"|"neutral"|"negative", "intent_tag": "Chốt đơn"|"Hỏi thông tin"|"Phản hồi SP"|"Yêu cầu hỗ trợ"|null, "question_tag": string|null, "product_tag": string|null, "has_phone": bool}], "session_note": "string (max 300 ký tự)", "extracted_keywords": ["keyword1", "keyword2"]}
-Không kèm bất kỳ giải thích nào ngoài JSON.
+<context>
+This is a live shopping session on TikTok in Vietnam. Viewers interact, play minigames, ask questions, and buy products.
+- Registered Products: {$productContext}
+- Tracked Keywords: {$keywordList}{$liveContext}{$memorySection}{$audioSection}
+</context>
 
-=== BỐI CẢNH ===
-Đây là Livestream bán hàng trực tuyến trên TikTok. Người xem vừa mua sắm, vừa tương tác giải trí. Trong một phiên live, người xem có thể: đặt hàng, hỏi thông tin sản phẩm, phản hồi trải nghiệm, yêu cầu hỗ trợ sau mua, hoặc chỉ đơn giản là tương tác xã hội (chào hỏi, cổ vũ, tham gia minigame/đoán số, bình luận cho vui).
-- Sản phẩm đang bán: {$productContext}
-- Từ khóa theo dõi: {$keywordList}{$liveContext}{$memorySection}{$audioSection}
+<rules>
+Analyze each comment individually and map to the following schema properties:
 
-=== CÁCH SUY LUẬN ===
+1. **sentiment**:
+   - "positive": Expresses praise, satisfaction, excitement, or support for the product/shop.
+   - "negative": Expresses severe dissatisfaction, anger, complaints about quality/delivery, or refund/return requests.
+   - "neutral": Neutral tone, generic social chats, OR general product inquiries/questions.
+     *CRITICAL RULE*: General questions, requests for skin type consultation, stock checks (e.g., "sao e vào giỏ hàng k có ạ"), usage guidelines, or minor feedback (e.g., "ban đầu e bôi hơi rát k sao dk ạ") must be classified as "neutral". A customer asking a question is NEVER "negative" unless they use offensive, angry, or insulting words.
 
-**sentiment** — Cảm xúc mà người bình luận thể hiện:
-- "positive": Cảm xúc tích cực hướng về sản phẩm hoặc shop (khen, hài lòng, yêu thích, ủng hộ).
-- "negative": Cảm xúc tiêu cực (chỉ dùng khi thực sự phàn nàn gay gắt, chê bai sản phẩm tệ/không tốt, bày tỏ sự thất vọng, tức giận, hoặc đòi trả hàng/hoàn tiền).
-- "neutral": Không thể hiện cảm xúc rõ ràng hoặc trung lập.
-  *Lưu ý đặc biệt*: Các thắc mắc, câu hỏi thông thường nhờ tư vấn về việc tìm kiếm sản phẩm trong giỏ hàng (ví dụ: "sao e vào giỏ hàng k có ạ"), cách sử dụng sản phẩm hoặc phản ứng nhẹ trong quá trình sử dụng (ví dụ: "ban đầu e bôi hơi rát k sao dk ạ") phải được phân loại là "neutral" (trung lập). Một câu hỏi thắc mắc nhờ tư vấn KHÔNG bao giờ được coi là "negative" trừ khi chứa từ ngữ tức giận, chửi bới rõ rệt.
+2. **intent_tag**:
+   - "Chốt đơn": Clear purchase intent. Trusted signals include: providing a phone number or delivery address, specifying product name with size/color/quantity alongside a request to ship, or using the shop's custom order syntax ('cú pháp đặt hàng' in Vietnamese) such as "Mã 2", "M...", "MS...". Note: the syntax must contain a prefix signifying an order, not just random letters or numbers.
+   - "Hỏi thông tin": General product queries/inquiries (price, size, stock, materials, fragrance, usage, shipping, discounts). Examples: "sao e vào giỏ hàng k có ạ" (asking about stock) or "ban đầu e bôi hơi rát k sao dk ạ" (asking about usage/reactions).
+   - "Phản hồi SP": Shares personal experience after using the product (praise or critique).
+   - "Yêu cầu hỗ trợ": Issues post-purchase needing resolution (return requests, refunds, wrong item delivered, shipping delays, cancellation requests). Do not confuse general product/stock questions with post-purchase support.
+   - null: No transaction or inquiry intent. Includes greetings, general chat, minigame/number guesses, or very short/vague comments.
+   *CRITICAL RULE*: If context is ambiguous or signals are weak, default to null. It is better to miss a lead than to generate false purchase leads from entertainment chat.
 
-**intent_tag** — Ý định thực sự đằng sau bình luận. Hãy tự hỏi: "Người này đang muốn gì?"
-- "Chốt đơn": Người bình luận đang thể hiện RÕ RÀNG ý định đặt mua. Tín hiệu đáng tin: cung cấp SĐT/địa chỉ giao hàng, nêu rõ sản phẩm kèm size/màu/số lượng và yêu cầu mua/ship, hoặc sử dụng cú pháp đặt hàng mà shop quy định (ví dụ "Mã...", "M...", "MS..."). Lưu ý: cú pháp đặt hàng phải có tiền tố rõ ràng thể hiện hành động đặt hàng, không phải bất kỳ ký tự/số nào cũng là mã đơn.
-- "Hỏi thông tin": Bình luận chứa câu hỏi thực sự hoặc yêu cầu tìm hiểu về sản phẩm (giá cả, tồn kho, tìm sản phẩm trong giỏ hàng, công dụng, thành phần, cách dùng, phản ứng nhẹ khi bôi/dùng sản phẩm, ship...). Ví dụ: các câu hỏi "sao e vào giỏ hàng k có ạ" (Hỏi tồn kho) hoặc "ban đầu e bôi hơi rát k sao dk ạ" (Hỏi công dụng/cách dùng) là "Hỏi thông tin".
-- "Phản hồi SP": Chia sẻ trải nghiệm cá nhân sau khi đã sử dụng sản phẩm (khen tốt hoặc chê xấu).
-- "Yêu cầu hỗ trợ": Chỉ áp dụng đối với các vấn đề phát sinh cụ thể sau mua cần shop giải quyết (yêu cầu đổi trả hàng, đòi hoàn tiền, báo lỗi vận chuyển giao chậm/mất hàng, hoặc yêu cầu hủy đơn hàng đã đặt). Đừng nhầm lẫn câu hỏi thắc mắc/xin tư vấn của khách là yêu cầu hỗ trợ sau mua.
-- null: Tất cả các bình luận KHÔNG mang ý định mua bán hoặc hỏi cụ thể. Bao gồm: lời chào, cổ vũ, tương tác xã hội, tham gia trò chơi/minigame, hoặc nội dung quá ngắn gọn/mơ hồ không đủ ngữ cảnh để xác định ý định.
+3. **question_tag**:
+   - If the comment is a question, select exactly one of the following Vietnamese tags:
+     "Hỏi giá", "Hỏi size", "Hỏi ship", "Hỏi chất liệu", "Hỏi màu", "Hỏi tồn kho", "Hỏi giảm giá", "Hỏi bảo hành", "Hỏi thanh toán", "Hỏi mùi hương", "Hỏi công dụng", "Hỏi cấu hình", "Hỏi trả góp", "Hỏi xuất xứ", "Hỏi phụ kiện", "Hỏi tình trạng", "Hỏi quà tặng".
+   - If not a question, output null.
 
-Nguyên tắc quan trọng: Khi nội dung bình luận mơ hồ, thiếu ngữ cảnh, hoặc không có tín hiệu mua hàng rõ ràng → intent_tag = null. Tốt hơn là bỏ sót một đơn hàng thật còn hơn tạo ra nhiều đơn ảo từ bình luận giải trí.
+4. **product_tag**:
+   - If a product is mentioned in a buying/inquiry context, map it to the exact registered product name from the list. If not matching or ambiguous, output null.
 
-**question_tag** — Nếu bình luận là câu hỏi, phân loại theo nội dung: "Hỏi giá", "Hỏi size", "Hỏi ship", "Hỏi chất liệu", "Hỏi màu", "Hỏi tồn kho", "Hỏi giảm giá", "Hỏi bảo hành", "Hỏi thanh toán", "Hỏi mùi hương", "Hỏi công dụng", "Hỏi cấu hình", "Hỏi trả góp", "Hỏi xuất xứ", "Hỏi phụ kiện", "Hỏi tình trạng", "Hỏi quà tặng". Không phải câu hỏi → null.
+5. **has_phone**:
+   - true if the comment contains a continuous sequence of 9-11 digits (Vietnamese phone number format). Otherwise, false.
 
-**product_tag** — Nếu bình luận đề cập đến sản phẩm đang bán trong ngữ cảnh mua bán/hỏi thông tin, ánh xạ về tên chuẩn trong danh sách sản phẩm. Nếu không rõ hoặc không khớp → null.
+6. **session_note**:
+   - Write a short summary note (maximum 300 characters) in Vietnamese about the current livestream's status to help the next batch analyzer maintain context. E.g., "Đang bán Áo thun đen, nhiều người hỏi size. Có minigame đoán số đang chạy. Streamer vừa chuyển sang giới thiệu Váy đỏ."
 
-**has_phone** — true nếu bình luận chứa chuỗi số liên tiếp 9-11 chữ số (SĐT Việt Nam).
+7. **extracted_keywords**:
+   - Extract a list of up to 5 prominent keywords from this batch of comments. Keywords must be in lowercase, short (1-3 words), and relate to products, pricing, quality, or common user queries.
+</rules>
 
-**session_note** — Viết ghi chú ngắn gọn (tối đa 300 ký tự) tóm tắt ngữ cảnh hiện tại của buổi live để giúp lần phân tích tiếp theo hiểu rõ hơn. Ví dụ: "Đang bán Áo thun đen, nhiều người hỏi size. Có minigame đoán số đang chạy. Streamer vừa chuyển sang giới thiệu Váy đỏ."
+<reasoning_process>
+For each comment:
+1. Examine the raw text and detect language nuances (slang, typos, abbreviations).
+2. Determine if it is a purchase request ("Chốt đơn"), a question/consultation request ("Hỏi thông tin"), usage feedback ("Phản hồi SP"), post-purchase issue ("Yêu cầu hỗ trợ"), or general chat/minigame guess (null).
+3. Evaluate the sentiment (positive, neutral, negative) strictly applying the CRITICAL RULE for questions.
+4. Extract phone numbers and map products if present.
+5. Compile the session note and extract lowercase keywords based on the entire comment batch and audio/session memory context.
+6. Format the output as JSON.
+</reasoning_process>
 
-**extracted_keywords** — Thêm trường "extracted_keywords" chứa danh sách tối đa 5 từ khóa được trích xuất từ batch bình luận này. Các từ khóa phải viết thường (lowercase), ngắn từ 1-3 từ, liên quan đến sản phẩm, giá cả, chất lượng hoặc các câu hỏi chung của người xem.
+<few_shot_examples>
+Example 1:
+- Input comments batch:
+  101|chốt đơn áo thun đen size L 0912000111
+  102|áo thun đen vải gì vậy shop
+  103|34
+- Reasoning:
+  * comment 101: Intent is "Chốt đơn" (buying intent + size + phone number). Sentiment is "neutral". has_phone is true.
+  * comment 102: Intent is "Hỏi thông tin" (asking about material). Sentiment is "neutral". question_tag is "Hỏi chất liệu". product_tag matches "Áo thun đen".
+  * comment 103: Intent is null (minigame number guess). Sentiment is "neutral".
+  * session_note: "Đang bán áo thun đen. Có khách chốt đơn và hỏi chất liệu. Có chơi đoán số."
+  * extracted_keywords: ["áo thun đen", "chất liệu", "đoán số"]
+
+- Output JSON structure:
+  {
+    "results": [
+      {
+        "id": 101,
+        "sentiment": "neutral",
+        "intent_tag": "Chốt đơn",
+        "question_tag": null,
+        "product_tag": "Áo thun đen",
+        "has_phone": true
+      },
+      {
+        "id": 102,
+        "sentiment": "neutral",
+        "intent_tag": "Hỏi thông tin",
+        "question_tag": "Hỏi chất liệu",
+        "product_tag": "Áo thun đen",
+        "has_phone": false
+      },
+      {
+        "id": 103,
+        "sentiment": "neutral",
+        "intent_tag": null,
+        "question_tag": null,
+        "product_tag": null,
+        "has_phone": false
+      }
+    ],
+    "session_note": "Đang bán áo thun đen. Có khách chốt đơn và hỏi chất liệu. Có chơi đoán số.",
+    "extracted_keywords": ["áo thun đen", "chất liệu", "đoán số"]
+  }
+</few_shot_examples>
+
+<output_format>
+Return a single JSON object. No explanation, markdown code blocks, or extra text outside the JSON.
+JSON Structure:
+{
+  "results": [
+    {
+      "id": integer,
+      "sentiment": "positive" | "neutral" | "negative",
+      "intent_tag": "Chốt đơn" | "Hỏi thông tin" | "Phản hồi SP" | "Yêu cầu hỗ trợ" | null,
+      "question_tag": "Hỏi giá" | "Hỏi size" | "Hỏi ship" | "Hỏi chất liệu" | "Hỏi màu" | "Hỏi tồn kho" | "Hỏi giảm giá" | "Hỏi bảo hành" | "Hỏi thanh toán" | "Hỏi mùi hương" | "Hỏi công dụng" | "Hỏi cấu hình" | "Hỏi trả góp" | "Hỏi xuất xứ" | "Hỏi phụ kiện" | "Hỏi tình trạng" | "Hỏi quà tặng" | null,
+      "product_tag": string | null,
+      "has_phone": boolean
+    }
+  ],
+  "session_note": "string",
+  "extracted_keywords": ["string"]
+}
+</output_format>
 PROMPT;
     }
 
