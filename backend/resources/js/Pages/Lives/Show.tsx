@@ -570,6 +570,21 @@ function CommentsPanel() {
     const [filter, setFilter] = React.useState('all');
     const [search, setSearch] = React.useState('');
     const [visibleCount, setVisibleCount] = React.useState(BATCH);
+    const [selectedQuestionTag, setSelectedQuestionTag] = React.useState<string | null>(null);
+
+    const questionTagsInComments = React.useMemo(() => {
+        const tags: { [key: string]: number } = {};
+        allComments.forEach((c) => {
+            if (c.question_tag) {
+                tags[c.question_tag] = (tags[c.question_tag] || 0) + 1;
+            } else if (c.intent_tag === 'Hỏi thông tin') {
+                tags['Chưa phân loại'] = (tags['Chưa phân loại'] || 0) + 1;
+            }
+        });
+        return Object.entries(tags)
+            .map(([tag, count]) => ({ tag, count }))
+            .sort((a, b) => b.count - a.count);
+    }, [allComments]);
 
     const [copiedId, setCopiedId] = React.useState<number | null>(null);
 
@@ -649,12 +664,17 @@ function CommentsPanel() {
             c.intent_tag !== 'Chốt đơn'
         )
             return false;
-        if (
-            filter === 'question' &&
-            !c.question_tag &&
-            c.intent_tag !== 'Hỏi thông tin'
-        )
-            return false;
+        if (filter === 'question') {
+            if (selectedQuestionTag) {
+                if (selectedQuestionTag === 'Chưa phân loại') {
+                    if (c.question_tag || c.intent_tag !== 'Hỏi thông tin') return false;
+                } else if (c.question_tag !== selectedQuestionTag) {
+                    return false;
+                }
+            } else {
+                if (!c.question_tag && c.intent_tag !== 'Hỏi thông tin') return false;
+            }
+        }
         if (
             filter === 'support' &&
             c.intent_tag !== 'Yêu cầu hỗ trợ' &&
@@ -791,6 +811,7 @@ function CommentsPanel() {
                             key={tab.key}
                             onClick={() => {
                                 setFilter(tab.key);
+                                setSelectedQuestionTag(null);
                                 setVisibleCount(BATCH);
                             }}
                             className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
@@ -812,6 +833,34 @@ function CommentsPanel() {
                         </button>
                     ))}
                 </div>
+                {filter === 'question' && questionTagsInComments.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-3 border-t border-border/50">
+                        <button
+                            onClick={() => setSelectedQuestionTag(null)}
+                            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                                selectedQuestionTag === null
+                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                                    : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 border border-transparent'
+                            }`}
+                        >
+                            Tất cả câu hỏi
+                        </button>
+                        {questionTagsInComments.map(({ tag, count }) => (
+                            <button
+                                key={tag}
+                                onClick={() => setSelectedQuestionTag(tag)}
+                                className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                                    selectedQuestionTag === tag
+                                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                                        : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 border border-transparent'
+                                }`}
+                            >
+                                {tag}
+                                <span className="text-[9px] opacity-70">({count})</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
             </CardHeader>
             <FadeScrollArea>
                 <div className="divide-y px-4">
