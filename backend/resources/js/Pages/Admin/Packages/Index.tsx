@@ -227,7 +227,7 @@ export default function AdminPackages({ packages = [] }: Props) {
         </div>
       </header>
 
-      <div className="mx-auto w-full max-w-6xl flex flex-1 flex-col gap-6 p-4 pt-0">
+      <div className="mx-auto w-full max-w-6xl flex flex-1 flex-col gap-6 p-4 pt-4">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Quản lý gói dịch vụ</h1>

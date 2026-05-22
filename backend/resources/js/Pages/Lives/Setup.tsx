@@ -106,7 +106,7 @@ export default function LivesSetup({ products }: Props) {
         </div>
       </header>
 
-      <form onSubmit={handleSubmit} className="mx-auto w-full max-w-4xl flex flex-1 flex-col gap-6 p-4 pt-0">
+      <form onSubmit={handleSubmit} className="mx-auto w-full max-w-4xl flex flex-1 flex-col gap-6 p-4 pt-4">
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold tracking-tight">

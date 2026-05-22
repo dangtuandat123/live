@@ -1,5 +1,5 @@
 import * as React from "react"
-import { usePage, Link } from "@inertiajs/react"
+import { usePage, Link, router } from "@inertiajs/react"
 
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
@@ -32,7 +32,19 @@ import {
 
 function SidebarCredits() {
   const { auth } = usePage().props as any
-  const { state } = useSidebar()
+  const { state, isMobile } = useSidebar()
+
+  React.useEffect(() => {
+    if (!auth?.user) return
+
+    const interval = setInterval(() => {
+      router.reload({
+        only: ['auth', 'activeSubscription'],
+      })
+    }, 10000)
+
+    return () => clearInterval(interval)
+  }, [auth?.user])
   
   if (!auth?.user) return null
 
@@ -41,7 +53,7 @@ function SidebarCredits() {
   const limit = subscription?.features?.ai_credits ?? 1000
   const percentage = limit > 0 ? Math.min(100, Math.max(0, (used / limit) * 100)) : 0
 
-  if (state === "collapsed") {
+  if (state === "collapsed" && !isMobile) {
     return (
       <Tooltip>
         <TooltipTrigger asChild>

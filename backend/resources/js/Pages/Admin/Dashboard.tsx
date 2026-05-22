@@ -113,7 +113,7 @@ export default function AdminDashboard({ stats = [], revenueData = [], recentUse
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+      <div className="flex flex-1 flex-col gap-4 p-4 pt-4">
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Tổng quan hệ thống</h1>

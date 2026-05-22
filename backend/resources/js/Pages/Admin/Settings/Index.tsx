@@ -79,7 +79,7 @@ export default function AdminSettings({ settings }: Props) {
         </div>
       </header>
 
-      <form onSubmit={handleSubmit} className="mx-auto w-full max-w-4xl flex flex-1 flex-col gap-6 p-4 pt-0">
+      <form onSubmit={handleSubmit} className="mx-auto w-full max-w-4xl flex flex-1 flex-col gap-6 p-4 pt-4">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Cài đặt hệ thống</h1>
