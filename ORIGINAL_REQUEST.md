@@ -208,3 +208,144 @@ Integrity mode: development
 - [ ] Chạy thành công các unit test cũ và mới liên quan đến phân tích AI.
 - [ ] Toàn bộ PHP syntax kiểm tra không có lỗi.
 - [ ] Build dự án thành công (`npm run build` không lỗi).
+
+## Follow-up — 2026-05-22T21:06:52+07:00
+
+Nghiên cứu và cải tiến trải nghiệm người dùng (UX/UI) liên quan đến các giới hạn gói dịch vụ (Free, Trial, Pro, Enterprise) trên trang chi tiết livestream (Lives/Show.tsx). Triển khai các Dialog tự động cảnh báo khi livestream bị ngắt do quá thời lượng gói cước hoặc hết tín dụng AI, hiển thị trực quan thông tin gói cước ngay trên Dashboard, và tối ưu hóa các tính năng bị khóa (gated features) để thúc đẩy tỷ lệ chuyển đổi.
+
+Working directory: d:/Workspace/livestream
+Integrity mode: development
+
+## Requirements
+
+### R1. Tự động hiển thị Dialog nâng cấp khi quá thời lượng (Upgrade Duration Dialog)
+- Sửa lỗi đồng bộ dữ liệu ở frontend: Đảm bảo trường `error_message` của session được cập nhật chính xác từ API polling ngay cả khi status của session chuyển thành `ended`.
+- Tự động hiển thị Dialog cảnh báo khi phát hiện session bị ngắt do quá giới hạn thời lượng của gói cước (ví dụ: `session.status === 'ended'` và `error_message` chứa thông tin quá thời lượng).
+- Dialog cần thiết kế hiện đại, premium bằng Shadcn UI, nêu rõ thời lượng giới hạn của gói hiện tại và cung cấp nút "Nâng cấp gói dịch vụ" dẫn đến trang `/subscription`.
+
+### R2. Tự động hiển thị Dialog hết credits (Upgrade Credits Dialog)
+- Khi phát hiện session bị lỗi do hết credits AI (ví dụ: `session.status === 'error'` và `error_message` chứa thông tin hết tín dụng AI).
+- Thay thế hoặc bổ sung cho banner lỗi đỏ thô bằng một Dialog thông báo chuyên nghiệp, thân thiện. Giải thích rõ việc phân tích AI đã bị tạm dừng do hết credits và cung cấp các lựa chọn mua thêm/nâng cấp gói.
+
+### R3. Gated Features UI & Upgrade Trigger
+- Hiển thị trực quan trạng thái khóa (ví dụ: thêm icon ổ khóa nhỏ hoặc badge Premium) trên các tính năng bị giới hạn bởi gói cước của người dùng:
+  - Nút "Xuất CSV" và "Copy tất cả" ở danh sách khách hàng tiềm năng.
+  - Tính năng phân tích âm thanh (audio analysis) hoặc các tính năng nâng cao khác (nếu có).
+- Khi người dùng click vào các tính năng bị khóa này, thay vì không phản hồi hoặc báo lỗi thô, hệ thống phải kích hoạt Dialog nâng cấp tương ứng để hướng dẫn họ nâng cấp.
+
+### R4. Live Session Subscription Status Banner
+- Thêm một khu vực hiển thị trạng thái gói cước (Subscription Status Banner hoặc Progress Bar) nhỏ gọn, tinh tế ngay trên Dashboard livestream (ví dụ: ở đầu trang hoặc gần header của session).
+- Hiển thị rõ: tên gói hiện tại (Free, Trial, Pro, Enterprise), thời lượng tối đa cho phép mỗi phiên, và thanh tiến trình thể hiện lượng AI credits đã sử dụng (đã dùng / tổng số credits của gói).
+
+## Acceptance Criteria
+
+### UX/UI & Dialogs Correctness
+- [ ] Khi livestream đang chạy mà bị ngắt do quá thời lượng (test với status `ended` và error message chứa "thời lượng tối đa"), một Dialog nâng cấp thời lượng phải tự động bật lên lập tức.
+- [ ] Khi livestream bị lỗi do hết AI credits (test với status `error` và error message chứa "tín dụng AI"), một Dialog nâng cấp credits phải tự động bật lên lập tức.
+- [ ] Tất cả các Dialog sử dụng `@/components/ui/dialog` (Shadcn/ui) with style hiện đại, có shadow, rounded corners, blur backdrop, logo/icon nổi bật (ví dụ: Sparkles, Clock, Shield) và thông điệp kêu gọi hành động rõ ràng.
+- [ ] Các tính năng bị khóa (export CSV, copy leads) có hiển thị icon ổ khóa nhỏ hoặc chỉ số trực quan cho biết đây là tính năng giới hạn. Click vào hiện Dialog nâng cấp.
+- [ ] Header hoặc vị trí phù hợp trên Livestream Show page có hiển thị một Banner/Card nhỏ hiển thị: "Gói: [Tên Gói] | AI Credits: [Used]/[Limit] [Progress Bar]". Nếu gói cước hỗ trợ vô hạn AI credits hoặc vô hạn thời lượng, hiển thị nhãn "Vô hạn".
+
+### Code Integrity & System Robustness
+- [ ] Không làm phá vỡ logic backend hoặc các test case PHPUnit hiện tại (giữ nguyên logic của `SubscriptionGatingTest.php`).
+- [ ] Đảm bảo state `session` được cập nhật đầy đủ các trường `error_message` khi polling.
+- [ ] Dialog không được hiển thị lặp đi lặp lại vô tận (sử dụng state hoặc session storage hợp lý để người dùng có thể đóng Dialog nếu muốn xem tiếp dữ liệu cũ của phiên livestream đã kết thúc).
+
+## Follow-up — 2026-05-22T14:32:46Z
+
+Nghiên cứu và nâng cấp toàn diện trải nghiệm người dùng (UX/UI) liên quan đến các giới hạn gói dịch vụ (Free, Trial, Pro, Enterprise) trên ứng dụng Livestream Comment Analysis. Đảm bảo hiển thị trực quan, cảnh báo sớm thông minh và cung cấp đường dẫn nâng cấp mượt mà để tăng tỷ lệ chuyển đổi.
+
+Working directory: d:/Workspace/livestream
+
+## Requirements
+
+### R1. Cảnh báo sớm và thông báo rõ ràng về giới hạn thời lượng (Free 1h / Trial 2h)
+- **Cảnh báo sắp hết giờ (Low Time Warning Banner)**: Ở trang chi tiết live (`Show.tsx`), nếu phiên live đang hoạt động (`live` hoặc `connecting`) và sắp đạt giới hạn thời lượng của gói cước (ví dụ: đã chạy được 85% thời lượng tối đa, hoặc còn dưới 10 phút), hiển thị một Banner cảnh báo màu hổ phách (Amber) ở đầu trang: *"Phiên livestream sắp đạt giới hạn thời lượng gói cước (còn [X] phút). Vui lòng nâng cấp gói dịch vụ để không bị gián đoạn."* kèm nút CTA "Nâng cấp".
+- **Lưu trữ dữ liệu lịch sử**: Làm rõ trong Dialog thông báo tự động ngắt (`UpgradeDurationDialog`) rằng các bình luận và phân tích đã thực hiện trước đó được lưu trữ an toàn trong cơ sở dữ liệu, streamer có thể xem lại hoặc xuất dữ liệu bất cứ lúc nào.
+- **Trạng thái đặc biệt trong danh sách**: Ở trang danh sách phiên live (`Lives/Index.tsx` và `Dashboard.tsx`), nếu phiên live bị dừng do quá giới hạn gói cước, hiển thị Badge trạng thái nổi bật (ví dụ: "Bị ngắt (Hết giờ)" hoặc "Đạt giới hạn") thay vì chỉ hiện "Đã kết thúc" chung chung, giúp người dùng nhận biết rõ ràng.
+
+### R2. Cảnh báo sớm về Tín dụng AI (Low Credits Alert)
+- **Cảnh báo sắp hết Credits**: Ở trang chi tiết live (`Show.tsx`) và Sidebar (`AppSidebar.tsx`), khi số credits đã dùng đạt mức >= 90% giới hạn gói (và limit khác -1), hiển thị một Warning Alert Banner ở đầu trang chi tiết: *"Tín dụng AI của bạn sắp hết (còn lại [X] credits). Vui lòng nâng cấp hoặc mua thêm để tiếp tục phân tích bình luận."* kèm nút CTA "Mua thêm / Nâng cấp".
+- **Sidebar highlight**: Khi credit dưới 10%, hiển thị Progress bar màu đỏ hoặc cam ở Sidebar để thu hút sự chú ý.
+
+### R3. Hiển thị giới hạn gói cước tại trang Setup Live (`Lives/Setup.tsx`)
+- Thêm một Card/Box nhỏ hiển thị thông tin chi tiết về gói cước hiện tại của người dùng ngay trên trang Setup:
+  - Tên gói hiện tại (Free, Trial, Pro, Enterprise).
+  - Các giới hạn áp dụng: Số luồng live đồng thời (đã dùng / tối đa), Thời lượng tối đa mỗi phiên live, Tín dụng AI còn lại.
+  - Trạng thái các tính năng premium: Xuất file CSV (Có/Không), Phân tích âm thanh AI (Có/Không).
+  - Tích hợp một nút "Nâng cấp gói dịch vụ" dẫn đến `/subscription` ngay cạnh thông tin này để hướng dẫn nâng cấp trước khi tạo livestream.
+
+### R4. Gating trực quan cho tính năng Phân tích Âm thanh (Audio Analysis UI)
+- Trực quan hóa trạng thái của tính năng "Phân tích âm thanh AI (Audio Analysis)" trên trang chi tiết livestream:
+  - Hiển thị một Indicator (ví dụ: Icon Micro kèm Trạng thái hoạt động) ở gần Header hoặc panel AI Insights.
+  - Nếu gói cước hỗ trợ (`audio_analysis: true`), hiển thị: *"Phân tích âm thanh: Đang hoạt động"* (màu xanh lá/emerald).
+  - Nếu gói cước không hỗ trợ (`audio_analysis: false`), hiển thị: *"Phân tích âm thanh: Gói Pro"* kèm icon Ổ khóa. Khi người dùng click vào, mở một Dialog giới thiệu tính năng phân tích âm thanh đa phương thức bằng AI và cung cấp nút "Nâng cấp gói dịch vụ".
+
+## Acceptance Criteria
+
+### UX/UI & Dialogs Correctness
+- [ ] Màn hình Setup Live hiển thị rõ ràng Card thông tin gói cước kèm nút nâng cấp `/subscription`. Nếu đạt giới hạn stream chạy đồng thời, nút submit bị khóa và hiển thị hướng dẫn nâng cấp rõ ràng.
+- [ ] Xuất hiện banner cảnh báo màu hổ phách trước khi hết thời lượng (khi thời gian chạy đạt >= 85% giới hạn) hoặc sắp hết credits (khi dùng >= 90% giới hạn) trên trang chi tiết livestream.
+- [ ] Dialog hết thời lượng gói cước hiển thị thông điệp thân thiện, xác nhận dữ liệu đã được lưu trữ và có nút chuyển hướng nhanh sang `/subscription`.
+- [ ] Trang danh sách phiên live hiển thị đúng trạng thái đặc biệt "Bị ngắt do quá giờ" đối với các phiên live bị auto-stop do thời lượng.
+- [ ] Hiển thị trực quan trạng thái khóa/mở của tính năng Phân tích âm thanh AI trên Show.tsx. Click vào tính năng bị khóa sẽ hiện Dialog nâng cấp tương ứng.
+- [ ] Sidebar Credits tự động đổi màu progress bar sang đỏ khi lượng credits đã dùng đạt >= 90%.
+
+### Code Integrity & Performance
+- [ ] Tất cả các test suite của Laravel (`php artisan test`) đều chạy qua 100% thành công.
+- [ ] Biên dịch frontend sạch sẽ không có lỗi typecheck hoặc build cảnh báo (`npm run build`).
+
+## Follow-up — 2026-05-22T15:13:26Z
+
+# Teamwork Project Prompt — Redesign Audio Analysis to Multi-modal Pipeline
+
+Nghiên cứu, thiết kế và tích hợp hoàn chỉnh tính năng Phân tích âm thanh (Audio Analysis) đa phương thức (Text + Audio + Memory) cho ứng dụng Livestream Comment Analysis. Loại bỏ giao diện giả lập (mockup) hiện tại, cho phép AI trích xuất thông tin chi tiết từ âm thanh (audio cues) của livestream và hiển thị trực quan thông tin này lên giao diện cho streamer.
+
+Working directory: d:/Workspace/livestream
+Integrity mode: development
+
+## Requirements
+
+### R1. Lưu trữ và xử lý thông tin âm thanh ở Backend
+- **Cập nhật database**: Tạo migration để thêm cột `last_audio_cues` (text, nullable) vào bảng `live_sessions` để lưu trữ thông tin AI nghe thấy/phát hiện từ livestream audio snapshot gần nhất. Cập nhật `$fillable` trong model `LiveSession.php`.
+- **Cập nhật prompt AI (`AnalyzeCommentsJob.php`)**:
+  - Bổ sung yêu cầu trong system prompt để AI (Gemini multimodal) trích xuất một thuộc tính mới trong phản hồi JSON: `"audio_cues"` (string hoặc null, độ dài tối đa 200 ký tự tiếng Việt).
+  - Yêu cầu AI lắng nghe clip âm thanh 3s và đúc kết ngắn gọn những gì người bán đang nói hoặc trạng thái phòng live (ví dụ: *"Người bán đang giới thiệu Son màu đỏ"*, *"Phát hiện minigame đoán số đang chạy"*, *"Người bán đang chào người xem mới"*, vv.).
+  - Nếu không có audio hoặc không nghe rõ, AI trả về `null` cho trường này.
+- **Lưu trữ dữ liệu**: Trích xuất `"audio_cues"` từ response của AI và cập nhật vào thuộc tính `last_audio_cues` của `LiveSession` trong mỗi chu kỳ chạy job xử lý comment batch.
+
+### R2. Thiết kế và Hiển thị giao diện Phân tích Âm thanh thông minh (`Show.tsx`)
+- **Tái thiết kế `AudioAnalysisCard`**:
+  - Khi gói cước hỗ trợ (`audio_analysis` hoạt động):
+    - Hiển thị badge trạng thái màu xanh lá sáng: `"Đa phương thức (Text + Audio + Memory) hoạt động"`.
+    - Hiển thị thông tin thực tế mà AI nghe thấy gần nhất dưới dạng chữ trực quan: *"AI vừa nghe thấy: \"[last_audio_cues]\""*.
+    - Nếu `last_audio_cues` đang null, hiển thị trạng thái chờ thân thiện: *"Đang lắng nghe livestream để phân tích ngữ cảnh..."*.
+    - Cập nhật thời gian phân tích cuối (ví dụ: *"Cập nhật [X] giây trước"*).
+    - Giữ hiệu ứng sóng âm hoạt hình (waveform) chạy nhịp nhàng màu xanh để biểu thị quá trình capture đang chạy.
+    - Loại bỏ các thành phần mock rác không hoạt động (như danh sách thiết bị đầu vào ảo, thanh điều chỉnh âm lượng ảo).
+  - Khi gói cước không hỗ trợ (`audio_analysis` bị khóa):
+    - Giữ nguyên overlay khóa kèm Dialog hướng dẫn nâng cấp gói dịch vụ để đảm bảo trải nghiệm gating rõ ràng.
+
+### R3. Kiểm thử và Độ ổn định
+- Cập nhật các test suite liên quan (`AnalyzeCommentsJobTest.php`) để bao phủ việc kiểm tra AI trả về trường `audio_cues`, dữ liệu được lưu đúng vào model và cơ chế fallback khi không có audio vẫn hoạt động bình thường.
+- Đảm bảo toàn bộ 109 test hiện tại (`php artisan test`) đều pass sạch sẽ.
+- Thực hiện build frontend (`npm run build`) không có cảnh báo hay lỗi kiểu dữ liệu.
+
+## Acceptance Criteria
+
+### Backend & AI Ingestion
+- [ ] Migration tạo thành công trường `last_audio_cues` trên bảng `live_sessions`.
+- [ ] Job `AnalyzeCommentsJob` truyền audio base64 thành công sang Runware, yêu cầu và nhận thành công trường `"audio_cues"` trong JSON.
+- [ ] Lưu thành công giá trị `audio_cues` vào cột `last_audio_cues` của phiên live trong DB.
+
+### Frontend UI Correctness
+- [ ] `AudioAnalysisCard` hiển thị chính xác chuỗi `last_audio_cues` từ `session` prop được cập nhật theo thời gian thực (qua polling dữ liệu).
+- [ ] Giao diện thẻ được thiết kế sạch đẹp, loại bỏ hoàn toàn selector thiết bị micro và slider volume không có tác dụng thực tế.
+- [ ] Hiển thị badge trạng thái hoạt động của hệ thống đa phương thức màu emerald/green sáng.
+- [ ] Dialog khóa tính năng cho gói dịch vụ thấp hơn vẫn hoạt động bình thường khi click nâng cấp.
+
+### Tests & Stability
+- [ ] Chạy thành công lệnh `php artisan test` và đạt 100% tỷ lệ pass cho tất cả các test.
+- [ ] Chạy thành công lệnh build production của frontend mà không bị lỗi TypeScript.
+- [ ] Không làm phá vỡ cơ chế caching dữ liệu phiên live và không gây ra loop polling/request dư thừa ở frontend.
+

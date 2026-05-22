@@ -65,6 +65,7 @@ class LiveSessionController extends Controller
                 'products' => $session->products_count ?? 0,
                 'date' => $session->created_at?->format('d/m/Y') ?? '',
                 'thumbnail' => $session->thumbnail,
+                'error_message' => $session->error_message,
             ];
         });
 

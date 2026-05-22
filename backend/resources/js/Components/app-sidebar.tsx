@@ -118,7 +118,17 @@ function SidebarCredits() {
                         <div className="from-primary h-full w-full animate-pulse bg-gradient-to-r via-purple-500 to-indigo-500" />
                     </div>
                 ) : (
-                    <Progress value={percentage} className="h-1.5" />
+                    <Progress
+                        value={percentage}
+                        className="h-1.5"
+                        indicatorClassName={
+                            percentage >= 90
+                                ? 'bg-red-500'
+                                : percentage >= 80
+                                  ? 'bg-amber-500'
+                                  : 'bg-green-500'
+                        }
+                    />
                 )}
             </div>
         </div>

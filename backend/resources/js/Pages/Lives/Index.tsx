@@ -61,6 +61,7 @@ interface Session {
     products: number;
     date: string;
     thumbnail: string | null;
+    error_message?: string | null;
 }
 
 interface PaginatedSessions {
@@ -309,6 +310,38 @@ export default function LivesIndex({ sessions, kpi, filters }: Props) {
                                                     <span className="relative inline-flex size-1.5 rounded-full bg-white" />
                                                 </span>
                                                 Đang kết nối
+                                            </Badge>
+                                        ) : session.error_message &&
+                                          (session.error_message.includes(
+                                              'duration_limit',
+                                          ) ||
+                                              session.error_message.includes(
+                                                  'duration limit',
+                                              ) ||
+                                              session.error_message.includes(
+                                                  'Hết giờ',
+                                              ) ||
+                                              session.error_message.includes(
+                                                  'thời lượng',
+                                              )) ? (
+                                            <Badge className="border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-500 backdrop-blur-md">
+                                                Bị ngắt (Hết giờ)
+                                            </Badge>
+                                        ) : session.error_message &&
+                                          (session.error_message.includes(
+                                              'credit_limit',
+                                          ) ||
+                                              session.error_message.includes(
+                                                  'credit limit',
+                                              ) ||
+                                              session.error_message.includes(
+                                                  'Đạt giới hạn',
+                                              ) ||
+                                              session.error_message.includes(
+                                                  'tín dụng',
+                                              )) ? (
+                                            <Badge className="border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-500 backdrop-blur-md">
+                                                Đạt giới hạn
                                             </Badge>
                                         ) : session.status ===
                                           'disconnected' ? (

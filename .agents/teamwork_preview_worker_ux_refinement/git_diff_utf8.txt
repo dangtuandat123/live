@@ -1,0 +1,316 @@
+diff --git a/backend/resources/js/Pages/Lives/Show.tsx b/backend/resources/js/Pages/Lives/Show.tsx
+index 8132fca..123d900 100644
+--- a/backend/resources/js/Pages/Lives/Show.tsx
++++ b/backend/resources/js/Pages/Lives/Show.tsx
+@@ -76,6 +76,7 @@ import {
+     HelpCircleIcon,
+     LightbulbIcon,
+     LoaderIcon,
++    Lock,
+     MessageSquareIcon,
+     PackageIcon,
+     PhoneIcon,
+@@ -1601,6 +1602,7 @@ function CustomersPanel() {
+                             className="h-7 gap-1.5 text-xs"
+                             onClick={handleCopyAll}
+                         >
++                            {!canExportLeads && <Lock className="size-3 text-muted-foreground" />}
+                             {copiedAll ? (
+                                 <CheckIcon className="size-3 text-emerald-500" />
+                             ) : (
+@@ -1620,6 +1622,7 @@ function CustomersPanel() {
+                                 }
+                             }}
+                         >
++                            {!canExportLeads && <Lock className="size-3 text-muted-foreground" />}
+                             <DownloadIcon className="size-3" />
+                             Xuất CSV
+                         </Button>
+@@ -2929,6 +2932,64 @@ function StatsPanel() {
+     );
+ }
+ 
++function SubscriptionStatusBanner({ subscription }: { subscription: any }) {
++    if (!subscription) return null;
++
++    const packageName = subscription.package_name || 'Free';
++    const usedCredits = subscription.used_ai_credits ?? 0;
++    const limitCredits = subscription.features?.ai_credits ?? 0;
++    const maxDurationHours = subscription.features?.max_duration_hours ?? 0;
++
++    const displayDuration = maxDurationHours === -1 ? 'Vô hạn' : `${maxDurationHours} giờ`;
++    const displayLimitCredits = limitCredits === -1 ? 'Vô hạn' : limitCredits.toLocaleString();
++    const displayUsedCredits = usedCredits.toLocaleString();
++
++    const isCreditsUnlimited = limitCredits === -1;
++    const creditsPercentage = isCreditsUnlimited || limitCredits <= 0
++        ? 0
++        : Math.min(100, Math.max(0, (usedCredits / limitCredits) * 100));
++
++    return (
++        <Card className="bg-muted/30 border-border/40 shrink-0">
++            <CardContent className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between md:gap-6">
++                <div className="flex items-center gap-3">
++                    <div className="bg-primary/10 text-primary flex size-10 items-center justify-center rounded-lg">
++                        <PackageIcon className="size-5" />
++                    </div>
++                    <div>
++                        <div className="flex items-center gap-2">
++                            <span className="text-sm font-semibold">Gói dịch vụ: {packageName}</span>
++                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-emerald-500/10 text-emerald-500 border-none">
++                                Đang hoạt động
++                            </Badge>
++                        </div>
++                        <p className="text-muted-foreground text-xs">
++                            Thời lượng tối đa của phiên live: <span className="font-medium text-foreground">{displayDuration}</span>
++                        </p>
++                    </div>
++                </div>
++
++                <div className="flex flex-1 flex-col gap-1.5 max-w-md w-full">
++                    <div className="flex items-center justify-between text-xs">
++                        <span className="text-muted-foreground font-medium">Tín dụng AI đã dùng</span>
++                        <span className="font-semibold tabular-nums text-foreground">
++                            {displayUsedCredits} / {displayLimitCredits}
++                        </span>
++                    </div>
++                    <div className="flex items-center gap-2">
++                        <Progress value={creditsPercentage} className="h-2 flex-1" />
++                        {!isCreditsUnlimited && (
++                            <span className="text-muted-foreground text-[10px] font-medium tabular-nums min-w-[28px] text-right">
++                                {Math.round(creditsPercentage)}%
++                            </span>
++                        )}
++                    </div>
++                </div>
++            </CardContent>
++        </Card>
++    );
++}
++
+ // --- Main Page ---
+ export default function LivesShow({
+     session: initialSession,
+@@ -2945,6 +3006,12 @@ export default function LivesShow({
+     const [isOffline, setIsOffline] = React.useState(false);
+     const [isStopping, setIsStopping] = React.useState(false);
+ 
++    const [showDurationDialog, setShowDurationDialog] = React.useState(false);
++    const [showCreditsDialog, setShowCreditsDialog] = React.useState(false);
++
++    const { auth } = usePage().props as any;
++    const subscription = auth?.subscription;
++
+     // Live state — updated via polling
+     const [session, setSession] = React.useState(initialSession);
+     const [stats, setStats] = React.useState<StatsData>(
+@@ -2983,6 +3050,42 @@ export default function LivesShow({
+         initialTopKeywords ?? [],
+     );
+ 
++    React.useEffect(() => {
++        if (!session.id) return;
++
++        // Check for duration limit dialog
++        if (session.status === 'ended' && session.error_message) {
++            const lowerMsg = session.error_message.toLowerCase();
++            if (lowerMsg.includes('thời lượng tối đa') || lowerMsg.includes('max duration')) {
++                const dismissed = sessionStorage.getItem(`dismiss_duration_dialog_${session.id}`);
++                if (!dismissed) {
++                    setShowDurationDialog(true);
++                }
++            }
++        }
++
++        // Check for credits limit dialog
++        if (session.status === 'error' && session.error_message) {
++            const lowerMsg = session.error_message.toLowerCase();
++            if (lowerMsg.includes('tín dụng ai') || lowerMsg.includes('ai credits')) {
++                const dismissed = sessionStorage.getItem(`dismiss_credits_dialog_${session.id}`);
++                if (!dismissed) {
++                    setShowCreditsDialog(true);
++                }
++            }
++        }
++    }, [session.status, session.error_message, session.id]);
++
++    const handleCloseDurationDialog = () => {
++        sessionStorage.setItem(`dismiss_duration_dialog_${session.id}`, 'true');
++        setShowDurationDialog(false);
++    };
++
++    const handleCloseCreditsDialog = () => {
++        sessionStorage.setItem(`dismiss_credits_dialog_${session.id}`, 'true');
++        setShowCreditsDialog(false);
++    };
++
+     // Order alerts — detect real "Chốt đơn" từ AI data
+     const { alerts, dismiss } = useOrderAlerts(soundEnabled, comments);
+ 
+@@ -3028,7 +3131,7 @@ export default function LivesShow({
+                             ...prev,
+                             status: data.status,
+                             error_message:
+-                                data.status === 'error'
++                                data.status === 'error' || data.status === 'ended'
+                                     ? (data.error_message ?? prev.error_message)
+                                     : prev.error_message,
+                             duration: data.duration ?? prev.duration,
+@@ -3148,6 +3251,9 @@ export default function LivesShow({
+                     </header>
+ 
+                     <div className="flex flex-1 flex-col gap-2 overflow-hidden px-4 pb-4">
++                        {/* Subscription Status Banner */}
++                        <SubscriptionStatusBanner subscription={subscription} />
++
+                         {/* Offline Warning Banner */}
+                         {isOffline && (
+                             <div className="bg-destructive/10 border-destructive/20 text-destructive flex shrink-0 animate-pulse items-center gap-2 rounded-lg border px-4 py-2 text-sm">
+@@ -3178,6 +3284,21 @@ export default function LivesShow({
+                             </div>
+                         )}
+ 
++                        {/* Session Ended Limit Warning Banner */}
++                        {session.status === 'ended' && session.error_message && (
++                            <div className="bg-amber-500/10 border-amber-500/20 text-amber-600 flex shrink-0 items-center gap-2 rounded-lg border px-4 py-3 text-sm">
++                                <AlertTriangleIcon className="text-amber-600 size-4 shrink-0" />
++                                <div className="flex-1">
++                                    <p className="text-sm font-semibold">
++                                        Phiên phân tích đã dừng
++                                    </p>
++                                    <p className="text-xs opacity-90">
++                                        {session.error_message}
++                                    </p>
++                                </div>
++                            </div>
++                        )}
++
+                         {/* Session Header */}
+                         <div className="flex items-center justify-between">
+                             <div className="shrink-0">
+@@ -3622,6 +3743,125 @@ export default function LivesShow({
+                         </div>
+                     </div>
+                 </div>
++
++                {/* Upgrade Duration Dialog */}
++                <Dialog
++                    open={showDurationDialog}
++                    onOpenChange={(open) => {
++                        if (!open) {
++                            handleCloseDurationDialog();
++                        } else {
++                            setShowDurationDialog(true);
++                        }
++                    }}
++                >
++                    <DialogContent className="sm:max-w-md">
++                        <DialogHeader>
++                            <DialogTitle className="flex items-center gap-2 text-amber-600">
++                                <ClockIcon className="size-5" /> Giới hạn thời lượng đạt tới
++                            </DialogTitle>
++                            <DialogDescription className="space-y-3 pt-2">
++                                <p>
++                                    Phiên livestream này đã tự động dừng phân tích vì vượt quá thời lượng tối đa cho phép của gói dịch vụ hiện tại.
++                                </p>
++                                <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1.5 border border-border/40">
++                                    <div className="flex justify-between">
++                                        <span className="text-muted-foreground">Gói hiện tại:</span>
++                                        <span className="font-semibold">{subscription?.package_name || 'Free'}</span>
++                                    </div>
++                                    <div className="flex justify-between">
++                                        <span className="text-muted-foreground">Thời lượng tối đa:</span>
++                                        <span className="font-semibold">
++                                            {subscription?.features?.max_duration_hours === -1
++                                                ? 'Vô hạn'
++                                                : `${subscription?.features?.max_duration_hours} giờ`}
++                                        </span>
++                                    </div>
++                                </div>
++                                <p className="text-xs text-muted-foreground">
++                                    Vui lòng nâng cấp tài khoản lên gói cao hơn để tăng hoặc không giới hạn thời lượng phân tích.
++                                </p>
++                            </DialogDescription>
++                        </DialogHeader>
++                        <DialogFooter className="flex-col gap-2 sm:flex-row">
++                            <Button
++                                variant="outline"
++                                onClick={handleCloseDurationDialog}
++                            >
++                                Bỏ qua
++                            </Button>
++                            <Button
++                                onClick={() => {
++                                    handleCloseDurationDialog();
++                                    router.visit('/subscription');
++                                }}
++                                className="bg-primary text-primary-foreground"
++                            >
++                                Nâng cấp gói dịch vụ
++                            </Button>
++                        </DialogFooter>
++                    </DialogContent>
++                </Dialog>
++
++                {/* Upgrade Credits Dialog */}
++                <Dialog
++                    open={showCreditsDialog}
++                    onOpenChange={(open) => {
++                        if (!open) {
++                            handleCloseCreditsDialog();
++                        } else {
++                            setShowCreditsDialog(true);
++                        }
++                    }}
++                >
++                    <DialogContent className="sm:max-w-md">
++                        <DialogHeader>
++                            <DialogTitle className="flex items-center gap-2 text-destructive">
++                                <ZapIcon className="size-5" /> Hết tín dụng phân tích AI
++                            </DialogTitle>
++                            <DialogDescription className="space-y-3 pt-2">
++                                <p>
++                                    Quá trình phân tích bình luận bằng AI của phiên livestream đã bị tạm dừng vì tài khoản của bạn đã hết (hoặc vượt quá) giới hạn tín dụng AI.
++                                </p>
++                                <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1.5 border border-border/40">
++                                    <div className="flex justify-between">
++                                        <span className="text-muted-foreground">Gói hiện tại:</span>
++                                        <span className="font-semibold">{subscription?.package_name || 'Free'}</span>
++                                    </div>
++                                    <div className="flex justify-between">
++                                        <span className="text-muted-foreground">Tín dụng AI đã dùng:</span>
++                                        <span className="font-semibold">
++                                            {subscription?.used_ai_credits?.toLocaleString()} /{' '}
++                                            {subscription?.features?.ai_credits === -1
++                                                ? 'Vô hạn'
++                                                : subscription?.features?.ai_credits?.toLocaleString()}
++                                        </span>
++                                    </div>
++                                </div>
++                                <p className="text-xs text-muted-foreground">
++                                    Vui lòng mua thêm tín dụng hoặc nâng cấp gói dịch vụ để tiếp tục phân tích bình luận trực tiếp bằng trí tuệ nhân tạo.
++                                </p>
++                            </DialogDescription>
++                        </DialogHeader>
++                        <DialogFooter className="flex-col gap-2 sm:flex-row">
++                            <Button
++                                variant="outline"
++                                onClick={handleCloseCreditsDialog}
++                            >
++                                Bỏ qua
++                            </Button>
++                            <Button
++                                onClick={() => {
++                                    handleCloseCreditsDialog();
++                                    router.visit('/subscription');
++                                }}
++                                className="bg-primary text-primary-foreground"
++                            >
++                                Mua thêm / Nâng cấp
++                            </Button>
++                        </DialogFooter>
++                    </DialogContent>
++                </Dialog>
+             </LiveContext.Provider>
+         </AuthenticatedLayout>
+     );

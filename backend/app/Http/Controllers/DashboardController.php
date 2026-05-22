@@ -233,6 +233,7 @@ class DashboardController extends Controller
                 'sentiment' => LiveStat::sentimentScore($session->stats),
                 'duration' => $session->duration_formatted,
                 'date' => $session->created_at?->format('d/m/Y') ?? '',
+                'error_message' => $session->error_message,
             ])->toArray();
 
         return Inertia::render('Dashboard', [

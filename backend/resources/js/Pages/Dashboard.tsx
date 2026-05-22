@@ -93,6 +93,7 @@ interface RecentSessionItem {
     sentiment: number;
     duration: string;
     date: string;
+    error_message?: string | null;
 }
 
 interface DashboardProps {
@@ -117,7 +118,13 @@ const trendConfig = {
 
 // --- Components ---
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({
+    status,
+    errorMessage,
+}: {
+    status: string;
+    errorMessage?: string | null;
+}) {
     if (status === 'live') {
         return (
             <Badge variant="destructive" className="gap-1">
@@ -126,6 +133,55 @@ function StatusBadge({ status }: { status: string }) {
                     <span className="relative inline-flex size-2 rounded-full bg-current" />
                 </span>
                 Đang Live
+            </Badge>
+        );
+    }
+
+    if (errorMessage) {
+        if (
+            errorMessage.includes('duration_limit') ||
+            errorMessage.includes('duration limit') ||
+            errorMessage.includes('Hết giờ') ||
+            errorMessage.includes('thời lượng')
+        ) {
+            return (
+                <Badge className="border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-500 backdrop-blur-md">
+                    Bị ngắt (Hết giờ)
+                </Badge>
+            );
+        }
+        if (
+            errorMessage.includes('credit_limit') ||
+            errorMessage.includes('credit limit') ||
+            errorMessage.includes('Đạt giới hạn') ||
+            errorMessage.includes('tín dụng')
+        ) {
+            return (
+                <Badge className="border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-500 backdrop-blur-md">
+                    Đạt giới hạn
+                </Badge>
+            );
+        }
+    }
+
+    if (status === 'connecting') {
+        return (
+            <Badge className="bg-primary text-primary-foreground gap-1.5 px-2 py-0.5 text-[10px] font-semibold shadow-xs">
+                Đang kết nối
+            </Badge>
+        );
+    }
+    if (status === 'disconnected') {
+        return (
+            <Badge className="border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-500 shadow-xs backdrop-blur-md">
+                MẤT KẾT NỐI
+            </Badge>
+        );
+    }
+    if (status === 'error') {
+        return (
+            <Badge className="border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-500 backdrop-blur-md">
+                LỖI
             </Badge>
         );
     }
@@ -519,6 +575,9 @@ export default function Dashboard({
                                             <TableCell>
                                                 <StatusBadge
                                                     status={session.status}
+                                                    errorMessage={
+                                                        session.error_message
+                                                    }
                                                 />
                                             </TableCell>
                                             <TableCell className="text-right">

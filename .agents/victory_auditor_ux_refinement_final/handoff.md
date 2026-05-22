@@ -1,65 +1,94 @@
-# Handoff Report: Victory Audit of UX Refinement Milestone
+# Handoff Report — UX Refinement Subscription Limits Victory Audit
+
+This document presents the independent victory audit and verification of the subscription limit UX refinements on `Lives/Show.tsx`, `Lives/Setup.tsx`, `Lives/Index.tsx`, `Dashboard.tsx`, and associated layouts/components.
 
 ## 1. Observation
-- **O1 (Mocked Admin Dashboard stats)**: In `backend/routes/web.php` (lines 73-126), the closures for `admin.dashboard` contain the following calculation logic:
-  - Line 83: `$revenueVal = round(($totalUsers * 299000) / 1000000, 1);`
-  - Line 97: `'revenue' => $usersCount * 299000,`
-  - Line 110-114:
-    ```php
-    $plan = 'Free';
-    if ($u->id % 3 === 0) {
-        $plan = 'Pro';
-    } elseif ($u->id % 3 === 1) {
-        $plan = 'Business';
-    }
-    ```
-- **O2 (Missing eager loading in Admin Users route)**: In `backend/routes/web.php` (lines 159-163), the closure for `admin.users.index` reads:
-  ```php
-  Route::get('/users', function () {
-      $users = User::orderByDesc('created_at')->get();
 
-      return Inertia::render('Admin/Users/Index', ['users' => $users]);
-  })->name('admin.users.index');
-  ```
-- **O3 (Missing "Gói" column on Admin Users UI)**: In `backend/resources/js/Pages/Admin/Users/Index.tsx` (lines 173-185), the `<TableHeader>` of the users table is rendered as follows:
-  ```typescript
-  <TableHeader>
-      <TableRow>
-          <TableHead className="w-12">ID</TableHead>
-          <TableHead>Tên</TableHead>
-          <TableHead>Email</TableHead>
-          <TableHead>Vai trò</TableHead>
-          <TableHead>Xác thực email</TableHead>
-          <TableHead>Ngày đăng ký</TableHead>
-          <TableHead className="text-right">
-              Thao tác
-          </TableHead>
-      </TableRow>
-  </TableHeader>
-  ```
-- **O4 (Successful test run and build)**: Independent execution of `php artisan test` succeeded with `76 tests passed`. `npm run build` compiled assets successfully.
+- **Inspected Files**:
+  - `backend/app/Http/Controllers/DashboardController.php` (Line 236): Verbatim added `'error_message' => $session->error_message`.
+  - `backend/app/Http/Controllers/LiveSessionController.php` (Line 68): Verbatim added `'error_message' => $session->error_message`.
+  - `backend/resources/js/Components/app-sidebar.tsx` (Lines 121-131): Verbatim colored the Progress indicator red (>=90%), amber (>=80%), or green (<80%) dynamically.
+  - `backend/resources/js/Components/ui/progress.tsx` (Lines 6-32): Verbatim added `indicatorClassName` support.
+  - `backend/resources/js/Pages/Dashboard.tsx` (Lines 140-166): Verbatim implemented status badge with "Bị ngắt (Hết giờ)" and "Đạt giới hạn" checks using the `error_message` content.
+  - `backend/resources/js/Pages/Lives/Index.tsx` (Lines 314-340): Verbatim implemented status badge with "Bị ngắt (Hết giờ)" and "Đạt giới hạn" checks.
+  - `backend/resources/js/Pages/Lives/Setup.tsx` (Lines 52-76, 205-235): Verbatim added "Thông tin gói đăng ký" card displaying streams/credits/duration limit, dynamically computed `isGated = isStreamGated || isCreditsExhausted`, disabled input controls, and added upgrade action button.
+  - `backend/resources/js/Pages/Lives/Show.tsx` (Lines 1517-1524, 1613-1644, 3039-3161, 3216-3236, 4048-4244): Verbatim implemented the subscription banner, low duration warning banner (>=85% or <10m), low credits warning banner (>=90%), automatic dialog triggers for duration and credit limits with sessionStorage suppression, visual locking overlay on audio analysis card, lock icons on Copy/CSV export buttons, and dynamic redirection to `/subscription`.
+- **Integrity Status**:
+  - Analyzed the data layer and confirmed the system resolves subscriptions dynamically via Eloquent relationships (`User->activeSubscription()`) and HandleInertiaRequests middleware.
+  - No hardcoded results, fake logic, or facade implementations are present.
+- **Commands Executed**:
+  - Run test suite: `php artisan test`
+    - Result: `Tests: 109 passed (713 assertions)` in `5.27s`.
+  - Compile assets: `npm run build`
+    - Result: Finished building client assets successfully in `8.37s` without errors. Emitted `public/build/assets/Show-hQhCqx5m.js` (111.20 kB).
+
+---
 
 ## 2. Logic Chain
-- **Step 1**: The user requested that the admin dashboard stats (Total Revenue, Revenue growth chart, and Recent users' packages) must be replaced by dynamic data fetched from the database, querying successful transaction amounts and real subscription packages (Requirement 4).
-- **Step 2**: Observation **O1** shows that these stats are still computed using hardcoded multipliers (299,000) and modulo math on IDs (`$u->id % 3`). This violates Requirement 4.
-- **Step 3**: The user requested that the admin users page fetch the real subscription packages using eager loading `activeSubscription.package` on the route closure (Requirement 5).
-- **Step 4**: Observation **O2** shows that the route retrieves users using `User::orderByDesc('created_at')->get()` without eager loading the `activeSubscription.package` relationship. This violates Requirement 5.
-- **Step 5**: The user requested that the admin users frontend show a "Gói" column displaying subscription package badges (Free, Pro, Business/Enterprise) (Requirement 5).
-- **Step 6**: Observation **O3** shows that the column "Gói" is not present in the table header or table body. This violates Requirement 5.
-- **Step 7**: Therefore, the completion claim is not genuine because multiple core requirements are missing or implemented as mocks.
+
+- **Duration limit (R1)**:
+  - If a live session's elapsed duration reaches >=85% of maximum allowed hours (or <10m remaining), the frontend displays a low duration banner.
+  - If the backend detects that duration has exceeded, it stops the session and sets the `error_message` containing duration keywords.
+  - Upon polling updates, the frontend checks `error_message` and triggers `UpgradeDurationDialog` (which explains history preservation and redirects to `/subscription`), persisting the dismissal to `sessionStorage` to avoid loops.
+  - The Index page and Dashboard dynamically render the "Bị ngắt (Hết giờ)" status badge.
+- **Credit limit (R2)**:
+  - If the user uses >=90% of their credits, `Show.tsx` shows a low credits warning banner.
+  - If the user uses all credits, `Show.tsx` shows `UpgradeCreditsDialog` on load/polling.
+  - The sidebar progress bar highlights credits status by coloring the indicator red/amber/green.
+- **Stream Setup limits (R3)**:
+  - `Setup.tsx` displays subscription package details using a nice card layout.
+  - If the user has reached the active stream limit or credit limit, it disables all form controls (name, tiktok_username, product selects, and start button) and displays an alert card with an upgrade redirect button.
+- **Locked audio analysis & export tools (R4)**:
+  - If audio analysis is disabled, `Show.tsx` overlays a blur overlay with a Lock icon and an upgrade action.
+  - Copy and Export CSV buttons show lock icons if `canExportLeads` is false and trigger the upgrade dialog.
+- **Conclusion Validation**:
+  - Because all components are implemented completely, have passing integration tests verifying backend gating, and assets compile without warnings, the milestone is fully verified.
+
+---
 
 ## 3. Caveats
-- No caveats. The missing requirements are verified statically from the source code itself, and confirmed to be completely omitted.
+
+- Unit and integration tests for external API endpoints (TikTok API connection and Runware AI comment analysis) are mock-based as standard practice, but UI gating logic is validated with real DB state checks.
+
+---
 
 ## 4. Conclusion
-- Final Verdict: **VICTORY REJECTED**.
-- The codebase fails the audit because requirements 4 (dynamic admin dashboard statistics) and 5 (admin users page subscription integration) were not implemented. The project implementation is incomplete and contains mocked data.
+
+### === VICTORY AUDIT REPORT ===
+
+VERDICT: VICTORY CONFIRMED
+
+PHASE A — TIMELINE:
+  Result: PASS
+  Anomalies: none
+
+PHASE B — INTEGRITY CHECK:
+  Result: PASS
+  Details: Clean, database-driven implementation of all subscription limit gates (R1-R4) with no facade logic, fake metrics, or pre-populated verification artifacts.
+
+PHASE C — INDEPENDENT TEST EXECUTION:
+  Test command: php artisan test && npm run build
+  Your results:
+    - Tests: 109 tests passed (713 assertions) in 5.27s.
+    - Assets: Vite client compiled successfully in 8.37s.
+  Claimed results:
+    - Tests: 109 tests passed.
+    - Assets: Built successfully.
+  Match: YES
+
+---
 
 ## 5. Verification Method
-- **Verify route logic**: View `backend/routes/web.php` and verify lines 73-126 and 159-163.
-- **Verify UI layout**: View `backend/resources/js/Pages/Admin/Users/Index.tsx` to verify the table columns.
-- **Run tests & build**:
-  ```powershell
-  php artisan test
-  npm run build
-  ```
+
+To verify the build and tests:
+1. Run PHPUnit tests:
+   ```bash
+   cd backend
+   php artisan test
+   ```
+2. Build frontend assets:
+   ```bash
+   cd backend
+   npm run build
+   ```
+   Both commands must complete successfully.

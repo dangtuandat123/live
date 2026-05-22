@@ -1,0 +1,325 @@
+diff --git a/backend/resources/js/Pages/Lives/Show.tsx b/backend/resources/js/Pages/Lives/Show.tsx
+index a1b2c3d..e4f5g6h 100000
+--- a/backend/resources/js/Pages/Lives/Show.tsx
++++ b/backend/resources/js/Pages/Lives/Show.tsx
+@@ -92,6 +92,7 @@ import {
+     UsersIcon,
+     XIcon,
+     ZapIcon,
++    Volume2,
+ } from 'lucide-react';
+ 
+ const TIKTOK_EMOJI_MAP: Record<string, string> = {
+@@ -300,6 +301,7 @@ const LiveContext = React.createContext<{
+     setComments?: React.Dispatch<React.SetStateAction<CommentData[]>>;
+     setPotentialCustomers?: React.Dispatch<
+         React.SetStateAction<PotentialCustomer[]>
+     >;
++    triggerUpgradeDialog?: (featureName: string, description: string) => void;
+ }>(null!);
+ 
+ function useLiveData() {
+@@ -1480,8 +1482,8 @@ function CustomersPanel() {
+             } | null;
+         };
+     };
+-    const [showUpgradeDialog, setShowUpgradeDialog] = React.useState(false);
++    const { triggerUpgradeDialog } = useLiveData();
+     const canExportLeads = auth?.subscription?.features?.export_leads ?? false;
+ 
+     const [search, setSearch] = React.useState('');
+@@ -1511,7 +1513,10 @@ function CustomersPanel() {
+     };
+     const handleCopyAll = () => {
+         if (!canExportLeads) {
+-            setShowUpgradeDialog(true);
++            triggerUpgradeDialog?.(
++                'Xuất danh sách khách hàng tiềm năng',
++                'Tính năng xuất danh sách khách hàng tiềm năng (CSV & Copy) chỉ dành cho thành viên sử dụng gói Pro hoặc Enterprise. Vui lòng nâng cấp gói dịch vụ để mở khóa tính năng này.'
++            );
+             return;
+         }
+         copyLeadsToClipboard(filtered);
+@@ -1618,7 +1623,10 @@ function CustomersPanel() {
+                             className="h-7 gap-1.5 text-xs"
+                             onClick={() => {
+                                 if (!canExportLeads) {
+-                                    setShowUpgradeDialog(true);
++                                    triggerUpgradeDialog?.(
++                                        'Xuất danh sách khách hàng tiềm năng',
++                                        'Tính năng xuất danh sách khách hàng tiềm năng (CSV & Copy) chỉ dành cho thành viên sử dụng gói Pro hoặc Enterprise. Vui lòng nâng cấp gói dịch vụ để mở khóa tính năng này.'
++                                    );
+                                 } else {
+                                     exportLeadsCSV(filtered);
+                                 }
+@@ -1967,41 +1975,6 @@ function CustomersPanel() {
+             </FadeScrollArea>
+-
+-            {/* Upgrade Dialog */}
+-            <Dialog
+-                open={showUpgradeDialog}
+-                onOpenChange={setShowUpgradeDialog}
+-            >
+-                <DialogContent className="sm:max-w-md">
+-                    <DialogHeader>
+-                        <DialogTitle className="flex items-center gap-2">
+-                            <SparklesIcon className="text-primary size-5" /> Yêu
+-                            cầu nâng cấp gói dịch vụ
+-                        </DialogTitle>
+-                        <DialogDescription>
+-                            Tính năng xuất danh sách khách hàng tiềm năng (CSV &
+-                            Copy) chỉ dành cho thành viên sử dụng gói Pro hoặc
+-                            Enterprise. Vui lòng nâng cấp gói dịch vụ để mở khóa
+-                            tính năng này.
+-                        </DialogDescription>
+-                    </DialogHeader>
+-                    <DialogFooter className="flex-col gap-2 sm:flex-row">
+-                        <Button
+-                            variant="outline"
+-                            onClick={() => setShowUpgradeDialog(false)}
+-                        >
+-                            Đóng
+-                        </Button>
+-                        <Button
+-                            onClick={() => {
+-                                setShowUpgradeDialog(false);
+-                                router.visit('/subscription');
+-                            }}
+-                            className="bg-primary text-primary-foreground"
+-                        >
+-                            Nâng cấp ngay
+-                        </Button>
+-                    </DialogFooter>
+-                </DialogContent>
+-            </Dialog>
+         </Card>
+     );
+ }
+@@ -3082,6 +3055,42 @@ export default function LivesShow({
+     const [showDurationDialog, setShowDurationDialog] = React.useState(false);
+     const [showCreditsDialog, setShowCreditsDialog] = React.useState(false);
++    const [upgradeDialogConfig, setUpgradeDialogConfig] = React.useState({
++        open: false,
++        featureName: '',
++        description: '',
++    });
++
++    const triggerUpgradeDialog = React.useCallback((featureName: string, description: string) => {
++        setUpgradeDialogConfig({ open: true, featureName, description });
++    }, []);
++
++    const parseDurationToSeconds = (durationStr: string): number => {
++        if (!durationStr) return 0;
++        const parts = durationStr.split(':').map(Number);
++        if (parts.length === 3) {
++            return parts[0] * 3600 + parts[1] * 60 + parts[2];
++        } else if (parts.length === 2) {
++            return parts[0] * 60 + parts[1];
++        }
++        return 0;
++    };
++
++    const isSessionActive = session.status === 'live' || session.status === 'connecting';
++    const maxDurationHours = subscription?.features?.max_duration_hours ?? 0;
++    const hasDurationLimit = maxDurationHours > 0 && maxDurationHours !== -1;
++
++    let showLowTimeWarning = false;
++    let timePercent = 0;
++    let secondsLeft = 0;
++
++    if (isSessionActive && hasDurationLimit) {
++        const elapsedSeconds = parseDurationToSeconds(session.duration);
++        const maxDurationSeconds = maxDurationHours * 3600;
++        timePercent = maxDurationSeconds > 0 ? (elapsedSeconds / maxDurationSeconds) * 100 : 0;
++        secondsLeft = maxDurationSeconds - elapsedSeconds;
++        showLowTimeWarning = timePercent >= 85 || secondsLeft < 600;
++    }
++
++    const usedCredits = subscription?.used_ai_credits ?? 0;
++    const limitCredits = subscription?.features?.ai_credits ?? 0;
++    const hasCreditsLimit = limitCredits !== -1 && limitCredits > 0;
++    const showLowCreditsAlert = hasCreditsLimit && (usedCredits / limitCredits) >= 0.9;
+ 
+     const { auth } = usePage().props as unknown as InertiaPageProps;
+     const subscription = auth?.subscription;
+@@ -3285,6 +3294,7 @@ export default function LivesShow({
+                     setComments,
+                     setPotentialCustomers,
++                    triggerUpgradeDialog,
+                 }}
+             >
+                 <Head title={`${session.name} — Live`} />
+@@ -3339,6 +3349,48 @@ export default function LivesShow({
+                         {/* Subscription Status Banner */}
+                         <SubscriptionStatusBanner subscription={subscription} />
+ 
++                        {/* Low Time Warning Banner */}
++                        {showLowTimeWarning && (
++                            <div className="flex shrink-0 items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-600 dark:text-amber-400">
++                                <AlertTriangleIcon className="size-4 shrink-0 text-amber-500" />
++                                <div className="flex-1 flex items-center justify-between flex-wrap gap-2">
++                                    <div>
++                                        <p className="text-sm font-semibold">Thời lượng phân tích sắp hết</p>
++                                        <p className="text-xs opacity-90">
++                                            Phiên live đã chạy được {session.duration} trên tối đa {maxDurationHours} giờ ({Math.round(timePercent)}%). Thời gian còn lại: {Math.max(0, Math.floor(secondsLeft / 60))} phút.
++                                        </p>
++                                    </div>
++                                    <Button
++                                        variant="outline"
++                                        size="sm"
++                                        onClick={() => router.visit('/subscription')}
++                                        className="h-7 border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-semibold"
++                                    >
++                                        Nâng cấp gói dịch vụ
++                                    </Button>
++                                </div>
++                            </div>
++                        )}
++
++                        {/* Low Credits Alert Banner */}
++                        {showLowCreditsAlert && (
++                            <div className="flex shrink-0 items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-600 dark:text-amber-400">
++                                <ZapIcon className="size-4 shrink-0 text-amber-500" />
++                                <div className="flex-1 flex items-center justify-between flex-wrap gap-2">
++                                    <div>
++                                        <p className="text-sm font-semibold">Tín dụng phân tích AI sắp hết</p>
++                                        <p className="text-xs opacity-90">
++                                            Tài khoản của bạn đã sử dụng {usedCredits.toLocaleString()} / {limitCredits.toLocaleString()} tín dụng AI ({Math.round((usedCredits / limitCredits) * 100)}%). Vui lòng mua thêm tín dụng hoặc nâng cấp gói để tránh gián đoạn phân tích AI.
++                                        </p>
++                                    </div>
++                                    <Button
++                                        variant="outline"
++                                        size="sm"
++                                        onClick={() => router.visit('/subscription')}
++                                        className="h-7 border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-semibold"
++                                    >
++                                        Mua thêm / Nâng cấp
++                                    </Button>
++                                </div>
++                            </div>
++                        )}
++
+                         {/* Offline Warning Banner */}
+                         {isOffline && (
+@@ -3706,6 +3758,62 @@ export default function LivesShow({
+                                     </CardContent>
+                                 </Card>
+ 
++                                {/* Audio Analysis UI */}
++                                <Card 
++                                    className={!subscription?.features?.audio_analysis ? "cursor-pointer hover:bg-muted/20 transition-colors" : ""}
++                                    onClick={() => {
++                                        if (!subscription?.features?.audio_analysis) {
++                                            triggerUpgradeDialog(
++                                                'Phân tích âm thanh nâng cao',
++                                                'Tính năng phân tích âm thanh/giọng nói trực tiếp bằng AI chỉ dành cho thành viên sử dụng gói Pro hoặc Enterprise. Vui lòng nâng cấp gói dịch vụ để mở khóa tính năng này.'
++                                            );
++                                        }
++                                    }}
++                                >
++                                    <CardHeader className="px-3 pt-3 pb-2 flex flex-row items-center justify-between space-y-0">
++                                        <CardTitle className="flex items-center gap-2 text-xs">
++                                            <Volume2 className="size-3.5" />
++                                            Phân tích âm thanh AI
++                                        </CardTitle>
++                                        {!subscription?.features?.audio_analysis ? (
++                                            <Badge variant="secondary" className="h-4 gap-1 px-1.5 py-0 text-[9px] font-normal border-none bg-amber-500/10 text-amber-500">
++                                                <Lock className="size-2" />
++                                                Bản nâng cấp
++                                            </Badge>
++                                        ) : (
++                                            <Badge className="h-4 gap-1 px-1.5 py-0 text-[9px] font-normal bg-emerald-500 text-white animate-pulse">
++                                                <span>🎙️ Live</span>
++                                            </Badge>
++                                        )}
++                                    </CardHeader>
++                                    <CardContent className="px-3 pb-3">
++                                        {!subscription?.features?.audio_analysis ? (
++                                            <div className="flex flex-col items-center justify-center py-4 text-center">
++                                                <div className="flex space-x-1 mb-2 items-center h-4 justify-center">
++                                                    <span className="w-1 h-3 bg-muted rounded-full animate-none" />
++                                                    <span className="w-1 h-2 bg-muted rounded-full animate-none" />
++                                                    <span className="w-1 h-4 bg-muted rounded-full animate-none" />
++                                                    <span className="w-1 h-2 bg-muted rounded-full animate-none" />
++                                                    <span className="w-1 h-3 bg-muted rounded-full animate-none" />
++                                                </div>
++                                                <p className="text-muted-foreground text-xs">
++                                                    Tính năng nhận diện giọng nói & sắc thái âm thanh đang bị khóa. Click để nâng cấp.
++                                                </p>
++                                            </div>
++                                        ) : (
++                                            <div className="space-y-2">
++                                                <div className="flex items-center justify-between text-xs">
++                                                    <span className="text-muted-foreground">Chu kỳ ghi âm:</span>
++                                                    <span className="font-medium text-foreground">3 giây / snaps</span>
++                                                </div>
++                                                <div className="flex items-center justify-between text-xs">
++                                                    <span className="text-muted-foreground">Tình trạng:</span>
++                                                    <span className="text-emerald-500 font-semibold flex items-center gap-1">
++                                                        <span className="size-1.5 rounded-full bg-emerald-500 animate-ping" />
++                                                        Đang lắng nghe...
++                                                    </span>
++                                                </div>
++                                                <div className="flex space-x-1 pt-2 items-center h-6 justify-center">
++                                                    <span className="w-1 h-3 bg-emerald-500 rounded-full animate-[pulse_1.2s_infinite]" />
++                                                    <span className="w-1 h-5 bg-emerald-500 rounded-full animate-[pulse_0.8s_infinite]" />
++                                                    <span className="w-1 h-2 bg-emerald-500 rounded-full animate-[pulse_1.5s_infinite]" />
++                                                    <span className="w-1 h-4 bg-emerald-500 rounded-full animate-[pulse_1s_infinite]" />
++                                                    <span className="w-1 h-6 bg-emerald-500 rounded-full animate-[pulse_0.7s_infinite]" />
++                                                </div>
++                                            </div>
++                                        )}
++                                    </CardContent>
++                                </Card>
++
+                                 {/* Top Keywords Card */}
+                                 <Card className="flex-1 overflow-hidden">
+@@ -3875,6 +3983,9 @@ export default function LivesShow({
+                                     </div>
+                                 </div>
++                                <p className="text-emerald-600 dark:text-emerald-400 text-xs bg-emerald-500/10 p-2.5 rounded-md border border-emerald-500/20 font-medium">
++                                    🔒 Toàn bộ lịch sử bình luận, dữ liệu phân tích và danh sách khách hàng tiềm năng đã được lưu trữ an toàn trong cơ sở dữ liệu. Bạn có thể truy cập, xem lại hoặc xuất dữ liệu này bất cứ lúc nào từ trang quản lý.
++                                </p>
+                                 <p className="text-muted-foreground text-xs">
+                                     Vui lòng nâng cấp tài khoản lên gói cao hơn
+                                     để tăng hoặc không giới hạn thời lượng phân
+@@ -3978,6 +4089,37 @@ export default function LivesShow({
+                 </Dialog>
++
++                {/* Generic Upgrade Dialog */}
++                <Dialog
++                    open={upgradeDialogConfig.open}
++                    onOpenChange={(open) => setUpgradeDialogConfig(prev => ({ ...prev, open }))}
++                >
++                    <DialogContent className="sm:max-w-md">
++                        <DialogHeader>
++                            <DialogTitle className="flex items-center gap-2 text-primary">
++                                <SparklesIcon className="size-5" /> Nâng cấp gói dịch vụ
++                            </DialogTitle>
++                            <DialogDescription className="space-y-3 pt-2">
++                                <p className="font-semibold text-foreground">{upgradeDialogConfig.featureName}</p>
++                                <p>{upgradeDialogConfig.description}</p>
++                            </DialogDescription>
++                        </DialogHeader>
++                        <DialogFooter className="flex-col gap-2 sm:flex-row">
++                            <Button
++                                variant="outline"
++                                onClick={() => setUpgradeDialogConfig(prev => ({ ...prev, open: false }))}
++                            >
++                                Đóng
++                            </Button>
++                            <Button
++                                onClick={() => {
++                                    setUpgradeDialogConfig(prev => ({ ...prev, open: false }));
++                                    router.visit('/subscription');
++                                }}
++                                className="bg-primary text-primary-foreground"
++                            >
++                                Nâng cấp ngay
++                            </Button>
++                        </DialogFooter>
++                    </DialogContent>
++                </Dialog>
+             </LiveContext.Provider>
+         </AuthenticatedLayout>
+     );

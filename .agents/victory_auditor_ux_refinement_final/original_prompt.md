@@ -1,17 +1,29 @@
-## 2026-05-22T04:48:22Z
-You are the Victory Auditor. Your mission is to perform an independent, rigorous, and evidence-driven verification of the project completion claims made by the team for the requirements in d:\Workspace\livestream\ORIGINAL_REQUEST.md (under ## Follow-up — 2026-05-22T11:40:06+07:00).
+## 2026-05-22T21:23:39+07:00
+You are the Victory Auditor (victory_auditor) for the UX Refinement of Subscription limits on Lives/Show.tsx.
+Your working directory is d:\Workspace\livestream\.agents\victory_auditor_ux_refinement_final.
+Your task is to conduct an independent verification of the completion claims made by the Orchestrator (ID: 2a1d0a2a-e1a5-4160-ac72-a6b49eaf2185) regarding the requirements in d:\Workspace\livestream\ORIGINAL_REQUEST.md.
+Specifically:
+1. Conduct a timeline review and cheating detection.
+2. Independently execute unit and integration tests (`php artisan test`) and verify the build status (`npm run build`).
+3. Verify that the files modified (specifically Lives/Show.tsx and any other related files) strictly implement the requirements:
+   - Upgrade Duration Dialog
+   - Upgrade Credits Dialog
+   - Gated Features UI & Upgrade Trigger
+   - Live Session Subscription Status Banner
+4. Issue a clear final verdict: VICTORY CONFIRMED or VICTORY REJECTED.
+Write your findings to d:\Workspace\livestream\.agents\victory_auditor_ux_refinement_final\handoff.md and report the final verdict directly to me.
 
-Your working directory is d:\Workspace\livestream\.agents\victory_auditor_ux_refinement_final
-The project files are in d:\Workspace\livestream.
+## 2026-05-22T21:51:02Z
+You are the Victory Auditor.
+Your working directory is: d:\Workspace\livestream\.agents\victory_auditor_ux_refinement_final
+Your identity: victory_auditor_ux_refinement_final
 
-Please follow these steps:
-1. Conduct the 3-phase victory audit process:
-   - Phase 1: Verify requirements checklist and check if all features are actually implemented (not hardcoded or mocked).
-   - Phase 2: Run independent test execution and check assets compilation (e.g. `php artisan test`, `npm run build`).
-   - Phase 3: Look for cheating detection, dead/stub code, or incomplete implementations.
-2. Report your findings in a detailed audit report at d:\Workspace\livestream\.agents\victory_auditor_ux_refinement_final\victory_audit_report.md.
-3. Your final message back to the Sentinel (main agent) MUST state clearly one of the following verdicts in all caps:
-   - VICTORY CONFIRMED: if all requirements are fully met, verified by passing test suite, successful assets compilation, and no issues are found.
-   - VICTORY REJECTED: if any requirements are unmet, tests fail, compile fails, or cheating/incomplete work is detected. Include the detailed issues that need fixing.
+Conduct a 3-phase audit (timeline, cheating detection, independent test execution) on the subscription limit UX/UI changes (R1-R4) implemented in d:/Workspace/livestream.
+The requirements implemented are:
+1. R1: Low Time Warning Banner on Show.tsx, history preservation explanation in UpgradeDurationDialog, and "Bị ngắt (Hết giờ)" badge on Lives/Index.tsx & Dashboard.tsx.
+2. R2: Low Credits Alert on Show.tsx, app-sidebar progress bar highlight.
+3. R3: Subscription limits card on Lives/Setup.tsx, gating stream creation.
+4. R4: Locking indicator for Audio Analysis on Show.tsx, upgrade dialog.
 
-Begin the audit immediately.
+Ensure no cheats, mock tests, or dummy implementations exist. Run all verification steps (php artisan test, npm run build).
+Provide your structured verdict: VICTORY CONFIRMED or VICTORY REJECTED with a detailed audit report.

@@ -29,7 +29,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { LoaderIcon, VideoIcon, XIcon } from 'lucide-react';
 import * as React from 'react';
 
@@ -52,15 +52,28 @@ export default function LivesSetup({
     const { auth } = usePage().props as unknown as {
         auth: {
             subscription: {
+                package_name: string;
+                used_ai_credits: number;
                 features?: {
                     limit_streams?: number;
+                    max_duration_hours?: number;
+                    ai_credits?: number;
                 };
             } | null;
         };
     };
 
     const limitStreams = auth?.subscription?.features?.limit_streams ?? 1;
-    const isGated = limitStreams !== -1 && active_streams_count >= limitStreams;
+    const maxDurationHours =
+        auth?.subscription?.features?.max_duration_hours ?? -1;
+    const usedCredits = auth?.subscription?.used_ai_credits ?? 0;
+    const limitCredits = auth?.subscription?.features?.ai_credits ?? -1;
+
+    const isCreditsExhausted =
+        limitCredits !== -1 && usedCredits >= limitCredits;
+    const isStreamGated =
+        limitStreams !== -1 && active_streams_count >= limitStreams;
+    const isGated = isStreamGated || isCreditsExhausted;
 
     const form = useForm({
         name: '',
@@ -131,26 +144,89 @@ export default function LivesSetup({
                     </p>
                 </div>
 
+                {/* Subscription Limits Summary Card */}
+                <Card>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-semibold">
+                            Gói dịch vụ & Giới hạn của bạn
+                        </CardTitle>
+                        <CardDescription>
+                            Tổng quan về tài nguyên đã sử dụng trong chu kỳ hiện
+                            tại
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 sm:grid-cols-3">
+                        <div className="bg-muted/20 rounded-lg border p-3">
+                            <div className="text-muted-foreground text-xs font-medium">
+                                Phiên live đồng thời
+                            </div>
+                            <div className="mt-1 text-lg font-bold">
+                                {active_streams_count} /{' '}
+                                {limitStreams === -1 ? 'Vô hạn' : limitStreams}
+                            </div>
+                            <div className="text-muted-foreground mt-0.5 text-[10px]">
+                                {limitStreams === -1
+                                    ? 'Không giới hạn'
+                                    : `Còn lại: ${Math.max(0, limitStreams - active_streams_count)} phiên`}
+                            </div>
+                        </div>
+                        <div className="bg-muted/20 rounded-lg border p-3">
+                            <div className="text-muted-foreground text-xs font-medium">
+                                Tín dụng AI
+                            </div>
+                            <div className="mt-1 text-lg font-bold">
+                                {usedCredits.toLocaleString()} /{' '}
+                                {limitCredits === -1
+                                    ? 'Vô hạn'
+                                    : limitCredits.toLocaleString()}
+                            </div>
+                            <div className="text-muted-foreground mt-0.5 text-[10px]">
+                                {limitCredits === -1
+                                    ? 'Không giới hạn'
+                                    : `Còn lại: ${Math.max(0, limitCredits - usedCredits).toLocaleString()} credits`}
+                            </div>
+                        </div>
+                        <div className="bg-muted/20 rounded-lg border p-3">
+                            <div className="text-muted-foreground text-xs font-medium">
+                                Thời lượng tối đa / phiên
+                            </div>
+                            <div className="mt-1 text-lg font-bold">
+                                {maxDurationHours === -1
+                                    ? 'Vô hạn'
+                                    : `${maxDurationHours} giờ`}
+                            </div>
+                            <div className="text-muted-foreground mt-0.5 text-[10px]">
+                                Giới hạn thời gian của mỗi phiên live
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 {isGated && (
-                    <div className="border-destructive/20 bg-destructive/10 text-destructive rounded-lg border p-4">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-destructive/20 shrink-0 rounded-full p-2">
+                    <div className="border-destructive/20 bg-destructive/10 text-destructive flex flex-col justify-between gap-4 rounded-lg border p-4 sm:flex-row sm:items-center">
+                        <div className="flex items-start gap-3">
+                            <div className="bg-destructive/20 mt-0.5 shrink-0 rounded-full p-2">
                                 <XIcon className="text-destructive h-5 w-5" />
                             </div>
                             <div>
                                 <h4 className="text-sm font-semibold">
-                                    Đã đạt giới hạn số lượng livestream hoạt
-                                    động
+                                    Không thể tạo phiên live mới
                                 </h4>
-                                <p className="text-destructive/80 mt-1 text-xs">
-                                    Gói đăng ký hiện tại của bạn giới hạn tối đa{' '}
-                                    {limitStreams} phiên livestream hoạt động
-                                    đồng thời. Vui lòng kết thúc một phiên
-                                    livestream hiện tại trước khi tạo mới hoặc
-                                    nâng cấp gói dịch vụ.
+                                <p className="text-destructive/85 mt-1 text-xs font-medium">
+                                    {isCreditsExhausted
+                                        ? 'Bạn đã hết tín dụng AI. Vui lòng mua thêm tín dụng hoặc nâng cấp gói dịch vụ để bắt đầu phiên phân tích mới.'
+                                        : 'Bạn đã hết lượt tạo phiên hôm nay. Vui lòng nâng cấp gói dịch vụ để tiếp tục tạo thêm phiên livestream.'}
                                 </p>
                             </div>
                         </div>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={() => router.visit('/subscription')}
+                            className="w-full shrink-0 shadow-sm sm:w-auto"
+                        >
+                            Nâng cấp gói dịch vụ
+                        </Button>
                     </div>
                 )}
 
@@ -172,6 +248,7 @@ export default function LivesSetup({
                                 onChange={(e) =>
                                     form.setData('name', e.target.value)
                                 }
+                                disabled={isGated}
                             />
                             {form.errors.name && (
                                 <p className="text-destructive text-sm">
@@ -202,6 +279,7 @@ export default function LivesSetup({
                                             e.target.value,
                                         )
                                     }
+                                    disabled={isGated}
                                 />
                                 {form.errors.tiktok_username && (
                                     <p className="text-destructive text-sm">
@@ -244,20 +322,25 @@ export default function LivesSetup({
                                         <TableRow
                                             key={product.id}
                                             className="cursor-pointer"
-                                            onClick={() =>
-                                                toggleProduct(product.id)
-                                            }
+                                            onClick={() => {
+                                                if (!isGated) {
+                                                    toggleProduct(product.id);
+                                                }
+                                            }}
                                         >
                                             <TableCell>
                                                 <Checkbox
                                                     checked={form.data.product_ids.includes(
                                                         product.id,
                                                     )}
-                                                    onCheckedChange={() =>
-                                                        toggleProduct(
-                                                            product.id,
-                                                        )
-                                                    }
+                                                    onCheckedChange={() => {
+                                                        if (!isGated) {
+                                                            toggleProduct(
+                                                                product.id,
+                                                            );
+                                                        }
+                                                    }}
+                                                    disabled={isGated}
                                                 />
                                             </TableCell>
                                             <TableCell className="font-medium">

@@ -26,6 +26,7 @@ class LiveSession extends Model
         'ai_context_summary',
         'ai_insights',
         'ai_alerts',
+        'last_audio_cues',
     ];
 
     protected function casts(): array

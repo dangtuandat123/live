@@ -1,18 +1,13 @@
-# BRIEFING — 2026-05-22T20:35:00+07:00
+# BRIEFING — 2026-05-22T21:54:37+07:00
 
 ## Mission
-Đánh giá và tối ưu hóa hệ thống prompt AI của dự án (trong CommentAnalyzer và LiveSessionAnalyzer), chuyển đổi system prompt sang tiếng Anh với kỹ thuật Chain-of-Thought (CoT) và cấu trúc XML.
+Nâng cấp toàn diện trải nghiệm người dùng (UX/UI) liên quan đến các giới hạn gói dịch vụ (Free, Trial, Pro, Enterprise) trên ứng dụng Livestream Comment Analysis.
 
 ## 🔒 My Identity
 - Archetype: sentinel
 - Working directory: d:\Workspace\livestream\.agents
-- Orchestrator: 786d91c8-eb73-4c7e-87dc-6dd8e044bfa3
-- Victory Auditor: 3b6e7758-8482-4319-a3e5-95606d10499e
-- Active Orchestrator: cd8336cf-71af-49c3-aef0-45b06c8ab166
-- Active Victory Auditor: 34c280b3-c375-4759-99f9-90e5adaeb1d1
-- Orchestrator AI Audit: 6b2d3e92-2af2-4738-9c27-2bf6f50c78cd
-- Active Orchestrator AI Insights: 5182db82-58f4-44b3-bcb7-745968896b56
-- Active Orchestrator AI Prompt Optimization: cd8336cf-71af-49c3-aef0-45b06c8ab166
+- Orchestrator: b97b50c1-513a-48d1-8e24-c2dd4f7dec4a
+- Victory Auditor: 7770a0fa-2287-408b-b9f9-b4733d8c738b
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
@@ -21,9 +16,13 @@
 - Must not write code or perform technical analyses
 
 ## User Context
-- **Last user request**: Đánh giá và tối ưu hóa hệ thống prompt AI của dự án (trong CommentAnalyzer và LiveSessionAnalyzer), chuyển đổi system prompt sang tiếng Anh với kỹ thuật Chain-of-Thought (CoT) và cấu trúc XML.
-- **Pending clarifications**: [none]
-- **Delivered results**: Optimized system prompts in CommentAnalyzer.php and LiveSessionAnalyzer.php with English CoT/XML structures, preserving Vietnamese JSON outputs, passing all 109 tests.
+- **Last user request**: Nghiên cứu và nâng cấp toàn diện trải nghiệm người dùng (UX/UI) liên quan đến các giới hạn gói dịch vụ (Free, Trial, Pro, Enterprise) trên ứng dụng: banner cảnh báo sắp hết giờ/credits, làm rõ lưu trữ lịch sử trong Dialog ngắt, hiển thị trạng thái "Bị ngắt (Hết giờ)" trong danh sách live, hiển thị thông tin gói cước tại trang Setup Live, gating trực quan tính năng Phân tích Âm thanh AI.
+- **Pending clarifications**: none
+- **Delivered results**: 
+  - R1: Cảnh báo sắp hết giờ (Show.tsx), lưu trữ dữ liệu lịch sử trong UpgradeDurationDialog, trạng thái Badge "Bị ngắt (Hết giờ)" trong Dashboard & Lives/Index.
+  - R2: Cảnh báo sắp hết Credits (Show.tsx), progress bar sidebar đổi màu theo phần trăm credit.
+  - R3: Card hiển thị thông tin chi tiết về gói cước hiện tại tại Lives/Setup.tsx, khóa form và submit khi đạt giới hạn stream chạy đồng thời.
+  - R4: Lock icon và nhãn nâng cấp cho tính năng Phân tích âm thanh AI, click mở Dialog nâng cấp.
 
 ## Project Status
 - **Phase**: complete

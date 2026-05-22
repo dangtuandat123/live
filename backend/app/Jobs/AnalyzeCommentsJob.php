@@ -391,11 +391,22 @@ class AnalyzeCommentsJob implements ShouldQueue
 
                 // === Memory: Lưu session_note từ AI cho batch tiếp theo ===
                 $sessionNote = $response['session_note'] ?? null;
-                if ($sessionNote && is_string($sessionNote)) {
-                    $session->update([
-                        'ai_context_summary' => mb_substr($sessionNote, 0, 500),
-                    ]);
+                $audioCues = null;
+                if (is_array($response) && array_key_exists('audio_cues', $response)) {
+                    $cuesVal = $response['audio_cues'];
+                    if (is_string($cuesVal)) {
+                        $trimmed = trim($cuesVal);
+                        $audioCues = $trimmed !== '' ? mb_substr($trimmed, 0, 200) : null;
+                    }
                 }
+
+                $updateData = [];
+                if ($sessionNote && is_string($sessionNote)) {
+                    $updateData['ai_context_summary'] = mb_substr($sessionNote, 0, 500);
+                }
+                $updateData['last_audio_cues'] = $audioCues;
+
+                $session->update($updateData);
 
                 // === Auto-Insights: Tự động chạy phân tích insight/alert nếu vượt qua throttle 30s ===
                 $insightCacheKey = "live_session_{$this->liveSessionId}_last_insight_time";
@@ -654,6 +665,11 @@ Analyze each comment individually and map to the following schema properties:
 
 7. **extracted_keywords**:
    - Extract a list of up to 5 prominent keywords from this batch of comments. Keywords must be in lowercase, short (1-3 words), and relate to products, pricing, quality, or common user queries.
+
+8. **audio_cues**:
+   - Briefly summarize what the host/streamer is describing, holding, saying, or the room status by listening to the 3-second audio clip (if available).
+   - Maximum 200 characters in Vietnamese.
+   - If the audio is not available, noisy, unclear, or has no detectable speech/cues, output null.
 </rules>
 
 <reasoning_process>
@@ -678,6 +694,7 @@ Example 1:
   * comment 103: Intent is null (minigame number guess). Sentiment is "neutral".
   * session_note: "Đang bán áo thun đen. Có khách chốt đơn và hỏi chất liệu. Có chơi đoán số."
   * extracted_keywords: ["áo thun đen", "chất liệu", "đoán số"]
+  * audio_cues: "Host đang mô tả chất vải cotton mát của áo thun đen."
 
 - Output JSON structure:
   {
@@ -708,7 +725,8 @@ Example 1:
       }
     ],
     "session_note": "Đang bán áo thun đen. Có khách chốt đơn và hỏi chất liệu. Có chơi đoán số.",
-    "extracted_keywords": ["áo thun đen", "chất liệu", "đoán số"]
+    "extracted_keywords": ["áo thun đen", "chất liệu", "đoán số"],
+    "audio_cues": "Host đang mô tả chất vải cotton mát của áo thun đen."
   }
 </few_shot_examples>
 
@@ -727,7 +745,8 @@ JSON Structure:
     }
   ],
   "session_note": "string",
-  "extracted_keywords": ["string"]
+  "extracted_keywords": ["string"],
+  "audio_cues": "string" | null
 }
 </output_format>
 PROMPT;
