@@ -76,3 +76,42 @@ Integrity mode: development
 - [ ] Giao diện phân tích phiên live hiển thị đúng các từ khóa do AI tự động phát hiện kèm theo số lần xuất hiện tương ứng thực tế trong database.
 - [ ] Lệnh build frontend `npm run build` chạy thành công 100% không có lỗi.
 - [ ] Toàn bộ các test suite backend (`php artisan test`) chạy thành công.
+
+## Follow-up — 2026-05-22T15:58:23+07:00
+
+Thực hiện một đợt đánh giá chuyên sâu (Evidence-driven Static/Code-path Audit) toàn diện đối với toàn bộ hệ thống AI (bình luận, audio, trích xuất từ khóa, credit AI) trong codebase sử dụng workflow `/evidence-deep-audit-v3-12k` để phát hiện lỗi, rủi ro bảo mật, bất đồng bộ và lỗ hổng logic.
+
+Working directory: d:\Workspace\livestream
+Integrity mode: development
+
+## Requirements
+
+### R1. Áp dụng quy trình Đánh giá chuyên sâu (Pass 0 đến Pass 18)
+- Sử dụng đúng cấu trúc và nội dung hướng dẫn của workflow `/evidence-deep-audit-v3-12k` để kiểm tra toàn bộ hệ thống AI.
+- Tạo báo cáo audit chi tiết lưu tại file d:\Workspace\livestream\evidence_deep_audit_report_ai.md.
+
+### R2. Đánh giá chất lượng Prompt & Khả năng xử lý kết quả của AI
+- Kiểm tra system prompt và các tham số gọi AI trong AnalyzeCommentsJob.php và CommentAnalyzer.php.
+- Kiểm tra tính an toàn của định dạng JSON phản hồi từ AI, cách hệ thống xử lý khi AI trả về sai định dạng, thiếu trường, hoặc chứa mã độc/dữ liệu rác.
+- Đánh giá sự an toàn của logic ghi đè dữ liệu AI lên dữ liệu thực tế (ví dụ: trường has_phone, intent_tag, question_tag).
+
+### R3. Kiểm tra Invariants & Abuse Cases đối với hệ thống AI
+- Kiểm tra cơ chế giới hạn tín dụng AI (ai_credits và used_ai_credits) của gói đăng ký thành viên (Subscription).
+- Rà soát nguy cơ bypass giới hạn credit hoặc spam gửi request AI liên tục gây cạn kiệt tài nguyên (rate limit, race condition khi dispatch job phân tích comment).
+- Đánh giá độ tin cậy của tiến trình thu thập audio 3s từ livestream qua Python FFmpeg để gửi lên AI đa phương thức (multimodal analysis).
+
+### R4. Rà soát Cache & Đồng bộ Frontend
+- Kiểm tra cơ chế xóa cache (Cache::forget) sau khi AI Job hoàn thành để đảm bảo dữ liệu phân tích mới nhất được đẩy lên giao diện kịp thời.
+- Rà soát sự đồng bộ kiểu dữ liệu (Types/Contracts) giữa API phản hồi AI và các React components nhận dữ liệu trên frontend.
+
+## Acceptance Criteria
+
+### Báo cáo Audit (evidence_deep_audit_report_ai.md)
+- [ ] Báo cáo được tạo đầy đủ tất cả các Pass từ Pass 0 đến Pass 18 theo đúng cấu trúc chuẩn của `/evidence-deep-audit-v3-12k`.
+- [ ] Phải liệt kê đầy đủ các Scope, Stack, Coverage Ledger, Expected Behavior Contract, Static UX Matrix, Action Matrix, Backend Abuse Matrix, Invariant Matrix, State/Race Matrix, Security Matrix, và Test/Mutation Gaps.
+- [ ] Mỗi Finding được liệt kê phải có đầy đủ: Loại (Type), Mức độ (Severity), Vị trí (Location), Bằng chứng (Evidence), Đối chiếu chéo (Cross-check), Kịch bản lỗi (Scenario), Đề xuất sửa đổi tối thiểu (Minimal fix).
+- [ ] Báo cáo phải kết luận bằng một trong bốn quyết định chuẩn (ví dụ: Block merge / Merge with follow-up / Safe within audited scope / Fix before merge).
+
+### Chất lượng mã nguồn
+- [ ] Không làm hỏng hoặc thay đổi bất kỳ code logic AI nào đang hoạt động tốt (trừ khi có sự đồng ý hoặc phát hiện lỗi nghiêm trọng cần sửa).
+- [ ] Toàn bộ các test suite hiện có của Laravel (php artisan test) vẫn phải chạy qua thành công.
