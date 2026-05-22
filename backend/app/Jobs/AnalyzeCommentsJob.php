@@ -237,7 +237,7 @@ class AnalyzeCommentsJob implements ShouldQueue
                 ];
 
                 // Validate + save trong transaction
-                DB::transaction(function () use ($results, $unprocessed, $productNames, $session, &$batchStats, $activeSub, $commentsText) {
+                DB::transaction(function () use ($results, $unprocessed, $productNames, $session, &$batchStats, $activeSub, $commentsText, $response) {
                     $processedIds = [];
                     $positive = 0;
                     $neutral = 0;
@@ -339,6 +339,46 @@ class AnalyzeCommentsJob implements ShouldQueue
 
                     if ($activeSub) {
                         $activeSub->increment('used_ai_credits', $commentsText->count());
+                    }
+
+                    // R2: Integrate AI Auto-Discovery Keywords
+                    $extractedKeywords = $response['extracted_keywords'] ?? [];
+                    if (is_array($extractedKeywords) && !empty($extractedKeywords)) {
+                        $currentCount = $session->keywords()->count();
+                        if ($currentCount < 30) {
+                            $normalizedKeywords = [];
+                            foreach ($extractedKeywords as $kw) {
+                                if (!is_string($kw)) {
+                                    continue;
+                                }
+                                $normalized = mb_strtolower(trim($kw));
+                                if ($normalized !== '' && !in_array($normalized, $normalizedKeywords)) {
+                                    $normalizedKeywords[] = $normalized;
+                                }
+                            }
+
+                            if (!empty($normalizedKeywords)) {
+                                $existingKeywords = $session->keywords()
+                                    ->pluck('keyword')
+                                    ->map(fn($k) => mb_strtolower(trim($k)))
+                                    ->toArray();
+
+                                $newKeywords = [];
+                                foreach ($normalizedKeywords as $kw) {
+                                    if (!in_array($kw, $existingKeywords)) {
+                                        $newKeywords[] = $kw;
+                                    }
+                                }
+
+                                if (!empty($newKeywords)) {
+                                    $availableSlots = 30 - $currentCount;
+                                    $toAdd = array_slice($newKeywords, 0, $availableSlots);
+                                    foreach ($toAdd as $kw) {
+                                        $session->keywords()->create(['keyword' => $kw]);
+                                    }
+                                }
+                            }
+                        }
                     }
                 });
 
@@ -490,7 +530,7 @@ AUDIO;
         return <<<PROMPT
 Bạn là chuyên gia phân tích hành vi khách hàng trên Livestream bán hàng Việt Nam. Nhiệm vụ: đọc danh sách bình luận và phân loại từng bình luận.
 
-Trả về JSON duy nhất: {"results": [{"id": int, "sentiment": "positive"|"neutral"|"negative", "intent_tag": "Chốt đơn"|"Hỏi thông tin"|"Phản hồi SP"|"Yêu cầu hỗ trợ"|null, "question_tag": string|null, "product_tag": string|null, "has_phone": bool}], "session_note": "string (max 300 ký tự)"}
+Trả về JSON duy nhất: {"results": [{"id": int, "sentiment": "positive"|"neutral"|"negative", "intent_tag": "Chốt đơn"|"Hỏi thông tin"|"Phản hồi SP"|"Yêu cầu hỗ trợ"|null, "question_tag": string|null, "product_tag": string|null, "has_phone": bool}], "session_note": "string (max 300 ký tự)", "extracted_keywords": ["keyword1", "keyword2"]}
 Không kèm bất kỳ giải thích nào ngoài JSON.
 
 === BỐI CẢNH ===
@@ -521,6 +561,8 @@ Nguyên tắc quan trọng: Khi nội dung bình luận mơ hồ, thiếu ngữ 
 **has_phone** — true nếu bình luận chứa chuỗi số liên tiếp 9-11 chữ số (SĐT Việt Nam).
 
 **session_note** — Viết ghi chú ngắn gọn (tối đa 300 ký tự) tóm tắt ngữ cảnh hiện tại của buổi live để giúp lần phân tích tiếp theo hiểu rõ hơn. Ví dụ: "Đang bán Áo thun đen, nhiều người hỏi size. Có minigame đoán số đang chạy. Streamer vừa chuyển sang giới thiệu Váy đỏ."
+
+**extracted_keywords** — Thêm trường "extracted_keywords" chứa danh sách tối đa 5 từ khóa được trích xuất từ batch bình luận này. Các từ khóa phải viết thường (lowercase), ngắn từ 1-3 từ, liên quan đến sản phẩm, giá cả, chất lượng hoặc các câu hỏi chung của người xem.
 PROMPT;
     }
 

@@ -802,4 +802,113 @@ class AnalyzeCommentsJobTest extends TestCase
             return $job->uniqueId() === 'analyze-comments-'.$session->id;
         });
     }
+
+    public function test_it_extracts_and_persists_keywords_from_scratch(): void
+    {
+        $user = User::factory()->create();
+        $session = LiveSession::create([
+            'user_id' => $user->id,
+            'name' => 'Keywords Test Scratch',
+            'status' => 'live',
+            'tiktok_username' => 'testuser',
+        ]);
+
+        $comment = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now(),
+            'tiktok_user_id' => 'user_1',
+            'data' => ['comment' => 'test'],
+            'ai_processed' => false,
+        ]);
+
+        $this->mock(TikTokService::class);
+        $this->mock(RunwareAiService::class, function ($mock) use ($comment) {
+            $mock->shouldReceive('chatMultimodal')
+                ->once()
+                ->andReturn([
+                    'results' => [
+                        [
+                            'id' => $comment->id,
+                            'sentiment' => 'neutral',
+                            'intent_tag' => null,
+                            'question_tag' => null,
+                            'product_tag' => null,
+                            'has_phone' => false,
+                        ],
+                    ],
+                    'session_note' => 'Notes',
+                    'extracted_keywords' => ['áo thun', 'giá rẻ', 'size l'],
+                ]);
+        });
+
+        $job = new AnalyzeCommentsJob($session->id);
+        app()->call([$job, 'handle']);
+
+        $this->assertEquals(3, $session->keywords()->count());
+        $this->assertEquals(['áo thun', 'giá rẻ', 'size l'], $session->keywords()->pluck('keyword')->toArray());
+    }
+
+    public function test_it_extracts_and_persists_keywords_with_30_limit(): void
+    {
+        $user = User::factory()->create();
+        $session = LiveSession::create([
+            'user_id' => $user->id,
+            'name' => 'Keywords Test Limit',
+            'status' => 'live',
+            'tiktok_username' => 'testuser',
+        ]);
+
+        $comment = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now(),
+            'tiktok_user_id' => 'user_1',
+            'data' => ['comment' => 'test'],
+            'ai_processed' => false,
+        ]);
+
+        // Pre-populate 28 keywords to check the 30-limit
+        for ($i = 1; $i <= 28; $i++) {
+            $session->keywords()->create(['keyword' => "existing{$i}"]);
+        }
+
+        $this->mock(TikTokService::class);
+        $this->mock(RunwareAiService::class, function ($mock) use ($comment) {
+            $mock->shouldReceive('chatMultimodal')
+                ->once()
+                ->andReturn([
+                    'results' => [
+                        [
+                            'id' => $comment->id,
+                            'sentiment' => 'neutral',
+                            'intent_tag' => null,
+                            'question_tag' => null,
+                            'product_tag' => null,
+                            'has_phone' => false,
+                        ],
+                    ],
+                    'session_note' => 'Notes',
+                    'extracted_keywords' => [
+                        'EXISTING1', // existing, should be ignored (case insensitive)
+                        '  new1  ',   // new, should be trimmed and lowercased
+                        'new2',       // new, should be lowercased
+                        'new3',       // new, but should exceed limit (since 28 + 2 = 30)
+                        '',           // empty, should be ignored
+                        'new2',       // duplicate in the same batch, should be ignored
+                    ],
+                ]);
+        });
+
+        $job = new AnalyzeCommentsJob($session->id);
+        app()->call([$job, 'handle']);
+
+        // Verify the count is exactly 30
+        $this->assertEquals(30, $session->keywords()->count());
+
+        // Verify the specific keywords in database
+        $this->assertTrue($session->keywords()->where('keyword', 'new1')->exists());
+        $this->assertTrue($session->keywords()->where('keyword', 'new2')->exists());
+        $this->assertFalse($session->keywords()->where('keyword', 'new3')->exists());
+    }
 }

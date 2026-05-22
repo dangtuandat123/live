@@ -1,15 +1,15 @@
-# BRIEFING — 2026-05-22T14:38:26+07:00
+# BRIEFING — 2026-05-22T08:37:16Z
 
 ## Mission
-Audit and align the logic synchronization between the live session analysis UI (React/Inertia) and backend services (Laravel Controller, AI Job, and Python TikTok Live service).
+Chuyển đổi tính năng "Từ khóa được nhắc nhiều" sang cơ chế AI tự động phân tích và trích xuất từ khóa nổi bật.
 
 ## 🔒 My Identity
 - Archetype: sentinel
 - Working directory: d:\Workspace\livestream\.agents
-- Orchestrator: dc3d3191-596d-4364-ab79-83c5438a4dd9
-- Victory Auditor: f9a2aa2c-728d-4bea-ad82-fd9fe5a4cb56
-- Active Orchestrator: 021e1ff8-5b4d-44d3-ad91-827b5dd4ebf5
-- Active Victory Auditor: [TBD]
+- Orchestrator: 786d91c8-eb73-4c7e-87dc-6dd8e044bfa3
+- Victory Auditor: TBD
+- Active Orchestrator: 786d91c8-eb73-4c7e-87dc-6dd8e044bfa3
+- Active Victory Auditor: TBD
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
@@ -18,9 +18,9 @@ Audit and align the logic synchronization between the live session analysis UI (
 - Must not write code or perform technical analyses
 
 ## User Context
-- **Last user request**: Audit and align logic synchronization between React/Inertia frontend and backend services (Laravel Controller, AI Job, Python TikTok Live) to fix conversion funnel, align labels, fix cache invalidation, remove redundancy, and synchronize phone extraction regex vs AI.
-- **Pending clarifications**: [none]
-- **Delivered results**: [none]
+- **Last user request**: Chuyển đổi Top Keywords từ cấu hình thủ công sang AI tự động phát hiện và hiển thị thời gian thực.
+- **Pending clarifications**: none
+- **Delivered results**: none
 
 ## Project Status
 - **Phase**: not started

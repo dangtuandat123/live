@@ -122,8 +122,6 @@ class LiveSessionController extends Controller
             'tiktok_username' => ['required', 'string', 'max:100'],
             'product_ids' => ['nullable', 'array'],
             'product_ids.*' => ['integer', 'exists:products,id'],
-            'keywords' => ['nullable', 'array'],
-            'keywords.*' => ['string', 'max:100'],
         ]);
 
         $user = $request->user();
@@ -160,12 +158,6 @@ class LiveSessionController extends Controller
             $session->products()->attach($validProductIds);
         }
 
-        // Save keywords
-        if (! empty($validated['keywords'])) {
-            foreach ($validated['keywords'] as $keyword) {
-                $session->keywords()->create(['keyword' => $keyword]);
-            }
-        }
 
         // Tạo stats record
         LiveStat::create(['live_session_id' => $session->id]);

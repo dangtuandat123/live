@@ -66,10 +66,7 @@ export default function LivesSetup({
         name: '',
         tiktok_username: '',
         product_ids: [] as number[],
-        keywords: ['mua', 'chốt', 'ship', 'giá', 'size'] as string[],
     });
-
-    const [keywordInput, setKeywordInput] = React.useState('');
 
     function toggleProduct(id: number) {
         const current = form.data.product_ids;
@@ -78,21 +75,6 @@ export default function LivesSetup({
             current.includes(id)
                 ? current.filter((p) => p !== id)
                 : [...current, id],
-        );
-    }
-
-    function addKeyword() {
-        const trimmed = keywordInput.trim();
-        if (trimmed && !form.data.keywords.includes(trimmed)) {
-            form.setData('keywords', [...form.data.keywords, trimmed]);
-            setKeywordInput('');
-        }
-    }
-
-    function removeKeyword(kw: string) {
-        form.setData(
-            'keywords',
-            form.data.keywords.filter((k) => k !== kw),
         );
     }
 
@@ -309,58 +291,6 @@ export default function LivesSetup({
                     </CardContent>
                 </Card>
 
-                {/* Keywords */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Từ khóa theo dõi</CardTitle>
-                        <CardDescription>
-                            Các từ khóa bán hàng mà AI sẽ ưu tiên phát hiện
-                            trong bình luận
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid gap-3">
-                        <div className="flex gap-2">
-                            <Input
-                                placeholder="Nhập từ khóa rồi Enter..."
-                                value={keywordInput}
-                                onChange={(e) =>
-                                    setKeywordInput(e.target.value)
-                                }
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        addKeyword();
-                                    }
-                                }}
-                            />
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                onClick={addKeyword}
-                            >
-                                Thêm
-                            </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                            {form.data.keywords.map((kw) => (
-                                <Badge
-                                    key={kw}
-                                    variant="secondary"
-                                    className="gap-1"
-                                >
-                                    {kw}
-                                    <button
-                                        type="button"
-                                        onClick={() => removeKeyword(kw)}
-                                        className="hover:bg-muted rounded-full"
-                                    >
-                                        <XIcon className="size-3" />
-                                    </button>
-                                </Badge>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
 
                 {/* Submit */}
                 <div className="flex items-center gap-3">

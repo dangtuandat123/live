@@ -442,6 +442,79 @@ Integrity mode: development
 - [ ] Lệnh build frontend `npm run build` chạy thành công 100% không cảnh báo/lỗi TypeScript.
 - [ ] Toàn bộ các test suite backend (`php artisan test`) chạy thành công.
 
+## 2026-05-22T08:28:55Z
 
+Quét, phân tích và tìm tất cả các lỗi (functional, UI/UX, logic, đồng bộ, bảo mật, hiệu năng) có trong trang quản lý phiên live `http://localhost:8000/lives/3` và các controller, jobs, components liên quan.
 
+Working directory: d:\Workspace\livestream
+Integrity mode: development
 
+## Requirements
+
+### R1. Phân tích tĩnh và logic đồng bộ UI/UX (Lives/Show.tsx)
+Kiểm tra chi tiết file [Show.tsx](file:///d:/Workspace/livestream/backend/resources/js/Pages/Lives/Show.tsx) xem có:
+- Lỗi hardcode dữ liệu hoặc văn bản hiển thị.
+- Sự mâu thuẫn giữa các component hiển thị (ví dụ: hiển thị trạng thái kết nối, đếm comment, sản phẩm, khách hàng tiềm năng).
+- Các lỗi về component lifecycle, render thừa, state, props không đồng bộ khi polling dữ liệu mỗi 5 giây (`lives.fetch-events`).
+
+### R2. Đối chiếu logic Backend và APIs liên quan
+Kiểm tra sự đồng bộ và xử lý lỗi giữa [LiveSessionController.php](file:///d:/Workspace/livestream/backend/app/Http/Controllers/LiveSessionController.php) (các method `show`, `fetchEvents`, `stop`, `updateEvent`) với frontend:
+- Dữ liệu trả về từ API `fetchEvents` có khớp chính xác cấu trúc frontend mong đợi không?
+- Logic tính toán cảm xúc (sentiment positive/neutral/negative) có đồng bộ và nhất quán giữa DB, Job (`AnalyzeCommentsJob`) và frontend không?
+- Các API endpoints cập nhật sự kiện (`/api/live-events/{id}`) có được xử lý phân quyền và validate an toàn không?
+
+### R3. Kiểm tra logic nền (Jobs/Services)
+Kiểm tra [AnalyzeCommentsJob.php](file:///d:/Workspace/livestream/backend/app/Jobs/AnalyzeCommentsJob.php) và [TikTokService.php](file:///d:/Workspace/livestream/backend/app/Services/TikTokService.php) liên quan đến live session 3 xem có:
+- Tránh race condition hoặc lọt trùng lặp sự kiện comment/order.
+- Logic auto-healing hoạt động ổn định khi Python service bị mất kết nối hoặc restart không.
+
+## Verification Plan
+
+### Automated Verification
+- Chạy PHPUnit test suite hiện có của dự án để đảm bảo không làm hỏng logic nền:
+  `php artisan test`
+- Chạy lệnh biên dịch frontend để phát hiện các lỗi type hoặc build của `Show.tsx`:
+  `npm run build`
+
+### Static Code Review & Mapping
+- Thực hiện trace luồng dữ liệu từ database -> controller -> view/inertia response -> client-side state update để chỉ ra chính xác các dòng code có lỗi hoặc nguy cơ lỗi cao.
+
+## Acceptance Criteria
+
+### Báo cáo kiểm thử chi tiết
+- [ ] Danh sách lỗi được phân loại theo mức độ nghiêm trọng (Critical, High, Medium, Low) cùng với đường dẫn file cụ thể.
+- [ ] Chỉ ra các lỗi không khớp kiểu dữ liệu (type mismatch) giữa backend controller và frontend React component PageProps.
+- [ ] Đề xuất phương án sửa chữa tối thiểu và an toàn nhất cho từng lỗi phát hiện được mà không làm ảnh hưởng đến các phiên live khác.
+
+## 2026-05-22T08:37:16Z
+
+Chuyển đổi tính năng "Từ khóa được nhắc nhiều" (Top Keywords) trên trang phân tích phiên live từ cơ chế cấu hình thủ công (chủ shop nhập từ khóa thô) sang cơ chế AI tự động phân tích và trích xuất từ khóa nổi bật (AI Auto-Discovery Keywords).
+
+Working directory: d:\Workspace\livestream
+Integrity mode: development
+
+## Requirements
+
+### R1. Loại bỏ cấu hình Từ khóa thủ công
+- **Frontend**: Xóa bỏ hoàn toàn phần giao diện "Từ khóa theo dõi" (nhập từ khóa rồi nhấn Enter/Thêm) trong trang chuẩn bị phiên live (Setup.tsx).
+- **Backend**: Loại bỏ phần validate và lưu trữ từ khóa thủ công trong controller khi tạo phiên livestream mới (LiveSessionController).
+
+### R2. Tích hợp AI Auto-Discovery Keywords
+- **Prompt AI**: Cập nhật Prompt hệ thống của tiến trình AI phân tích bình luận (AnalyzeCommentsJob.php) để AI tự động trích xuất các từ khóa nổi bật trong batch bình luận.
+  - Yêu cầu AI trả về thêm trường `extracted_keywords` (mảng gồm tối đa 5 từ khóa nổi bật nhất trong batch bình luận hiện tại, viết thường, ngắn gọn 1-3 từ, tập trung vào sản phẩm, giá cả, chất lượng, thắc mắc chung).
+- **Lưu trữ từ khóa**: Khi nhận kết quả phân tích từ AI, backend sẽ tự động chuẩn hóa và lưu các từ khóa này vào bảng `live_session_keywords` liên kết với phiên live (nếu chưa tồn tại, và giới hạn số lượng từ khóa tối đa khoảng 30 từ mỗi phiên live để tránh phình to dữ liệu).
+
+### R3. Thống kê và hiển thị Từ khóa thời gian thực
+- **Backend đếm tần suất**: Giữ nguyên logic đếm tần suất thực tế của các từ khóa này bằng câu lệnh SQL `LIKE` thô trong `LiveSessionController::getTopKeywords` để đảm bảo độ chính xác số lượng đếm, cập nhật real-time và không phụ thuộc vào khả năng đếm số của AI.
+- **Frontend hiển thị**: Hiển thị danh sách các từ khóa do AI phát hiện và đếm được trên trang Lives Show (Show.tsx) một cách tự nhiên.
+
+## Acceptance Criteria
+
+### Giao diện chuẩn bị (Setup)
+- [ ] Không còn ô nhập "Từ khóa theo dõi" hay danh sách badge từ khóa thủ công trên trang Setup.
+
+### Phân tích AI & Thống kê
+- [ ] Khi chạy phiên live và có comment mới gửi lên, AI tự động trích xuất các từ khóa nổi bật (ví dụ: "chất liệu", "mã hàng", "ship", "giá") và lưu vào cơ sở dữ liệu.
+- [ ] Giao diện phân tích phiên live hiển thị đúng các từ khóa do AI tự động phát hiện kèm theo số lần xuấtian tương ứng thực tế trong database.
+- [ ] Lệnh build frontend `npm run build` chạy thành công 100% không có lỗi.
+- [ ] Toàn bộ các test suite backend (`php artisan test`) chạy thành công.
