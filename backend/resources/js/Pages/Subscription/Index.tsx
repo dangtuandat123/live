@@ -461,13 +461,21 @@ export default function SubscriptionIndex({
                                             Tính năng đi kèm:
                                         </span>
                                         <ul className="text-muted-foreground space-y-2 text-sm">
-                                            {pkg.features_list && pkg.features_list.length > 0 ? (
-                                                pkg.features_list.map((feature, idx) => (
-                                                    <li key={idx} className="flex items-start gap-2">
-                                                        <CheckIcon className="mt-0.5 size-4 shrink-0 text-emerald-500" />
-                                                        <span>{feature}</span>
-                                                    </li>
-                                                ))
+                                            {pkg.features_list &&
+                                            pkg.features_list.length > 0 ? (
+                                                pkg.features_list.map(
+                                                    (feature, idx) => (
+                                                        <li
+                                                            key={idx}
+                                                            className="flex items-start gap-2"
+                                                        >
+                                                            <CheckIcon className="mt-0.5 size-4 shrink-0 text-emerald-500" />
+                                                            <span>
+                                                                {feature}
+                                                            </span>
+                                                        </li>
+                                                    ),
+                                                )
                                             ) : (
                                                 <li className="flex items-start gap-2 italic">
                                                     <span>
@@ -722,9 +730,14 @@ export default function SubscriptionIndex({
                     <div className="flex-1 space-y-3 overflow-y-auto p-4">
                         {checkoutData?.vietqr_url && (
                             <div className="flex flex-col items-center gap-3">
-                                <div className="text-center space-y-1">
-                                    <h4 className="font-bold text-base text-foreground">Chuyển khoản QR</h4>
-                                    <p className="text-xs text-muted-foreground">Vui lòng quét mã QR dưới đây để thực hiện thanh toán</p>
+                                <div className="space-y-1 text-center">
+                                    <h4 className="text-foreground text-base font-bold">
+                                        Chuyển khoản QR
+                                    </h4>
+                                    <p className="text-muted-foreground text-xs">
+                                        Vui lòng quét mã QR dưới đây để thực
+                                        hiện thanh toán
+                                    </p>
                                 </div>
                                 {/* VietQR Code Frame */}
                                 <div className="border-border/40 group relative flex aspect-square max-h-[155px] max-w-[155px] items-center justify-center overflow-hidden rounded-2xl border bg-white p-2 shadow-md">
@@ -762,11 +775,18 @@ export default function SubscriptionIndex({
                                 )}
 
                                 {/* Thông tin chuyển khoản */}
-                                {(!checkoutData?.beneficiary_bank || !checkoutData?.beneficiary_account || !checkoutData?.beneficiary_name) ? (
+                                {!checkoutData?.beneficiary_bank ||
+                                !checkoutData?.beneficiary_account ||
+                                !checkoutData?.beneficiary_name ? (
                                     <div className="flex gap-2 rounded-lg border border-red-500/20 bg-red-500/5 p-3.5 text-sm text-red-600">
                                         <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-red-500" />
                                         <p>
-                                            <span className="font-semibold">Lưu ý:</span> Không tìm thấy thông tin tài khoản ngân hàng thụ hưởng. Vui lòng liên hệ Admin để cấu hình thanh toán.
+                                            <span className="font-semibold">
+                                                Lưu ý:
+                                            </span>{' '}
+                                            Không tìm thấy thông tin tài khoản
+                                            ngân hàng thụ hưởng. Vui lòng liên
+                                            hệ Admin để cấu hình thanh toán.
                                         </p>
                                     </div>
                                 ) : (
@@ -784,7 +804,9 @@ export default function SubscriptionIndex({
                                                 Số tài khoản:
                                             </span>
                                             <span className="text-foreground font-semibold">
-                                                {checkoutData.beneficiary_account}
+                                                {
+                                                    checkoutData.beneficiary_account
+                                                }
                                             </span>
                                         </div>
                                         <div className="border-border/40 flex items-center justify-between border-b py-1">

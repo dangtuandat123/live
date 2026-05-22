@@ -268,6 +268,14 @@ class LiveSessionController extends Controller
             }
         }
 
+        $cacheTtl = in_array($liveSession->status, ['ended', 'error']) ? 3600 : 5;
+        $potentialCustomersCount = Cache::remember("live_session_{$liveSession->id}_potential_customers_count", $cacheTtl, function () use ($liveSession) {
+            return $this->getPotentialCustomersCount($liveSession);
+        });
+        $topKeywords = Cache::remember("live_session_{$liveSession->id}_top_keywords", $cacheTtl, function () use ($liveSession) {
+            return $this->getTopKeywords($liveSession);
+        });
+
         return Inertia::render('Lives/Show', [
             'session' => [
                 'id' => $liveSession->id,
@@ -287,7 +295,6 @@ class LiveSessionController extends Controller
                     'price' => $p->price,
                     'image' => $p->image,
                 ]),
-                'keywords' => $liveSession->keywords->pluck('keyword'),
             ],
             'stats' => $liveSession->stats ? [
                 'total_views' => $liveSession->stats->total_views,
@@ -307,6 +314,8 @@ class LiveSessionController extends Controller
             'potentialCustomers' => $this->getPotentialCustomers($liveSession),
             'topQuestions' => $this->getTopQuestions($liveSession),
             'statsHistory' => $this->getFormattedStatsHistory($liveSession),
+            'potentialCustomersCount' => $potentialCustomersCount,
+            'topKeywords' => $topKeywords,
         ]);
     }
 
@@ -412,6 +421,14 @@ class LiveSessionController extends Controller
             return $this->getFormattedStatsHistory($liveSession);
         });
 
+        $potentialCustomersCount = Cache::remember("live_session_{$liveSession->id}_potential_customers_count", $cacheTtl, function () use ($liveSession) {
+            return $this->getPotentialCustomersCount($liveSession);
+        });
+
+        $topKeywords = Cache::remember("live_session_{$liveSession->id}_top_keywords", $cacheTtl, function () use ($liveSession) {
+            return $this->getTopKeywords($liveSession);
+        });
+
         // Nếu session đã bị lỗi hoặc kết thúc, không gọi service nữa mà trả về dữ liệu DB hiện tại
         if ($liveSession->status === 'error' || $liveSession->status === 'ended') {
             $latestComments = $liveSession->events()
@@ -453,6 +470,8 @@ class LiveSessionController extends Controller
                 'potentialCustomers' => $potentialCustomers,
                 'topQuestions' => $topQuestions,
                 'statsHistory' => $statsHistory,
+                'potentialCustomersCount' => $potentialCustomersCount,
+                'topKeywords' => $topKeywords,
             ]);
         }
 
@@ -510,6 +529,8 @@ class LiveSessionController extends Controller
                             'potentialCustomers' => $this->getPotentialCustomers($liveSession),
                             'topQuestions' => $this->getTopQuestions($liveSession),
                             'statsHistory' => $this->getFormattedStatsHistory($liveSession),
+                            'potentialCustomersCount' => $this->getPotentialCustomersCount($liveSession),
+                            'topKeywords' => $this->getTopKeywords($liveSession),
                         ]);
                     }
                 } catch (\Exception $restartException) {
@@ -575,6 +596,8 @@ class LiveSessionController extends Controller
             'potentialCustomers' => $potentialCustomers,
             'topQuestions' => $topQuestions,
             'statsHistory' => $statsHistory,
+            'potentialCustomersCount' => $potentialCustomersCount,
+            'topKeywords' => $topKeywords,
         ]);
     }
 
@@ -977,6 +1000,11 @@ class LiveSessionController extends Controller
      */
     private function getTopQuestions(LiveSession $session): array
     {
+        $dbDriver = $session->events()->getConnection()->getDriverName();
+        $groupConcatSql = $dbDriver === 'sqlite'
+            ? "GROUP_CONCAT(DISTINCT NULLIF(product_tag, '')) as products"
+            : "GROUP_CONCAT(DISTINCT NULLIF(product_tag, '') SEPARATOR ', ') as products";
+
         $rows = $session->events()
             ->where('event_type', 'comment')
             ->where(function ($query) {
@@ -987,7 +1015,7 @@ class LiveSessionController extends Controller
             ->selectRaw("
                 COALESCE(NULLIF(question_tag, ''), 'Hỏi chung') as question,
                 COUNT(*) as cnt,
-                GROUP_CONCAT(DISTINCT NULLIF(product_tag, '') SEPARATOR ', ') as products
+                {$groupConcatSql}
             ")
             ->groupByRaw("COALESCE(NULLIF(question_tag, ''), 'Hỏi chung')")
             ->orderByDesc('cnt')
@@ -1096,6 +1124,8 @@ class LiveSessionController extends Controller
             $liveEvent->save();
         }
 
+        $this->clearSessionCache($liveSession->id);
+
         return response()->json([
             'success' => true,
             'event' => [
@@ -1108,5 +1138,59 @@ class LiveSessionController extends Controller
                 'status' => $liveEvent->data['status'] ?? 'pending',
             ]
         ]);
+    }
+
+    private function getPotentialCustomersCount(LiveSession $session): int
+    {
+        return $session->events()
+            ->where('event_type', 'comment')
+            ->whereNotNull('tiktok_user_id')
+            ->where('tiktok_user_id', '!=', '')
+            ->where(function ($q) {
+                $q->where('intent_tag', 'Chốt đơn')
+                  ->orWhere('has_phone', true);
+            })
+            ->distinct('tiktok_user_id')
+            ->count('tiktok_user_id');
+    }
+
+    private function getTopKeywords(LiveSession $session): array
+    {
+        $setupKeywords = $session->keywords()->pluck('keyword')->toArray();
+        $keywordCounts = [];
+        
+        foreach ($setupKeywords as $kw) {
+            $kw = trim($kw);
+            if ($kw === '') {
+                continue;
+            }
+            $count = $session->events()
+                ->where('event_type', 'comment')
+                ->where('data->comment', 'like', "%{$kw}%")
+                ->count();
+            if ($count > 0) {
+                $keywordCounts[] = [
+                    'keyword' => $kw,
+                    'count' => $count,
+                ];
+            }
+        }
+
+        // Sort descending by count
+        usort($keywordCounts, function ($a, $b) {
+            return $b['count'] <=> $a['count'];
+        });
+
+        return $keywordCounts;
+    }
+
+    private function clearSessionCache(int $sessionId): void
+    {
+        Cache::forget("live_session_{$sessionId}_top_products");
+        Cache::forget("live_session_{$sessionId}_potential_customers");
+        Cache::forget("live_session_{$sessionId}_top_questions");
+        Cache::forget("live_session_{$sessionId}_stats_history");
+        Cache::forget("live_session_{$sessionId}_potential_customers_count");
+        Cache::forget("live_session_{$sessionId}_top_keywords");
     }
 }

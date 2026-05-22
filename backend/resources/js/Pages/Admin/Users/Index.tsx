@@ -139,9 +139,11 @@ export default function UsersIndex({ users }: Props) {
                                         <TableCell>
                                             <Badge
                                                 variant={
-                                                    user.plan_name === 'Enterprise'
+                                                    user.plan_name ===
+                                                    'Enterprise'
                                                         ? 'default'
-                                                        : user.plan_name === 'Pro'
+                                                        : user.plan_name ===
+                                                            'Pro'
                                                           ? 'secondary'
                                                           : 'outline'
                                                 }

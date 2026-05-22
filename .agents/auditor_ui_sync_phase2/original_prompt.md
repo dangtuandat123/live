@@ -1,15 +1,14 @@
-## 2026-05-22T03:53:06Z
-You are the Forensic Auditor. Your working directory is d:\Workspace\livestream\.agents\auditor_ui_sync_phase2.
-Your task is to conduct an integrity verification audit on the Phase 2 UI/UX sync and refinements.
-Verify that:
-1. The user menu dynamic labels logic in nav-user.tsx operates correctly using auth.subscription values from Inertia page props.
-2. The TypeScript interfaces for subscription features are properly declared in index.d.ts.
-3. The paddings of the 10 main page files have been standardized to p-6 (or p-6 pt-6).
-4. The checkout modal sizing and QR max-width is constrained to 155px.
-5. The landing page buttons are w-full.
-6. The status badges are premium and semi-transparent.
-7. Verify that no hardcoded test results, facade mock bypasses, or integrity violations exist.
-8. Verify that Vite compilations and all tests run cleanly.
+## 2026-05-22T07:57:00Z
+Your working directory is d:\Workspace\livestream\.agents\auditor_ui_sync_phase2.
+Your identity: Forensic Auditor (teamwork_preview_auditor).
+Your task is to perform an integrity audit on the code alignment and synchronization changes.
 
-Produce a comprehensive Audit Report in markdown at d:\Workspace\livestream\.agents\auditor_ui_sync_phase2\handoff.md based on the strict-evidence-audit-v3-12k.md instructions.
-When finished, notify the orchestrator (conversation ID: ddd017b4-48bd-46a1-a53c-05a9021ed31f) using send_message.
+Target Files to audit:
+1. `d:\Workspace\livestream\backend\app\Http\Controllers\LiveSessionController.php`
+2. `d:\Workspace\livestream\backend\app\Jobs\AnalyzeCommentsJob.php`
+3. `d:\Workspace\livestream\backend\resources\js\Pages\Lives/Show.tsx`
+
+Audit Guidelines:
+1. Perform checks for integrity violations (hardcoding expected outcomes, mock outputs, dummy/facade code, or test bypasses).
+2. Verify that the implementation of R1-R5 uses authentic business logic and database/model state.
+3. Write your detailed audit report (in the standard strict-evidence-audit format) to `d:\Workspace\livestream\.agents\auditor_ui_sync_phase2\audit.md` and send a message back with the verdict.

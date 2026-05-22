@@ -108,6 +108,8 @@ class AnalyzeCommentsJob implements ShouldQueue
                 LiveEvent::whereIn('id', $unprocessed->pluck('id'))
                     ->update(['ai_processed' => true, 'sentiment' => 'neutral']);
 
+                $this->clearSessionCache();
+
                 // Check if there are more unprocessed comments to continue the pipeline
                 $hasMoreUnprocessed = LiveEvent::where('live_session_id', $this->liveSessionId)
                     ->where('event_type', 'comment')
@@ -258,6 +260,11 @@ class AnalyzeCommentsJob implements ShouldQueue
                         $event = $unprocessed->firstWhere('id', $eventId);
                         $tiktokUserId = $event ? $event->tiktok_user_id : null;
 
+                        // Guard for has_phone: if it is already true in the DB, keep it true
+                        if ($event && $event->has_phone) {
+                            $validated['has_phone'] = true;
+                        }
+
                         // Increment local counts
                         if ($validated['sentiment'] === 'positive') {
                             $positive++;
@@ -335,6 +342,9 @@ class AnalyzeCommentsJob implements ShouldQueue
                     }
                 });
 
+                // Clear session cache dynamically
+                $this->clearSessionCache();
+
                 // === Memory: Lưu session_note từ AI cho batch tiếp theo ===
                 $sessionNote = $response['session_note'] ?? null;
                 if ($sessionNote && is_string($sessionNote)) {
@@ -381,6 +391,9 @@ class AnalyzeCommentsJob implements ShouldQueue
                         DB::table('live_events')
                             ->whereIn('id', $unprocessed->pluck('id'))
                             ->update(['ai_processed' => true, 'sentiment' => 'neutral']);
+
+                        $this->clearSessionCache();
+
                         Log::warning('Marked batch comments as processed (neutral) due to unrecoverable AI error or max retries reached to prevent queue deadlock', [
                             'session_id' => $this->liveSessionId,
                             'comments_ids' => $unprocessed->pluck('id')->toArray(),
@@ -608,6 +621,24 @@ PROMPT;
                 'leads_count' => DB::raw("leads_count + {$newLeadsCount}"),
             ]);
             $statsModel->refresh();
+        }
+    }
+
+    /**
+     * Clear the cache for the live session.
+     */
+    private function clearSessionCache(): void
+    {
+        $cacheKeys = [
+            "live_session_{$this->liveSessionId}_top_products",
+            "live_session_{$this->liveSessionId}_potential_customers",
+            "live_session_{$this->liveSessionId}_top_questions",
+            "live_session_{$this->liveSessionId}_stats_history",
+            "live_session_{$this->liveSessionId}_potential_customers_count",
+            "live_session_{$this->liveSessionId}_top_keywords",
+        ];
+        foreach ($cacheKeys as $key) {
+            \Illuminate\Support\Facades\Cache::forget($key);
         }
     }
 }

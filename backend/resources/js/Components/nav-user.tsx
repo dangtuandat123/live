@@ -26,7 +26,6 @@ import {
     BadgeCheckIcon,
     BellIcon,
     ChevronsUpDownIcon,
-    CreditCardIcon,
     LaptopIcon,
     LogOutIcon,
     MoonIcon,

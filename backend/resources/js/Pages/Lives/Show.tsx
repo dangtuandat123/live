@@ -185,7 +185,6 @@ interface SessionData {
         price: number;
         image: string | null;
     }[];
-    keywords: string[];
 }
 
 interface StatsData {
@@ -256,6 +255,11 @@ interface StatsHistoryEntry {
     [key: string]: unknown;
 }
 
+interface TopKeyword {
+    keyword: string;
+    count: number;
+}
+
 interface PageProps {
     session: SessionData;
     stats: StatsData | null;
@@ -264,6 +268,8 @@ interface PageProps {
     potentialCustomers: PotentialCustomer[];
     topQuestions: TopQuestion[];
     statsHistory?: StatsHistoryEntry[];
+    potentialCustomersCount: number;
+    topKeywords: TopKeyword[];
 }
 
 // --- Context for sharing data across sub-components ---
@@ -275,8 +281,12 @@ const LiveContext = React.createContext<{
     potentialCustomers: PotentialCustomer[];
     topQuestions: TopQuestion[];
     statsHistory: StatsHistoryEntry[];
+    potentialCustomersCount: number;
+    topKeywords: TopKeyword[];
     setComments?: React.Dispatch<React.SetStateAction<CommentData[]>>;
-    setPotentialCustomers?: React.Dispatch<React.SetStateAction<PotentialCustomer[]>>;
+    setPotentialCustomers?: React.Dispatch<
+        React.SetStateAction<PotentialCustomer[]>
+    >;
 }>(null!);
 
 function useLiveData() {
@@ -555,7 +565,7 @@ function SentimentBadge({ sentiment }: { sentiment: string }) {
 // --- Sub-components for each tab ---
 
 function CommentsPanel() {
-    const { session, comments: allComments, setComments } = useLiveData();
+    const { comments: allComments, setComments } = useLiveData();
     const BATCH = 50;
     const [filter, setFilter] = React.useState('all');
     const [search, setSearch] = React.useState('');
@@ -564,13 +574,15 @@ function CommentsPanel() {
     const [copiedId, setCopiedId] = React.useState<number | null>(null);
 
     const togglePin = async (id: number) => {
-        const comment = allComments.find(c => c.id === id);
+        const comment = allComments.find((c) => c.id === id);
         if (!comment) return;
         const newPinned = !comment.is_pinned;
 
         if (setComments) {
             setComments((prev) =>
-                prev.map((c) => (c.id === id ? { ...c, is_pinned: newPinned } : c))
+                prev.map((c) =>
+                    c.id === id ? { ...c, is_pinned: newPinned } : c,
+                ),
             );
         }
 
@@ -593,13 +605,15 @@ function CommentsPanel() {
     };
 
     const toggleOrder = async (id: number) => {
-        const comment = allComments.find(c => c.id === id);
+        const comment = allComments.find((c) => c.id === id);
         if (!comment) return;
         const newHighlighted = !comment.is_highlighted;
 
         if (setComments) {
             setComments((prev) =>
-                prev.map((c) => (c.id === id ? { ...c, is_highlighted: newHighlighted } : c))
+                prev.map((c) =>
+                    c.id === id ? { ...c, is_highlighted: newHighlighted } : c,
+                ),
             );
         }
 
@@ -727,7 +741,8 @@ function CommentsPanel() {
                             {
                                 key: 'pinned',
                                 label: '📌 Ghim',
-                                count: allComments.filter((c) => c.is_pinned).length,
+                                count: allComments.filter((c) => c.is_pinned)
+                                    .length,
                             },
                             {
                                 key: 'order',
@@ -1369,7 +1384,7 @@ function QuestionsPanel() {
 }
 
 function CustomersPanel() {
-    const { session, potentialCustomers, setPotentialCustomers } = useLiveData();
+    const { potentialCustomers, setPotentialCustomers } = useLiveData();
     const { auth } = usePage().props as unknown as {
         auth: {
             subscription: {
@@ -1430,7 +1445,7 @@ function CustomersPanel() {
     const saveOrder = async () => {
         if (orderDialog.customerIdx === null) return;
         const customer = filtered[orderDialog.customerIdx];
-        
+
         try {
             const res = await fetch(`/api/live-events/${customer.id}`, {
                 method: 'PUT',
@@ -1459,8 +1474,8 @@ function CustomersPanel() {
                                       note: orderForm.note,
                                       status: orderForm.status,
                                   }
-                                : c
-                        )
+                                : c,
+                        ),
                     );
                 }
                 setOrderDialog({ open: false, customerIdx: null });
@@ -1486,7 +1501,12 @@ function CustomersPanel() {
                         <CardDescription>
                             Trích xuất SĐT/địa chỉ từ bình luận ·{' '}
                             {filtered.length} khách ·{' '}
-                            {potentialCustomers.filter(c => c.status && c.status !== '').length} đơn
+                            {
+                                potentialCustomers.filter(
+                                    (c) => c.status && c.status !== '',
+                                ).length
+                            }{' '}
+                            đơn
                         </CardDescription>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -1677,7 +1697,8 @@ function CustomersPanel() {
                                                         <CheckIcon className="size-2.5" />
                                                         {c.status === 'pending'
                                                             ? 'Chờ'
-                                                            : c.status === 'confirmed'
+                                                            : c.status ===
+                                                                'confirmed'
                                                               ? 'Xác nhận'
                                                               : 'Ship'}
                                                     </button>
@@ -2151,7 +2172,7 @@ function AIInsightsPanel() {
 }
 
 function StatsPanel() {
-    const { stats, topProducts, potentialCustomers, statsHistory } =
+    const { stats, topProducts, statsHistory, potentialCustomersCount } =
         useLiveData();
 
     // Dữ liệu hoạt động — cập nhật từ statsHistory của backend
@@ -2193,7 +2214,7 @@ function StatsPanel() {
     const funnelData = [
         { stage: 'Người xem', value: stats.total_views },
         { stage: 'Bình luận', value: stats.total_comments },
-        { stage: 'Có SĐT/ĐC', value: potentialCustomers.length },
+        { stage: 'KH tiềm năng', value: potentialCustomersCount ?? 0 },
         { stage: 'Chốt đơn', value: stats.leads_count },
     ];
 
@@ -2631,6 +2652,8 @@ export default function LivesShow({
     potentialCustomers: initialPotentialCustomers,
     topQuestions: initialTopQuestions,
     statsHistory: initialStatsHistory,
+    potentialCustomersCount: initialPotentialCustomersCount,
+    topKeywords: initialTopKeywords,
 }: PageProps) {
     const [soundEnabled, setSoundEnabled] = React.useState(true);
     const [isOffline, setIsOffline] = React.useState(false);
@@ -2668,6 +2691,11 @@ export default function LivesShow({
     const [statsHistory, setStatsHistory] = React.useState<StatsHistoryEntry[]>(
         initialStatsHistory ?? [],
     );
+    const [potentialCustomersCount, setPotentialCustomersCount] =
+        React.useState(initialPotentialCustomersCount ?? 0);
+    const [topKeywords, setTopKeywords] = React.useState<TopKeyword[]>(
+        initialTopKeywords ?? [],
+    );
 
     // Order alerts — detect real "Chốt đơn" từ AI data
     const { alerts, dismiss } = useOrderAlerts(soundEnabled, comments);
@@ -2704,6 +2732,11 @@ export default function LivesShow({
                         setPotentialCustomers(data.potentialCustomers);
                     if (data.topQuestions) setTopQuestions(data.topQuestions);
                     if (data.statsHistory) setStatsHistory(data.statsHistory);
+                    if (data.potentialCustomersCount !== undefined)
+                        setPotentialCustomersCount(
+                            data.potentialCustomersCount,
+                        );
+                    if (data.topKeywords) setTopKeywords(data.topKeywords);
                     if (data.status) {
                         setSession((prev) => ({
                             ...prev,
@@ -2776,6 +2809,8 @@ export default function LivesShow({
                     potentialCustomers,
                     topQuestions,
                     statsHistory,
+                    potentialCustomersCount,
+                    topKeywords,
                     setComments,
                     setPotentialCustomers,
                 }}
@@ -3008,8 +3043,8 @@ export default function LivesShow({
                                                     {stats.leads_count}
                                                 </div>
                                                 <p className="text-muted-foreground flex items-center justify-center gap-1 text-xs">
-                                                    <PhoneIcon className="size-3" />
-                                                    KH tiềm năng
+                                                    <ShoppingCartIcon className="size-3" />
+                                                    Chốt đơn
                                                 </p>
                                             </div>
                                         </div>
@@ -3177,44 +3212,21 @@ export default function LivesShow({
                                     </CardHeader>
                                     <CardContent className="min-h-0 flex-1 overflow-hidden px-3">
                                         <div className="relative flex h-full flex-wrap gap-1.5 overflow-hidden">
-                                            {topQuestions.length > 0 ||
-                                            topProducts.length > 0 ? (
-                                                <>
-                                                    {topQuestions.map(
-                                                        (item) => (
-                                                            <div
-                                                                key={`q-${item.question}`}
-                                                                className="flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-400"
-                                                            >
-                                                                <span>
-                                                                    {
-                                                                        item.question
-                                                                    }
-                                                                </span>
-                                                                <span className="font-bold tabular-nums">
-                                                                    {item.count}
-                                                                </span>
-                                                            </div>
-                                                        ),
-                                                    )}
-                                                    {topProducts
-                                                        .slice(0, 6)
-                                                        .map((item) => (
-                                                            <div
-                                                                key={`p-${item.name}`}
-                                                                className="flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-0.5 text-xs text-blue-700 dark:text-blue-400"
-                                                            >
-                                                                <span>
-                                                                    {item.name}
-                                                                </span>
-                                                                <span className="font-bold tabular-nums">
-                                                                    {
-                                                                        item.mentions
-                                                                    }
-                                                                </span>
-                                                            </div>
-                                                        ))}
-                                                </>
+                                            {topKeywords &&
+                                            topKeywords.length > 0 ? (
+                                                topKeywords.map((item) => (
+                                                    <div
+                                                        key={`k-${item.keyword}`}
+                                                        className="bg-primary/10 text-primary flex items-center gap-1 rounded-md px-2 py-0.5 text-xs"
+                                                    >
+                                                        <span>
+                                                            {item.keyword}
+                                                        </span>
+                                                        <span className="font-bold tabular-nums">
+                                                            {item.count}
+                                                        </span>
+                                                    </div>
+                                                ))
                                             ) : (
                                                 <div className="text-muted-foreground text-xs">
                                                     Chưa có dữ liệu

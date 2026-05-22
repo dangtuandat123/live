@@ -384,10 +384,64 @@ Integrity mode: development
 - [ ] Màn hình Dashboard (`Dashboard.tsx`) và Reports (`Reports/Index.tsx`) hiển thị đúng dữ liệu thống kê, biểu đồ xu hướng và từ khóa từ dữ liệu live thực tế thay vì dữ liệu mock tĩnh.
 - [ ] Các màn hình Lives (`Setup.tsx`, `Show.tsx`, `Index.tsx`) hiển thị thông tin phiên live, danh sách sản phẩm, các số liệu tương tác thực tế từ TikTok Live Event.
 
-### Tổng thể & Kiểm thử
-- [ ] Lệnh build frontend `npm run build` chạy thành công không có lỗi TypeScript hay linter.
-- [ ] Toàn bộ các test suite backend (`php artisan test`) chạy thành công 100%.
 - [ ] Không có bug hoặc lỗi hiển thị trắng trang do dữ liệu động bị null/undefined (cần có cơ chế fallback an toàn ở React component khi dữ liệu chưa tải xong).
+
+## 2026-05-22T14:38:26Z
+
+Thực hiện kiểm tra (audit) chuyên sâu và căn chỉnh sự đồng bộ logic giữa giao diện phân tích phiên live (React/Inertia) và service backend (Laravel Controller, AI Job, và Python TikTok Live service) để phát hiện và đề xuất phương án khắc phục các lỗi mâu thuẫn dữ liệu, bất đồng bộ cache, và nhãn hiển thị không nhất quán.
+
+Working directory: `d:\Workspace\livestream`
+Integrity mode: development
+
+## Requirements
+
+### R1. Phân tích & Khắc phục lỗi Phễu chuyển đổi (Conversion Funnel Distortion)
+- **Vấn đề**: Backend giới hạn danh sách khách hàng tiềm năng trả về là 50 (`limit(50)`). Frontend sử dụng `potentialCustomers.length` làm giá trị cho bước "Có SĐT/ĐC" trong phễu, trong khi bước tiếp theo "Chốt đơn" dùng `stats.leads_count` (không bị giới hạn). Khi số lượng chốt đơn thực tế vượt quá 50, bước đáy phễu sẽ lớn hơn bước trên nó (ví dụ: Có SĐT/ĐC = 50, Chốt đơn = 60), tạo ra tỉ lệ chuyển đổi > 100% (120%) và làm vỡ thiết kế hình học của phễu.
+- **Yêu cầu**: Cung cấp tổng số lượng khách hàng tiềm năng chính xác từ backend (ví dụ: trả về trường `potential_customers_count` riêng biệt) để vẽ phễu chuẩn xác mà không phụ thuộc vào độ dài mảng danh sách chi tiết (vốn bị giới hạn để tối ưu hóa hiệu năng hiển thị).
+
+### R2. Chuẩn hóa Nhãn hiển thị (Labeling Alignment)
+- **Vấn đề**: 
+  - Tại thanh thống kê nhanh dưới video: `stats.leads_count` được hiển thị dưới nhãn **"KH tiềm năng"**.
+  - Tại Phễu chuyển đổi: Stage 3 dùng `potentialCustomers.length` nhãn **"Có SĐT/ĐC"**, Stage 4 dùng `stats.leads_count` nhãn **"Chốt đơn"**.
+  - Tại tab bên phải: Nhãn tab hiển thị **"KH tiềm năng"** nhưng danh sách lại chứa cả khách hàng chốt đơn và khách hàng chỉ để lại SĐT.
+- **Yêu cầu**: Đảm bảo sự thống nhất tuyệt đối về mặt ngữ nghĩa của các thuật ngữ trên giao diện để tránh gây nhầm lẫn cho chủ shop. Nhãn phải phản ánh đúng bản chất dữ liệu (ví dụ: "Số lượng chốt đơn", "Số lượng có SĐT/Địa chỉ").
+
+### R3. Khắc phục lỗi Lưu bộ nhớ đệm (Cache Invalidation Bug)
+- **Vấn đề**: Các hàm `show` và `fetchEvents` của `LiveSessionController` sử dụng cache với thời gian sống (TTL) 5 giây (khi live) hoặc 3600 giây (khi kết thúc) cho các dữ liệu `potentialCustomers`, `topProducts`, `topQuestions`, và `statsHistory`. Tuy nhiên:
+  - Khi người dùng cập nhật thông tin đơn hàng qua API `updateEvent` (ghim comment, đánh dấu chốt đơn, sửa số lượng/ghi chú/trạng thái), cache không hề bị xóa.
+  - Khi tiến trình AI `AnalyzeCommentsJob` hoàn thành phân tích các bình luận mới trong nền, cache cũng không được xóa.
+  - Hậu quả: Dữ liệu hiển thị của người dùng bị ghi đè bởi dữ liệu cũ từ cache trong lần polling tiếp theo (đặc biệt nghiêm trọng khi phiên live đã kết thúc, dữ liệu bị đơ suốt 1 tiếng).
+- **Yêu cầu**: Bổ sung cơ chế tự động xóa các khóa cache liên quan đến phiên live (`potential_customers`, `top_products`, `top_questions`, `stats_history`) ngay khi có cập nhật từ `updateEvent` hoặc khi `AnalyzeCommentsJob` hoàn thành lưu kết quả phân tích.
+
+### R4. Loại bỏ các Thành phần trùng lặp và Mã thừa (Redundancy & Clean Code)
+- **Vấn đề**:
+  - Biểu đồ "Phân tích cảm sentiment" (cột trái) và biểu đồ tròn "Phân bổ cảm xúc" (Tab Thống kê) hiển thị thông tin trùng lặp, lãng phí diện tích giao diện.
+  - Thẻ "Từ khóa được nhắc nhiều" hiển thị danh sách câu hỏi nổi bật (`topQuestions`) và sản phẩm nổi bật (`topProducts`) ghép lại, không thực sự hiển thị "Từ khóa" (keywords) thực tế.
+  - Prop `keywords: string[]` (nạp từ quan hệ `keywords` của `LiveSession`) được truyền xuống client từ backend nhưng hoàn toàn không được sử dụng ở React.
+- **Yêu cầu**: Đánh giá và dọn dẹp các thành phần trùng lặp, tối ưu hóa bố cục hiển thị và loại bỏ các prop/truy vấn DB thừa.
+
+### R5. Đồng bộ hóa logic trích xuất Số điện thoại
+- **Vấn đề**: 
+  - Tại `fetchAndStoreEvents` (khi lưu comment mới), hệ thống dùng Regex `0\d{9,10}` để tự động xác định `has_phone`.
+  - Tại `AnalyzeCommentsJob` (khi AI phân tích), trường `has_phone` của AI trả về sẽ ghi đè trực tiếp lên giá trị DB. Nếu AI nhận diện sai hoặc bỏ sót số điện thoại, giá trị `has_phone` đúng đắn được tính từ Regex ban đầu sẽ bị mất.
+- **Yêu cầu**: Đảm bảo an toàn dữ liệu, ưu tiên tính chính xác tuyệt đối của Regex. Chỉ ghi đè hoặc bổ sung nếu Regex chưa phát hiện ra nhưng AI phát hiện ra, không để AI ghi đè `false` lên kết quả `true` của Regex.
+
+## Acceptance Criteria
+
+### Tính chính xác của Phễu và Nhãn
+- [ ] Không xuất hiện tỉ lệ chuyển đổi > 100% trong phễu chuyển đổi trong bất kỳ trường hợp nào.
+- [ ] Nhãn thống kê, nhãn phễu và tên tab thống nhất về mặt ngữ nghĩa (ví dụ: Leads chốt đơn phải thống nhất gọi là "Chốt đơn" hoặc "Số đơn hàng", danh sách khách hàng tiềm năng bao gồm cả khách để lại SĐT phải được mô tả rõ ràng).
+
+### Trải nghiệm cập nhật thời gian thực & Cache
+- [ ] Khi thực hiện lưu cập nhật đơn hàng ở tab "KH tiềm năng", dữ liệu thay đổi lập tức được bảo toàn ở lần polling tiếp theo mà không bị giật/hoàn tác về trạng thái cũ.
+- [ ] Khi phiên live đã kết thúc (`ended`), mọi thao tác chỉnh sửa ghi chú hay trạng thái đơn hàng của khách hàng được cập nhật và hiển thị lập tức trên giao diện.
+
+### Tối ưu hóa giao diện & Mã nguồn
+- [ ] Loại bỏ hoặc thiết kế lại biểu đồ cảm xúc trùng lặp để giao diện gọn gàng, trực quan hơn.
+- [ ] Loại bỏ trường/prop `keywords` thừa không sử dụng ra khỏi Inertia response và React component.
+- [ ] Lệnh build frontend `npm run build` chạy thành công 100% không cảnh báo/lỗi TypeScript.
+- [ ] Toàn bộ các test suite backend (`php artisan test`) chạy thành công.
+
 
 
 
