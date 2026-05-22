@@ -107,7 +107,7 @@ function SidebarCredits() {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const auth = usePage().props.auth
+  const { auth } = usePage().props as any
 
   const user = {
     name: auth.user?.name ?? "User",
@@ -115,11 +115,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     avatar: "",
   }
 
+  const subscription = auth?.subscription
+  const planName = subscription?.package_name ?? "Free"
+
   const teams = [
     {
       name: "LiveStream AI",
       logo: <GalleryVerticalEndIcon />,
-      plan: "Pro",
+      plan: planName,
     },
   ]
 
