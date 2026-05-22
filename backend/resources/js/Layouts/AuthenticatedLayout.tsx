@@ -6,9 +6,7 @@ export default function Authenticated({ children }: PropsWithChildren) {
     return (
         <SidebarProvider>
             <AppSidebar />
-            <SidebarInset>
-                {children}
-            </SidebarInset>
+            <SidebarInset>{children}</SidebarInset>
         </SidebarProvider>
     );
 }

@@ -57,3 +57,252 @@ Integrity mode: development
 - [ ] Job phân tích bình luận kiểm tra tín dụng AI còn lại, cập nhật đúng số credits đã dùng và tắt phân tích audio nếu gói không hỗ trợ.
 - [ ] Admin CRUD Packages lưu cấu trúc JSON `features` thành công, có cơ chế xử lý tương thích ngược dữ liệu cũ.
 - [ ] Chạy `php artisan test` pass 100% và `npm run build` không có lỗi TypeScript.
+
+## 2026-05-22T03:09:23Z
+
+Nghiên cứu sâu sắc giao diện (Frontend React) kết hợp Backend Laravel để tìm ra các điểm sai lệch, thừa thãi, thiếu sót, giá trị hardcode hoặc các chi tiết trải nghiệm không hợp lý, sau đó sửa chữa toàn diện để đồng bộ hóa hệ thống.
+
+Working directory: d:\Workspace\livestream\backend
+Integrity mode: development
+
+## Requirements
+
+### R1. UI Audit & Hardcoded Text Elimination
+- Quét toàn bộ mã nguồn của các trang giao diện (trong thư mục `resources/js/Pages` bao gồm cả phân vùng Admin và Client).
+- Tìm và sửa đổi toàn bộ các phần text hardcode bất hợp lý (ví dụ: hiển thị gói dịch vụ giả, số credit giả, các thông số cứng, text tiếng Anh/tiếng Việt lẫn lộn).
+- Đảm bảo tất cả thông số hiển thị (tên gói dịch vụ, credits, trạng thái tài khoản) được lấy từ profile người dùng (`auth.user`) hoặc các API/props thực tế từ backend truyền xuống.
+
+### R2. UI/UX Flow & Interaction Fixes
+- Kiểm tra các nút bấm hoặc hành động tương tác chính trên màn hình (như nút "Đăng ký ngay", nút nâng cấp, form cập nhật) để đảm bảo không có nút bấm "chết" (nhấn vào không có phản ứng).
+- Bổ sung hoặc cải thiện các trạng thái phản hồi trực quan: loading khi gửi yêu cầu, toast thông báo lỗi hoặc thành công khi thao tác biểu mẫu.
+- Đảm bảo tính nhất quán về giao diện (khoảng cách, màu sắc, font chữ, hover animations) theo đúng chuẩn premium của hệ thống.
+
+### R3. Frontend-Backend Contract Alignment
+- Đối chiếu các chức năng phân quyền hiển thị trên Frontend với logic phân quyền Gating trên Backend.
+- Đảm bảo các chức năng nâng cao (như export dữ liệu, phân tích âm thanh, giới hạn livestream) hiển thị đúng trạng thái kích hoạt/khóa dựa trên gói dịch vụ thực tế của người dùng.
+- Hiển thị thông báo/modal nâng cấp gói phù hợp khi người dùng click vào các tính năng bị khóa.
+
+## Acceptance Criteria
+
+### Interface & Experience Quality
+- [ ] Không còn text hardcode không khớp với dữ liệu thực tế (như gói dịch vụ, credits, số luồng tối đa) trên Client và Admin dashboard.
+- [ ] Tất cả các hành động tương tác chính (nút submit, chuyển hướng, upgrade) hoạt động đúng chức năng, không bị treo hoặc không phản hồi.
+- [ ] Các thông báo toast hiển thị chính xác trạng thái kết quả từ backend trả về.
+- [ ] Giao diện build thành công bằng `npm run build` không có lỗi.
+- [ ] Backend test suite `php artisan test` vượt qua 100%.
+
+
+## 2026-05-22T03:16:17Z
+
+Nghiên cứu kỹ chuyên sâu giao diện, đối chiếu tổng thể web và backend để khắc phục hoàn toàn các lỗi sai, thừa, thiếu, các giá trị hardcode và các điểm tương tác UI chưa hợp lý.
+
+Working directory: d:\Workspace\livestream\backend
+Integrity mode: development
+
+## Requirements
+
+### R1. Loại bỏ các giá trị Hardcode & Đồng bộ cấu hình động
+- **Thông tin ngân hàng thụ hưởng**:
+  - Tại Frontend `Subscription/Index.tsx` và Backend `SubscriptionController.php`, thay thế thông tin ngân hàng và chủ tài khoản đang bị hardcode cứng ("MB Bank" và "DANG TUAN DAT") bằng dữ liệu lấy động từ cấu hình hoạt động trong database (`PaymentConfig` model).
+  - API checkout `/api/subscription/checkout` cần trả về đầy đủ các thông tin cấu hình thụ hưởng này để Frontend hiển thị động lên Checkout Modal.
+- **Doanh thu Admin Dashboard**:
+  - Thay thế số doanh thu giả định (5.600.000đ) hiển thị trên card thống kê của trang Payments Admin (`Admin/Payments/Index.tsx`) bằng tổng doanh thu thực tế tính bằng `sum('amount')` từ các transaction có trạng thái `success`.
+
+### R2. Khắc phục Dữ liệu Tạm thời & Tương tác "Chết"
+- **Duy trì trạng thái bằng localStorage**:
+  - Tích hợp `localStorage` để lưu trữ dữ liệu orders tạm thời, bình luận ghim (`pinnedIds`) và đơn hàng được đánh dấu (`markedOrderIds`) trong trang `Lives/Show.tsx`.
+  - Các key lưu trữ cần có hậu tố theo `session.id` của livestream (ví dụ: `orders_{id}`, `pinned_{id}`, `marked_{id}`) để đảm bảo dữ liệu không bị mất khi F5 hoặc reload trang, và không bị chồng chéo giữa các phiên live khác nhau.
+
+### R3. Bổ sung Trạng thái Phản hồi & Toast Notifications
+- **Loading Spinners**:
+  - Thêm spinner loading khi người dùng click vào nút "Kết thúc phiên phân tích" (`Lives/Show.tsx`) and nút "Xác nhận xóa" livestream (`Lives/Index.tsx`).
+- **Toasts thông báo**:
+  - Bổ sung thông báo Toast (sử dụng thư viện `sonner` hoặc toast có sẵn) khi: copy tất cả Leads, copy SĐT của khách hàng, lưu đơn hàng tạm thời, kết thúc thành công phiên live.
+
+### R4. Tích hợp Gating kiểm tra ở Frontend (Client-side Gating)
+- **Check limits tạo livestream**:
+  - Tại trang `Lives/Setup.tsx`, kiểm tra số lượng active streams hiện tại của user so với giới hạn gói dịch vụ (`auth.subscription.features.limit_streams`).
+  - If số active streams đã đạt tối đa, vô hiệu hóa nút submit tạo stream và hiển thị cảnh báo yêu cầu nâng cấp gói cước.
+
+### R5. Đồng bộ Backend Validation cho Packages
+- **Ràng buộc các trường âm**:
+  - Tại `SubscriptionController.php` (phần lưu/cập nhật Packages), cập nhật validation rules cho các trường trong `features` (như `limit_streams` và `ai_credits`) để cho phép giá trị tối thiểu là `-1` (định nghĩa cho vô hạn) thay vì chỉ check `integer`, tránh các lỗi logic khi admin nhập số âm bất kỳ.
+
+## Acceptance Criteria
+
+### UI & Gating Correctness
+- [ ] Màn hình thanh toán (Checkout Modal) hiển thị đúng thông tin ngân hàng thụ hưởng lấy từ DB cấu hình (không hardcode).
+- [ ] Thẻ tổng doanh thu trên Admin Payments hiển thị chính xác tổng số tiền thực từ các transactions thành công.
+- [ ] Các dữ liệu ghim comment, đơn hàng đã tạo và đơn hàng đánh dấu được bảo toàn sau khi reload/F5 trang `Lives/Show.tsx`.
+- [ ] Các nút bấm kết thúc livestream và xóa livestream có hiển thị hiệu ứng loading/spinner và vô hiệu hóa click khi đang xử lý.
+- [ ] Hiển thị toast thông báo trực quan khi copy thông tin hoặc lưu đơn hàng thành công.
+- [ ] Nút tạo livestream ở setup page bị chặn nếu user đã đạt số lượng active streams giới hạn.
+- [ ] Các package parameters được validate chặt chẽ trên backend, hỗ trợ giá trị `-1` cho vô hạn.
+- [ ] Biên dịch frontend bằng `npm run build` thành công, không gặp lỗi TypeScript.
+- [ ] Tất cả các test cases chạy bằng `php artisan test` đều pass.
+
+## 2026-05-22T10:38:58Z
+
+Nghiên cứu kỹ chuyên sâu giao diện, đối chiếu tổng thể web và backend để khắc phục hoàn toàn các lỗi sai, thừa, thiếu, các giá trị hardcode và các điểm tương tác UI/UX chưa hợp lý.
+
+Working directory: d:\Workspace\livestream\backend
+Integrity mode: development
+
+## Requirements
+
+### R1. Loại bỏ các giá trị Hardcode & Đồng bộ cấu hình động ở User Menu
+- **Menu Nâng cấp Pro**:
+  - Tại `nav-user.tsx` (dòng 160), thay thế chữ "Nâng cấp Pro" bị hardcode cứng.
+  - Sử dụng hook `usePage().props` để đọc `auth.subscription` động từ Backend.
+  - Nếu người dùng đã là gói "Pro" hoặc "Enterprise" và đang hoạt động (`active === true`), đổi nhãn hiển thị thành "Quản lý gói".
+  - Cập nhật kiểu dữ liệu TypeScript trong `index.d.ts` để khai báo đầy đủ các thuộc tính của `subscription` (package_name, active, used_ai_credits, features, v.v.).
+- **Thông tin ngân hàng thụ hưởng**:
+  - Đảm bảo Checkout Modal (`Subscription/Index.tsx`) lấy động các thuộc tính thụ hưởng (`beneficiary_bank`, `beneficiary_account`, `beneficiary_name`) từ response của API checkout `/api/subscription/checkout`, thay vì dùng fallback mặc định là "MB Bank", "11183041", "DANG TUAN DAT".
+- **Doanh thu Admin Dashboard**:
+  - Thay thế số doanh thu giả định hiển thị trên card thống kê của trang Payments Admin (`Admin/Payments/Index.tsx`) bằng tổng doanh thu thực tế tính bằng `sum('amount')` từ các transaction có trạng thái `success`.
+
+### R2. Tối ưu hóa Khoảng cách (Spacing) & Chiều cao Layout
+- **Khoảng cách Header sticky và Content chính**:
+  - Tại tất cả các trang chính (bao gồm `Dashboard.tsx`, `Lives/Index.tsx`, `Reports/Index.tsx`, `Products/Index.tsx`, `Settings/Index.tsx`, `Admin/Dashboard.tsx`, `Admin/Users/Index.tsx`, `Admin/Packages/Index.tsx`, `Admin/Payments/Index.tsx`, `Admin/Settings/Index.tsx`), thay thế class padding chính dưới header từ `p-4 pt-4` hoặc `p-4` sang `p-6` (hoặc `p-6 pt-6` nếu cần) để tăng khoảng cách từ 16px lên 24px, mang lại độ thoáng đãng và sang trọng chuẩn UI/UX cao cấp.
+- **Tối ưu chiều cao Checkout Modal**:
+  - Tại modal thanh toán gói dịch vụ (`Subscription/Index.tsx`), do chiều cao tối đa bị giới hạn ở `max-h-[85vh]` nên rất dễ bị khuất các nút bấm ở Footer trên các màn hình laptop nhỏ (13.3", 14").
+  - Tiến hành thu hẹp khoảng cách bằng cách giảm padding của `DialogHeader`, `DialogFooter` và nội dung ở giữa từ `p-5` xuống `p-4` (hoặc `px-5 py-4`).
+  - Giảm nhẹ kích thước khung QR code xuống `max-w-[155px]` (vẫn đảm bảo quét tốt nhưng thon gọn hơn) và giảm gap/space-y trong modal từ `gap-6` thành `gap-4`, `space-y-4` thành `space-y-3`.
+  - Đảm bảo toàn bộ thông tin thanh toán, QR code và nút footer hiển thị trọn vẹn trên màn hình nhỏ mà không bị che khuất.
+
+### R3. Nút thiếu padding trên Landing Page
+- **Landing Page Buttons**:
+  - Tại `landing.blade.php`, thẻ `<a>` cho nút "Bắt đầu ngay" (dòng 770) và "Đăng ký ngay" (dòng 814) bị thiếu class padding ngang `px-...` hoặc độ rộng làm chữ bị ép sát lề hai bên nút.
+  - Sửa đổi thành `w-full` để nút chiếm toàn bộ chiều ngang card, giúp bố cục dạng cột cân xứng, dễ bấm và chuyên nghiệp tương đương các nút khác của landing page.
+
+### R4. Thiết kế lại các Badge Livestream dịu nhẹ và cao cấp
+- **Badge Livestream**:
+  - Các badge trạng thái livestream trong `Lives/Index.tsx` (dòng 267, 271) và `Lives/Show.tsx` (dòng 1697) đang dùng màu thô và nổi bật thái quá (`bg-blue-600 hover:bg-blue-700`, `bg-amber-500 hover:bg-amber-600`), lạc quẻ với tông màu xanh lục primary oklch của hệ thống.
+  - Thiết kế lại các badge này sang style mờ cao cấp (`bg-.../10 text-... border border-.../20`):
+    - `connecting` (Đang kết nối): `bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20` (kèm pulse nhẹ).
+    - `disconnected` (Mất kết nối): `bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20` (kèm pulse nhẹ).
+    - `ended` (Đã kết thúc) hoặc khác: `bg-muted text-muted-foreground border border-border/50`.
+    - `live` (Đang Live): Giữ màu đỏ tươi hoặc tối ưu nhẹ sang `bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20` kết hợp animation ping tròn truyền thống.
+
+### R5. Khắc phục Dữ liệu Tạm thời & Tương tác "Chết"
+- **Duy trì trạng thái bằng localStorage**:
+  - Tích hợp `localStorage` to lưu trữ dữ liệu orders tạm thời, bình luận ghim (`pinnedIds`) và đơn hàng được đánh dấu (`markedOrderIds`) trong trang `Lives/Show.tsx`.
+  - Các key lưu trữ cần có hậu tố theo `session.id` của livestream (ví dụ: `orders_{id}`, `pinned_{id}`, `marked_{id}`) để đảm bảo dữ liệu không bị mất khi F5 hoặc reload trang, và không bị chồng chéo giữa các phiên live khác nhau.
+- **Bổ sung Trạng thái Phản hồi & Toast Notifications**:
+  - Thêm spinner loading khi người dùng click vào nút "Kết thúc phiên phân tích" (`Lives/Show.tsx`) và nút "Xác nhận xóa" livestream (`Lives/Index.tsx`).
+  - Bổ sung thông báo Toast (sử dụng thư viện `sonner` hoặc toast có sẵn) khi: copy tất cả Leads, copy SĐT của khách hàng, lưu đơn hàng tạm thời, kết thúc thành công phiên live.
+
+### R6. Tích hợp Gating kiểm tra ở Frontend (Client-side Gating)
+- **Check limits tạo livestream**:
+  - Tại trang `Lives/Setup.tsx`, kiểm tra số lượng active streams hiện tại của user so với giới hạn gói dịch vụ (`auth.subscription.features.limit_streams`).
+  - Nếu số active streams đã đạt tối đa, vô hiệu hóa nút submit tạo stream và hiển thị cảnh báo yêu cầu nâng cấp gói cước.
+
+### R7. Đồng bộ Backend Validation cho Packages
+- **Ràng buộc các trường âm**:
+  - Tại `SubscriptionController.php` (phần lưu/cập nhật Packages), cập nhật validation rules cho các trường trong `features` (như `limit_streams` và `ai_credits`) để cho phép giá trị tối thiểu là `-1` (định nghĩa cho vô hạn) thay vì chỉ check `integer`, tránh các lỗi logic khi admin nhập số âm bất kỳ.
+
+## Acceptance Criteria
+
+### UI & Gating Correctness
+- [ ] Nhãn ở User Menu đổi động thành "Quản lý gói" nếu user đang có gói Pro hoặc Enterprise còn hoạt động.
+- [ ] Khai báo TypeScript cho `UserSubscription` trong `index.d.ts` hoàn thiện, không bị lỗi compile.
+- [ ] Nút bấm trên Landing Page rộng toàn bộ card (`w-full`), bố cục cân đối và đẹp mắt.
+- [ ] Toàn bộ nội dung Checkout Modal (bao gồm cả mã QR và các nút bấm footer) hiển thị trọn vẹn trên màn hình 13.3"/14" mà không bị khuất nút bấm "Tôi đã chuyển tiền".
+- [ ] Các badge trạng thái livestream dùng style mờ cao cấp, không dùng màu thô xanh dương/cam đậm, đồng bộ với thiết kế chung.
+- [ ] Khoảng cách content chính với header sticky rộng rãi, thoáng mát (`p-6` thay vì `p-4 pt-4` hay `p-4`).
+- [ ] Thẻ tổng doanh thu trên Admin Payments hiển thị chính xác tổng số tiền thực từ các transactions thành công.
+- [ ] Các dữ liệu ghim comment, đơn hàng đã tạo và đơn hàng đánh dấu được bảo toàn sau khi reload/F5 trang `Lives/Show.tsx`.
+- [ ] Các nút bấm kết thúc livestream và xóa livestream có hiển thị hiệu ứng loading/spinner và vô hiệu hóa click khi đang xử lý.
+- [ ] Hiển thị toast thông báo trực quan khi copy thông tin hoặc lưu đơn hàng thành công.
+- [ ] Nút tạo livestream ở setup page bị chặn nếu user đã đạt số lượng active streams giới hạn.
+- [ ] Các package parameters được validate chặt chẽ trên backend, hỗ trợ giá trị `-1` cho vô hạn.
+- [ ] Biên dịch frontend bằng `npm run build` thành công, không gặp lỗi TypeScript.
+- [ ] Tất cả các test cases chạy bằng `php artisan test` đều pass.
+
+## 2026-05-22T04:40:06Z
+
+Nghiên cứu kỹ chuyên sâu giao diện, đối chiếu tổng thể web và backend để khắc phục hoàn toàn các lỗi sai, thừa, thiếu, các giá trị hardcode và các điểm tương tác UI/UX chưa hợp lý.
+
+Working directory: d:\Workspace\livestream\backend
+Integrity mode: development
+
+## Requirements
+
+### R1. Loại bỏ các giá trị Hardcode & Đồng bộ cấu hình động ở User Menu
+- **Menu Nâng cấp Pro**:
+  - Tại `nav-user.tsx` (dòng 160), thay thế chữ "Nâng cấp Pro" bị hardcode cứng.
+  - Sử dụng hook `usePage().props` để đọc `auth.subscription` động từ Backend.
+  - Nếu người dùng đã là gói "Pro" hoặc "Enterprise" và đang hoạt động (`active === true`), đổi nhãn hiển thị thành "Quản lý gói".
+  - Cập nhật kiểu dữ liệu TypeScript trong `index.d.ts` để khai báo đầy đủ các thuộc tính của `subscription` (package_name, active, used_ai_credits, features, v.v.).
+- **Thông tin ngân hàng thụ hưởng**:
+  - Đảm bảo Checkout Modal (`Subscription/Index.tsx`) lấy động các thuộc tính thụ hưởng (`beneficiary_bank`, `beneficiary_account`, `beneficiary_name`) từ response của API checkout `/api/subscription/checkout`, thay vì dùng fallback mặc định là "MB Bank", "11183041", "DANG TUAN DAT".
+- **Đồng bộ hóa dữ liệu & Doanh thu Admin Dashboard**:
+  - Tại `routes/web.php` (route `admin.dashboard`), thay thế cách tính doanh thu giả định (`$totalUsers * 299000` và `$usersCount * 299000`) bằng doanh thu thực tế từ database:
+    - Card KPI "Tổng doanh thu" (thay thế "Doanh thu ước tính"): tính tổng `amount` của các `Transaction` có trạng thái `success`.
+    - Biểu đồ tăng trưởng doanh thu (`revenueData`): tính tổng doanh thu thực tế từ các `Transaction` có trạng thái `success` được tạo trong từng tháng tương ứng.
+    - Người dùng gần đây (`recentUsers`): lấy thông tin gói cước thực tế của người dùng bằng cách gọi `$u->resolveActiveSubscription()->package->name` (nếu không có thì mặc định là `'Free'`) thay vì giả định chia dư theo ID (`$u->id % 3 === 0 ? 'Pro' : ...`).
+  - Thay thế số doanh thu giả định hiển thị trên card thống kê của trang Payments Admin (`Admin/Payments/Index.tsx`) bằng tổng doanh thu thực tế tính bằng `sum('amount')` từ các transaction có trạng thái `success`.
+- **Trang quản lý người dùng Admin (Admin Users Page)**:
+  - Cập nhật route `admin.users.index` để lấy danh sách người dùng kèm theo gói cước thực tế của họ (sử dụng eager loading `activeSubscription.package` để tránh N+1 query).
+  - Cập nhật frontend `Admin/Users/Index.tsx` để hiển thị thêm một cột "Gói" hiển thị badge tương ứng với gói cước thực tế của người dùng (Free, Pro, Business/Enterprise).
+
+### R2. Tối ưu hóa Khoảng cách (Spacing) & Chiều cao Layout
+- **Khoảng cách Header sticky và Content chính**:
+  - Tại tất cả các trang chính (bao gồm `Dashboard.tsx`, `Lives/Index.tsx`, `Reports/Index.tsx`, `Products/Index.tsx`, `Settings/Index.tsx`, `Admin/Dashboard.tsx`, `Admin/Users/Index.tsx`, `Admin/Packages/Index.tsx`, `Admin/Payments/Index.tsx`, `Admin/Settings/Index.tsx`), thay thế class padding chính dưới header từ `p-4 pt-4` hoặc `p-4` sang `p-6` (hoặc `p-6 pt-6` nếu cần) để tăng khoảng cách từ 16px lên 24px, mang lại độ thoáng đãng và sang trọng chuẩn UI/UX cao cấp.
+- **Tối ưu chiều cao Checkout Modal**:
+  - Tại modal thanh toán gói dịch vụ (`Subscription/Index.tsx`), do chiều cao tối đa bị giới hạn ở `max-h-[85vh]` nên rất dễ bị khuất các nút bấm ở Footer trên các màn hình laptop nhỏ (13.3", 14").
+  - Tiến hành thu hẹp khoảng cách bằng cách giảm padding của `DialogHeader`, `DialogFooter` và nội dung ở giữa từ `p-5` xuống `p-4` (hoặc `px-5 py-4`).
+  - Giảm nhẹ kích thước khung QR code xuống `max-w-[155px]` (vẫn đảm bảo quét tốt nhưng thon gọn hơn) và giảm gap/space-y trong modal từ `gap-6` thành `gap-4`, `space-y-4` thành `space-y-3`.
+  - Đảm bảo toàn bộ thông tin thanh toán, QR code và nút footer hiển thị trọn vẹn trên màn hình nhỏ mà không cần cuộn sâu.
+
+### R3. Nút thiếu padding trên Landing Page
+- **Landing Page Buttons**:
+  - Tại `landing.blade.php`, thẻ `<a>` cho nút "Bắt đầu ngay" (dòng 770) và "Đăng ký ngay" (dòng 814) bị thiếu class padding ngang `px-...` hoặc độ rộng làm chữ bị ép sát lề hai bên nút.
+  - Sửa đổi thành `w-full` để nút chiếm toàn bộ chiều ngang card, giúp bố cục dạng cột cân xứng, dễ bấm và chuyên nghiệp tương đương các nút khác của landing page.
+
+### R4. Thiết kế lại các Badge Livestream dịu nhẹ và cao cấp
+- **Badge Livestream**:
+  - Các badge trạng thái livestream trong `Lives/Index.tsx` (dòng 267, 271) và `Lives/Show.tsx` (dòng 1697) đang dùng màu thô và nổi bật thái quá (`bg-blue-600 hover:bg-blue-700`, `bg-amber-500 hover:bg-amber-600`), lạc quẻ với tông màu xanh lục primary oklch của hệ thống.
+  - Thiết kế lại các badge này sang style mờ cao cấp (`bg-.../10 text-... border border-.../20`):
+    - `connecting` (Đang kết nối): `bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20` (kèm pulse nhẹ).
+    - `disconnected` (Mất kết nối): `bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20` (kèm pulse nhẹ).
+    - `ended` (Đã kết thúc) hoặc khác: `bg-muted text-muted-foreground border border-border/50`.
+    - `live` (Đang Live): Giữ màu đỏ tươi hoặc tối ưu nhẹ sang `bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20` kết hợp animation ping tròn truyền thống.
+
+### R5. Khắc phục Dữ liệu Tạm thời & Tương tác "Chết"
+- **Duy trì trạng thái bằng localStorage**:
+  - Tích hợp `localStorage` để lưu trữ dữ liệu orders tạm thời, bình luận ghim (`pinnedIds`) và đơn hàng được đánh dấu (`markedOrderIds`) trong trang `Lives/Show.tsx`.
+  - Các key lưu trữ cần có hậu tố theo `session.id` của livestream (ví dụ: `orders_{id}`, `pinned_{id}`, `marked_{id}`) để đảm bảo dữ liệu không bị mất khi F5 hoặc reload trang, và không bị chồng chéo giữa các phiên live khác nhau.
+- **Bổ sung Trạng thái Phản hồi & Toast Notifications**:
+  - Thêm spinner loading khi người dùng click vào nút "Kết thúc phiên phân tích" (`Lives/Show.tsx`) và nút "Xác nhận xóa" livestream (`Lives/Index.tsx`).
+  - Bổ sung thông báo Toast (sử dụng thư viện `sonner` hoặc toast có sẵn) khi: copy tất cả Leads, copy SĐT của khách hàng, lưu đơn hàng tạm thời, kết thúc thành công phiên live.
+
+### R6. Tích hợp Gating kiểm tra ở Frontend (Client-side Gating)
+- **Check limits tạo livestream**:
+  - Tại trang `Lives/Setup.tsx`, kiểm tra số lượng active streams hiện tại của user so với giới hạn gói dịch vụ (`auth.subscription.features.limit_streams`).
+  - Nếu số active streams đã đạt tối đa, vô hiệu hóa nút submit tạo stream và hiển thị cảnh báo yêu cầu nâng cấp gói cước.
+
+### R7. Đồng bộ Backend Validation cho Packages
+- **Ràng buộc các trường âm**:
+  - Tại `SubscriptionController.php` (phần lưu/cập nhật Packages), cập nhật validation rules cho các trường trong `features` (như `limit_streams` và `ai_credits`) để cho phép giá trị tối thiểu là `-1` (định nghĩa cho vô hạn) thay vì chỉ check `integer`, tránh các lỗi logic khi admin nhập số âm bất kỳ.
+
+## Acceptance Criteria
+
+### UI & Gating Correctness
+- [ ] Nhãn ở User Menu đổi động thành "Quản lý gói" nếu user đang có gói Pro hoặc Enterprise còn hoạt động.
+- [ ] Khai báo TypeScript cho `UserSubscription` trong `index.d.ts` hoàn thiện, không bị lỗi compile.
+- [ ] Nút bấm trên Landing Page rộng toàn bộ card (`w-full`), bố cục cân đối và đẹp mắt.
+- [ ] Toàn bộ nội dung Checkout Modal (bao gồm cả mã QR và các nút bấm footer) hiển thị trọn vẹn trên màn hình 13.3"/14" mà không bị khuất nút bấm "Tôi đã chuyển tiền".
+- [ ] Các badge trạng thái livestream dùng style mờ cao cấp, không dùng màu thô xanh dương/cam đậm, đồng bộ với thiết kế chung.
+- [ ] Khoảng cách content chính với header sticky rộng rãi, thoáng mát (`p-6` thay vì `p-4 pt-4` hay `p-4`).
+- [ ] Dữ liệu Admin Dashboard (doanh thu, biểu đồ, recent users) được đồng bộ từ dữ liệu thực tế thay vì tính giả lập.
+- [ ] Thẻ tổng doanh thu trên Admin Payments hiển thị chính xác tổng số tiền thực từ các transactions thành công.
+- [ ] Trang quản lý người dùng Admin (`Admin/Users/Index.tsx`) có cột "Gói" hiển thị đúng gói cước thực tế của người dùng.
+- [ ] Các dữ liệu ghim comment, đơn hàng đã tạo và đơn hàng đánh dấu được bảo toàn sau khi reload/F5 trang `Lives/Show.tsx`.
+- [ ] Các nút bấm kết thúc livestream và xóa livestream có hiển thị hiệu ứng loading/spinner và vô hiệu hóa click khi đang xử lý.
+- [ ] Hiển thị toast thông báo trực quan khi copy thông tin hoặc lưu đơn hàng thành công.
+- [ ] Nút tạo livestream ở setup page bị chặn nếu user đã đạt số lượng active streams giới hạn.
+- [ ] Các package parameters được validate chặt chẽ trên backend, hỗ trợ giá trị `-1` cho vô hạn.
+- [ ] Biên dịch frontend bằng `npm run build` thành công, không gặp lỗi TypeScript.
+- [ ] Tất cả các test cases chạy bằng `php artisan test` đều pass.
+

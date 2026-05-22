@@ -246,4 +246,68 @@ class SubscriptionPaymentChallengerTest extends TestCase
         $response3->assertSessionHas('success');
         $this->assertDatabaseMissing('subscription_packages', ['id' => $cleanPackage->id]);
     }
+
+    /**
+     * Test package CRUD endpoints and validation support for min -1.
+     */
+    public function test_package_crud_validation_min_minus_one(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'email_verified_at' => now()]);
+
+        // 1. Check creating package with stream limit -1 succeeds
+        $response1 = $this->actingAs($admin)->post("/admin/packages", [
+            'name' => 'Unlimited Stream Pack',
+            'price' => 500000,
+            'duration_days' => 30,
+            'features' => [
+                'limit_streams' => -1,
+                'max_duration_hours' => 5,
+                'ai_credits' => 5000,
+                'audio_analysis' => true,
+                'export_leads' => true,
+            ]
+        ]);
+        $response1->assertSessionHas('success');
+        $this->assertDatabaseHas('subscription_packages', [
+            'name' => 'Unlimited Stream Pack',
+            'price' => 500000,
+        ]);
+
+        // 2. Check creating package with limit_streams -2 fails validation
+        $response2 = $this->actingAs($admin)->post("/admin/packages", [
+            'name' => 'Invalid Stream Pack',
+            'price' => 500000,
+            'duration_days' => 30,
+            'features' => [
+                'limit_streams' => -2,
+                'max_duration_hours' => 5,
+                'ai_credits' => 5000,
+                'audio_analysis' => true,
+                'export_leads' => true,
+            ]
+        ]);
+        $response2->assertSessionHasErrors(['features.limit_streams']);
+
+        // 3. Check updating package with max_duration_hours -1 succeeds
+        $package = SubscriptionPackage::where('name', 'Unlimited Stream Pack')->first();
+        $response3 = $this->actingAs($admin)->put("/admin/packages/{$package->id}", [
+            'name' => 'Unlimited Stream Pack Updated',
+            'price' => 600000,
+            'duration_days' => 60,
+            'features' => [
+                'limit_streams' => -1,
+                'max_duration_hours' => -1,
+                'ai_credits' => 10000,
+                'audio_analysis' => true,
+                'export_leads' => true,
+            ]
+        ]);
+        $response3->assertSessionHas('success');
+        $this->assertDatabaseHas('subscription_packages', [
+            'id' => $package->id,
+            'name' => 'Unlimited Stream Pack Updated',
+            'price' => 600000,
+        ]);
+    }
 }
+

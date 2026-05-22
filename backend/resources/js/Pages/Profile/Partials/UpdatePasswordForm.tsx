@@ -1,16 +1,30 @@
-import { useForm } from '@inertiajs/react';
-import { FormEventHandler, useRef } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { KeyRound, LoaderIcon, CheckIcon } from 'lucide-react';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useForm } from '@inertiajs/react';
+import { CheckIcon, KeyRound, LoaderIcon } from 'lucide-react';
+import { FormEventHandler, useRef } from 'react';
 
 export default function UpdatePasswordForm() {
     const passwordInput = useRef<HTMLInputElement>(null);
     const currentPasswordInput = useRef<HTMLInputElement>(null);
 
-    const { data, setData, errors, put, reset, processing, recentlySuccessful } = useForm({
+    const {
+        data,
+        setData,
+        errors,
+        put,
+        reset,
+        processing,
+        recentlySuccessful,
+    } = useForm({
         current_password: '',
         password: '',
         password_confirmation: '',
@@ -39,7 +53,7 @@ export default function UpdatePasswordForm() {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <KeyRound className="size-5 text-primary" />
+                        <KeyRound className="text-primary size-5" />
                         Đổi mật khẩu
                     </CardTitle>
                     <CardDescription>
@@ -48,17 +62,23 @@ export default function UpdatePasswordForm() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid gap-2">
-                        <Label htmlFor="current_password">Mật khẩu hiện tại</Label>
+                        <Label htmlFor="current_password">
+                            Mật khẩu hiện tại
+                        </Label>
                         <Input
                             id="current_password"
                             ref={currentPasswordInput}
                             type="password"
                             autoComplete="current-password"
                             value={data.current_password}
-                            onChange={(e) => setData('current_password', e.target.value)}
+                            onChange={(e) =>
+                                setData('current_password', e.target.value)
+                            }
                         />
                         {errors.current_password && (
-                            <p className="text-sm text-destructive font-medium">{errors.current_password}</p>
+                            <p className="text-destructive text-sm font-medium">
+                                {errors.current_password}
+                            </p>
                         )}
                     </div>
 
@@ -70,34 +90,48 @@ export default function UpdatePasswordForm() {
                             type="password"
                             autoComplete="new-password"
                             value={data.password}
-                            onChange={(e) => setData('password', e.target.value)}
+                            onChange={(e) =>
+                                setData('password', e.target.value)
+                            }
                         />
                         {errors.password && (
-                            <p className="text-sm text-destructive font-medium">{errors.password}</p>
+                            <p className="text-destructive text-sm font-medium">
+                                {errors.password}
+                            </p>
                         )}
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="password_confirmation">Xác nhận mật khẩu mới</Label>
+                        <Label htmlFor="password_confirmation">
+                            Xác nhận mật khẩu mới
+                        </Label>
                         <Input
                             id="password_confirmation"
                             type="password"
                             autoComplete="new-password"
                             value={data.password_confirmation}
-                            onChange={(e) => setData('password_confirmation', e.target.value)}
+                            onChange={(e) =>
+                                setData('password_confirmation', e.target.value)
+                            }
                         />
                         {errors.password_confirmation && (
-                            <p className="text-sm text-destructive font-medium">{errors.password_confirmation}</p>
+                            <p className="text-destructive text-sm font-medium">
+                                {errors.password_confirmation}
+                            </p>
                         )}
                     </div>
 
-                    <Button type="submit" disabled={processing} className="gap-2">
+                    <Button
+                        type="submit"
+                        disabled={processing}
+                        className="gap-2"
+                    >
                         {processing ? (
                             <LoaderIcon className="size-4 animate-spin" />
                         ) : recentlySuccessful ? (
                             <CheckIcon className="size-4" />
                         ) : null}
-                        {recentlySuccessful ? "Đã lưu" : "Cập nhật mật khẩu"}
+                        {recentlySuccessful ? 'Đã lưu' : 'Cập nhật mật khẩu'}
                     </Button>
                 </CardContent>
             </Card>

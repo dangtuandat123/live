@@ -1,11 +1,22 @@
+import { Button } from '@/components/ui/button';
+import {
+    Field,
+    FieldDescription,
+    FieldGroup,
+    FieldLabel,
+} from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 
-export default function ResetPassword({ token, email }: { token: string; email: string }) {
+export default function ResetPassword({
+    token,
+    email,
+}: {
+    token: string;
+    email: string;
+}) {
     const { data, setData, post, processing, errors, reset } = useForm({
         token,
         email,
@@ -27,7 +38,7 @@ export default function ResetPassword({ token, email }: { token: string; email: 
                 <FieldGroup>
                     <div className="flex flex-col items-center gap-1 text-center">
                         <h1 className="text-2xl font-bold">Đặt lại mật khẩu</h1>
-                        <p className="text-sm text-balance text-muted-foreground mt-2">
+                        <p className="text-muted-foreground mt-2 text-sm text-balance">
                             Nhập mật khẩu mới cho tài khoản của bạn.
                         </p>
                     </div>
@@ -41,10 +52,16 @@ export default function ResetPassword({ token, email }: { token: string; email: 
                             value={data.email}
                             onChange={(e) => setData('email', e.target.value)}
                         />
-                        {errors.email && <FieldDescription className="text-destructive font-medium">{errors.email}</FieldDescription>}
+                        {errors.email && (
+                            <FieldDescription className="text-destructive font-medium">
+                                {errors.email}
+                            </FieldDescription>
+                        )}
                     </Field>
                     <Field>
-                        <FieldLabel htmlFor="password" className="mt-2">Mật khẩu mới</FieldLabel>
+                        <FieldLabel htmlFor="password" className="mt-2">
+                            Mật khẩu mới
+                        </FieldLabel>
                         <Input
                             id="password"
                             type="password"
@@ -52,23 +69,44 @@ export default function ResetPassword({ token, email }: { token: string; email: 
                             autoComplete="new-password"
                             autoFocus
                             value={data.password}
-                            onChange={(e) => setData('password', e.target.value)}
+                            onChange={(e) =>
+                                setData('password', e.target.value)
+                            }
                         />
-                        {errors.password && <FieldDescription className="text-destructive font-medium">{errors.password}</FieldDescription>}
+                        {errors.password && (
+                            <FieldDescription className="text-destructive font-medium">
+                                {errors.password}
+                            </FieldDescription>
+                        )}
                     </Field>
                     <Field>
-                        <FieldLabel htmlFor="password_confirmation" className="mt-2">Xác nhận mật khẩu</FieldLabel>
+                        <FieldLabel
+                            htmlFor="password_confirmation"
+                            className="mt-2"
+                        >
+                            Xác nhận mật khẩu
+                        </FieldLabel>
                         <Input
                             id="password_confirmation"
                             type="password"
                             className="bg-background"
                             autoComplete="new-password"
                             value={data.password_confirmation}
-                            onChange={(e) => setData('password_confirmation', e.target.value)}
+                            onChange={(e) =>
+                                setData('password_confirmation', e.target.value)
+                            }
                         />
-                        {errors.password_confirmation && <FieldDescription className="text-destructive font-medium">{errors.password_confirmation}</FieldDescription>}
+                        {errors.password_confirmation && (
+                            <FieldDescription className="text-destructive font-medium">
+                                {errors.password_confirmation}
+                            </FieldDescription>
+                        )}
                     </Field>
-                    <Button type="submit" disabled={processing} className="w-full mt-2">
+                    <Button
+                        type="submit"
+                        disabled={processing}
+                        className="mt-2 w-full"
+                    >
                         Đặt lại mật khẩu
                     </Button>
                 </FieldGroup>

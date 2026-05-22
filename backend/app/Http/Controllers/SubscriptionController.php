@@ -10,6 +10,7 @@ use App\Models\UserSubscription;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Inertia\Inertia;
 
 class SubscriptionController extends Controller
 {
@@ -142,16 +143,19 @@ class SubscriptionController extends Controller
         // Paid package: generate transaction and VietQR
         $transactionId = ($paymentConfig->prefix ?? 'TX_').strtoupper(Str::random(10));
 
-        $vietQrTemplate = 'https://api.vietqr.io/image/970416-11183041-rdXzPHV.jpg?accountName=DANG%20TUAN%20DAT&addInfo={Prefix}%20{userId}%20{Suffix}&amount={amount}';
+        $vietQrTemplate = $paymentConfig->qr_template ?? 'https://api.vietqr.io/image/970416-11183041-rdXzPHV.jpg?accountName=DANG%20TUAN%20DAT&addInfo={Prefix}%20{userId}%20{Suffix}&amount={amount}';
 
+        $bankIdVal = rawurlencode($paymentConfig->bank_id ?? '970416');
+        $accountNoVal = rawurlencode($paymentConfig->account_no ?? '11183041');
+        $accountNameVal = rawurlencode($paymentConfig->account_name ?? 'DANG TUAN DAT');
         $prefixVal = rawurlencode($paymentConfig->prefix ?? '');
         $userIdVal = rawurlencode((string) $user->id);
         $suffixVal = rawurlencode($paymentConfig->suffix ?? '');
         $amountVal = rawurlencode((string) $package->price);
 
         $vietQrUrl = str_replace(
-            ['{Prefix}', '{userId}', '{Suffix}', '{amount}'],
-            [$prefixVal, $userIdVal, $suffixVal, $amountVal],
+            ['{bank_id}', '{account_no}', '{account_name}', '{Prefix}', '{userId}', '{Suffix}', '{amount}'],
+            [$bankIdVal, $accountNoVal, $accountNameVal, $prefixVal, $userIdVal, $suffixVal, $amountVal],
             $vietQrTemplate
         );
 
@@ -168,6 +172,83 @@ class SubscriptionController extends Controller
         return response()->json([
             'transaction_id' => $transaction->transaction_id,
             'vietqr_url' => $transaction->vietqr_url,
+            'beneficiary_bank' => $paymentConfig->bank_name ?? 'MB Bank',
+            'beneficiary_account' => $paymentConfig->account_no ?? '11183041',
+            'beneficiary_name' => $paymentConfig->account_name ?? 'DANG TUAN DAT',
         ]);
     }
+
+    /**
+     * Admin: Display list of subscription packages.
+     */
+    public function packagesIndex()
+    {
+        $packages = SubscriptionPackage::orderBy('price')->get();
+
+        return Inertia::render('Admin/Packages/Index', ['packages' => $packages]);
+    }
+
+    /**
+     * Admin: Store a new subscription package.
+     */
+    public function storePackage(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'price' => ['required', 'integer', 'min:0'],
+            'duration_days' => ['required', 'integer', 'min:1'],
+            'features' => ['nullable', 'array'],
+            'features.limit_streams' => ['nullable', 'integer', 'min:-1'],
+            'features.max_duration_hours' => ['nullable', 'integer', 'min:-1'],
+            'features.ai_credits' => ['nullable', 'integer', 'min:-1'],
+            'features.audio_analysis' => ['nullable', 'boolean'],
+            'features.export_leads' => ['nullable', 'boolean'],
+        ]);
+
+        SubscriptionPackage::create($validated);
+
+        return back()->with('success', 'Đã tạo gói dịch vụ mới thành công.');
+    }
+
+    /**
+     * Admin: Update an existing subscription package.
+     */
+    public function updatePackage(Request $request, SubscriptionPackage $package)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'price' => ['required', 'integer', 'min:0'],
+            'duration_days' => ['required', 'integer', 'min:1'],
+            'features' => ['nullable', 'array'],
+            'features.limit_streams' => ['nullable', 'integer', 'min:-1'],
+            'features.max_duration_hours' => ['nullable', 'integer', 'min:-1'],
+            'features.ai_credits' => ['nullable', 'integer', 'min:-1'],
+            'features.audio_analysis' => ['nullable', 'boolean'],
+            'features.export_leads' => ['nullable', 'boolean'],
+        ]);
+
+        $package->update($validated);
+
+        return back()->with('success', 'Đã cập nhật gói dịch vụ thành công.');
+    }
+
+    /**
+     * Admin: Delete a subscription package.
+     */
+    public function destroyPackage(SubscriptionPackage $package)
+    {
+        $hasAssociations = UserSubscription::where('subscription_package_id', $package->id)->exists()
+            || Transaction::where('subscription_package_id', $package->id)->exists();
+        if ($hasAssociations) {
+            return back()->withErrors(['error' => 'Không thể xóa gói dịch vụ đã có lịch sử đăng ký hoặc giao dịch.']);
+        }
+        try {
+            $package->delete();
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => 'Lỗi khi xóa gói dịch vụ: '.$e->getMessage()]);
+        }
+
+        return back()->with('success', 'Đã xóa gói dịch vụ thành công.');
+    }
 }
+

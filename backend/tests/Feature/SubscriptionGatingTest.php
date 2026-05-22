@@ -334,4 +334,54 @@ class SubscriptionGatingTest extends TestCase
         $this->assertArrayHasKey('features', $pageProps['activeSubscription']);
         $this->assertEquals(1000, $pageProps['activeSubscription']['features']['ai_credits']);
     }
+
+    public function test_stream_unlimited_duration_gating()
+    {
+        $user = User::factory()->create();
+        $package = SubscriptionPackage::create([
+            'name' => 'Unlimited Package',
+            'price' => 0,
+            'duration_days' => 30,
+            'features' => [
+                'limit_streams' => 1,
+                'max_duration_hours' => -1,
+                'ai_credits' => 1000,
+                'audio_analysis' => false,
+                'export_leads' => false,
+            ],
+        ]);
+
+        $user->subscriptions()->create([
+            'subscription_package_id' => $package->id,
+            'starts_at' => now(),
+            'expires_at' => now()->addDays(30),
+            'status' => 'active',
+            'used_ai_credits' => 0,
+        ]);
+
+        // Create a live session started 10 hours ago (should not auto-stop since max_duration_hours = -1)
+        $session = LiveSession::create([
+            'user_id' => $user->id,
+            'name' => 'Long Session',
+            'tiktok_username' => 'user1',
+            'status' => 'live',
+            'started_at' => now()->subHours(10),
+            'tiktok_session_id' => 'dummy-tiktok-session',
+        ]);
+
+        $this->mock(TikTokService::class, function ($mock) {
+            $mock->shouldNotReceive('stopSession');
+        });
+
+        $this->actingAs($user);
+
+        // Fetching the session show route should not trigger the auto-stop duration check
+        $response = $this->get(route('lives.show', $session));
+
+        $session->refresh();
+
+        $this->assertEquals('live', $session->status);
+        $this->assertNull($session->ended_at);
+        $this->assertNull($session->error_message);
+    }
 }

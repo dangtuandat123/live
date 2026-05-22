@@ -79,9 +79,9 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
             ->distinct('user_id')
             ->count('user_id');
 
-        // Doanh thu ước tính (M)
-        $revenueVal = round(($totalUsers * 299000) / 1000000, 1);
-        $estimatedRevenue = $revenueVal.'M';
+        // Tổng doanh thu
+        $revenueVal = Transaction::where('status', 'success')->sum('amount');
+        $totalRevenueVal = $revenueVal;
 
         // Biểu đồ 5 tháng gần đây
         $revenueData = [];
@@ -89,29 +89,31 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
             $monthDate = now()->subMonths($i);
             $monthLabel = 'T'.$monthDate->format('m');
 
+            $startOfMonth = $monthDate->copy()->startOfMonth();
+            $endOfMonth = $monthDate->copy()->endOfMonth();
+
             // Tính số lượng user đăng ký trước hoặc bằng ngày cuối tháng này
-            $usersCount = User::where('created_at', '<=', $monthDate->endOfMonth())->count();
+            $usersCount = User::where('created_at', '<=', $endOfMonth)->count();
+
+            $monthlyRevenue = Transaction::where('status', 'success')
+                ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+                ->sum('amount');
 
             $revenueData[] = [
                 'month' => $monthLabel,
-                'revenue' => $usersCount * 299000,
+                'revenue' => $monthlyRevenue,
                 'users' => $usersCount,
             ];
         }
 
         // Người dùng gần đây
-        $recentUsers = User::orderByDesc('created_at')
+        $recentUsers = User::with(['subscriptions', 'activeSubscription.package'])->orderByDesc('created_at')
             ->limit(5)
             ->get()
             ->map(function ($u) {
                 $sessionsCount = LiveSession::where('user_id', $u->id)->count();
-                // Phân bổ plan giả định dựa trên ID để đa dạng giao diện
-                $plan = 'Free';
-                if ($u->id % 3 === 0) {
-                    $plan = 'Pro';
-                } elseif ($u->id % 3 === 1) {
-                    $plan = 'Business';
-                }
+                $activeSub = $u->resolveActiveSubscription();
+                $plan = $activeSub && $activeSub->package ? $activeSub->package->name : 'Free';
 
                 return [
                     'id' => $u->id,
@@ -139,8 +141,8 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
                     'trend' => 'up',
                 ],
                 [
-                    'title' => 'Doanh thu ước tính',
-                    'value' => $estimatedRevenue,
+                    'title' => 'Tổng doanh thu',
+                    'value' => number_format($totalRevenueVal) . 'đ',
                     'change' => '+15% so với tháng trước',
                     'trend' => 'up',
                 ],
@@ -157,7 +159,14 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
     })->name('admin.dashboard');
 
     Route::get('/users', function () {
-        $users = User::orderByDesc('created_at')->get();
+        $users = User::with(['subscriptions', 'activeSubscription.package'])
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function ($u) {
+                $activeSub = $u->resolveActiveSubscription();
+                $u->plan_name = $activeSub && $activeSub->package ? $activeSub->package->name : 'Free';
+                return $u;
+            });
 
         return Inertia::render('Admin/Users/Index', ['users' => $users]);
     })->name('admin.users.index');
@@ -210,52 +219,10 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
     })->name('admin.settings.update');
 
     // Gói dịch vụ (CRUD packages)
-    Route::get('/packages', function () {
-        $packages = SubscriptionPackage::orderBy('price')->get();
-
-        return Inertia::render('Admin/Packages/Index', ['packages' => $packages]);
-    })->name('admin.packages.index');
-
-    Route::post('/packages', function (Request $request) {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'price' => ['required', 'integer', 'min:0'],
-            'duration_days' => ['required', 'integer', 'min:1'],
-            'features' => ['nullable', 'array'],
-        ]);
-
-        SubscriptionPackage::create($validated);
-
-        return back()->with('success', 'Đã tạo gói dịch vụ mới thành công.');
-    })->name('admin.packages.store');
-
-    Route::put('/packages/{package}', function (Request $request, SubscriptionPackage $package) {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'price' => ['required', 'integer', 'min:0'],
-            'duration_days' => ['required', 'integer', 'min:1'],
-            'features' => ['nullable', 'array'],
-        ]);
-
-        $package->update($validated);
-
-        return back()->with('success', 'Đã cập nhật gói dịch vụ thành công.');
-    })->name('admin.packages.update');
-
-    Route::delete('/packages/{package}', function (SubscriptionPackage $package) {
-        $hasAssociations = UserSubscription::where('subscription_package_id', $package->id)->exists()
-            || Transaction::where('subscription_package_id', $package->id)->exists();
-        if ($hasAssociations) {
-            return back()->withErrors(['error' => 'Không thể xóa gói dịch vụ đã có lịch sử đăng ký hoặc giao dịch.']);
-        }
-        try {
-            $package->delete();
-        } catch (Exception $e) {
-            return back()->withErrors(['error' => 'Lỗi khi xóa gói dịch vụ: '.$e->getMessage()]);
-        }
-
-        return back()->with('success', 'Đã xóa gói dịch vụ thành công.');
-    })->name('admin.packages.destroy');
+    Route::get('/packages', [SubscriptionController::class, 'packagesIndex'])->name('admin.packages.index');
+    Route::post('/packages', [SubscriptionController::class, 'storePackage'])->name('admin.packages.store');
+    Route::put('/packages/{package}', [SubscriptionController::class, 'updatePackage'])->name('admin.packages.update');
+    Route::delete('/packages/{package}', [SubscriptionController::class, 'destroyPackage'])->name('admin.packages.destroy');
 
     // Cấu hình thanh toán & webhook
     Route::get('/payments', function () {
@@ -263,7 +230,12 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
             ?? PaymentConfig::first()
             ?? new PaymentConfig;
 
-        return Inertia::render('Admin/Payments/Index', ['config' => $config]);
+        $totalRevenue = Transaction::where('status', 'success')->sum('amount');
+
+        return Inertia::render('Admin/Payments/Index', [
+            'config' => $config,
+            'total_revenue' => $totalRevenue,
+        ]);
     })->name('admin.payments.index');
 
     Route::put('/payments', function (Request $request) {
@@ -275,6 +247,11 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
             'method' => ['required', 'in:POST,GET,PUT'],
             'params_template' => ['nullable', 'array'],
             'headers_template' => ['nullable', 'array'],
+            'bank_name' => ['nullable', 'string', 'max:255'],
+            'bank_id' => ['nullable', 'string', 'max:50'],
+            'account_no' => ['nullable', 'string', 'max:100'],
+            'account_name' => ['nullable', 'string', 'max:255'],
+            'qr_template' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $config = PaymentConfig::where('is_active', true)->first() ?? PaymentConfig::first();

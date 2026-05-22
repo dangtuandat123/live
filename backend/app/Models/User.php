@@ -108,7 +108,11 @@ class User extends Authenticatable
      */
     public function resolveActiveSubscription(): ?UserSubscription
     {
-        if (! $this->subscriptions()->exists()) {
+        $hasSubscriptions = $this->relationLoaded('subscriptions')
+            ? $this->subscriptions->isNotEmpty()
+            : $this->subscriptions()->exists();
+
+        if (! $hasSubscriptions) {
             $freePackage = SubscriptionPackage::where('price', 0)->first()
                 ?? SubscriptionPackage::where('name', 'Free')->first();
 

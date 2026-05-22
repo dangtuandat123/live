@@ -1,9 +1,14 @@
+import { Button } from '@/components/ui/button';
+import {
+    Field,
+    FieldDescription,
+    FieldGroup,
+    FieldLabel,
+} from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 
 export default function ForgotPassword({ status }: { status?: string }) {
     const { data, setData, post, processing, errors } = useForm({ email: '' });
@@ -20,12 +25,15 @@ export default function ForgotPassword({ status }: { status?: string }) {
                 <FieldGroup>
                     <div className="flex flex-col items-center gap-1 text-center">
                         <h1 className="text-2xl font-bold">Quên mật khẩu</h1>
-                        <p className="text-sm text-balance text-muted-foreground mt-2">
-                            Nhập email của bạn và chúng tôi sẽ gửi liên kết đặt lại mật khẩu.
+                        <p className="text-muted-foreground mt-2 text-sm text-balance">
+                            Nhập email của bạn và chúng tôi sẽ gửi liên kết đặt
+                            lại mật khẩu.
                         </p>
                     </div>
                     {status && (
-                        <div className="text-sm font-medium text-green-600 text-center">{status}</div>
+                        <div className="text-center text-sm font-medium text-green-600">
+                            {status}
+                        </div>
                     )}
                     <Field>
                         <FieldLabel htmlFor="email">Email</FieldLabel>
@@ -38,9 +46,17 @@ export default function ForgotPassword({ status }: { status?: string }) {
                             value={data.email}
                             onChange={(e) => setData('email', e.target.value)}
                         />
-                        {errors.email && <FieldDescription className="text-destructive font-medium">{errors.email}</FieldDescription>}
+                        {errors.email && (
+                            <FieldDescription className="text-destructive font-medium">
+                                {errors.email}
+                            </FieldDescription>
+                        )}
                     </Field>
-                    <Button type="submit" disabled={processing} className="w-full mt-2">
+                    <Button
+                        type="submit"
+                        disabled={processing}
+                        className="mt-2 w-full"
+                    >
                         Gửi liên kết đặt lại mật khẩu
                     </Button>
                 </FieldGroup>

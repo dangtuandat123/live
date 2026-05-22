@@ -18,6 +18,11 @@ class PaymentConfig extends Model
         'params_template',
         'headers_template',
         'is_active',
+        'bank_name',
+        'bank_id',
+        'account_no',
+        'account_name',
+        'qr_template',
     ];
 
     protected $attributes = [

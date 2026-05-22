@@ -97,12 +97,18 @@ class LiveSessionController extends Controller
      */
     public function create(Request $request)
     {
-        $products = Product::where('user_id', $request->user()->id)
+        $userId = $request->user()->id;
+        $products = Product::where('user_id', $userId)
             ->orderBy('name')
             ->get(['id', 'name', 'sku', 'price']);
 
+        $activeStreamsCount = LiveSession::forUser($userId)
+            ->whereIn('status', ['connecting', 'live'])
+            ->count();
+
         return Inertia::render('Lives/Setup', [
             'products' => $products,
+            'active_streams_count' => $activeStreamsCount,
         ]);
     }
 
@@ -996,6 +1002,10 @@ class LiveSessionController extends Controller
             $user = $request->user();
             $features = $user->getSubscriptionFeatures();
             $maxDurationHours = $features['max_duration_hours'] ?? 1;
+
+            if ((int) $maxDurationHours === -1) {
+                return;
+            }
 
             $elapsedSeconds = $liveSession->started_at->diffInSeconds(now());
             $durationHours = $elapsedSeconds / 3600;

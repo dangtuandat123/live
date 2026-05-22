@@ -138,7 +138,13 @@ class SubscriptionPaymentTest extends TestCase
         ]);
 
         $response->assertStatus(200);
-        $response->assertJsonStructure(['transaction_id', 'vietqr_url']);
+        $response->assertJsonStructure([
+            'transaction_id',
+            'vietqr_url',
+            'beneficiary_bank',
+            'beneficiary_account',
+            'beneficiary_name',
+        ]);
 
         $data = $response->json();
         $transactionId = $data['transaction_id'];
@@ -149,6 +155,10 @@ class SubscriptionPaymentTest extends TestCase
         $this->assertStringContainsString((string) $user->id, $vietQrUrl);
         $this->assertStringContainsString('_CONF', $vietQrUrl);
         $this->assertStringContainsString('299000', $vietQrUrl);
+
+        $this->assertEquals($config->bank_name, $data['beneficiary_bank']);
+        $this->assertEquals($config->account_no, $data['beneficiary_account']);
+        $this->assertEquals($config->account_name, $data['beneficiary_name']);
 
         $this->assertDatabaseHas('transactions', [
             'transaction_id' => $transactionId,

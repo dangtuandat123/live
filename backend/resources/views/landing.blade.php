@@ -767,7 +767,7 @@
                             </li>
                         </ul>
                     </div>
-                    <a href="{{ route('register') }}" class="mt-8 inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background text-sm font-semibold text-foreground hover:bg-muted/80 transition-colors">
+                    <a href="{{ route('register') }}" class="w-full mt-8 inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background text-sm font-semibold text-foreground hover:bg-muted/80 transition-colors">
                         Bắt đầu ngay
                     </a>
                 </div>
@@ -811,7 +811,7 @@
                             </li>
                         </ul>
                     </div>
-                    <a href="{{ route('register') }}" class="mt-8 inline-flex h-10 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/95 transition-all hover:scale-[1.01]">
+                    <a href="{{ route('register') }}" class="w-full mt-8 inline-flex h-10 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/95 transition-all hover:scale-[1.01]">
                         Đăng ký ngay
                     </a>
                 </div>
@@ -833,8 +833,8 @@
                 <p class="mx-auto mt-4 max-w-xl text-base text-primary-foreground/80">
                     Gia nhập cộng đồng hơn 10.000 chủ shop đã tự động hóa thành công khâu chốt đơn livestream và bùng nổ doanh số.
                 </p>
-                <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <a href="{{ route('register') }}" class="w-full sm:w-auto inline-flex h-11 items-center justify-center rounded-xl bg-background px-8 text-sm font-bold text-primary shadow-lg hover:bg-muted transition-all hover:scale-[1.02] hover:-translate-y-0.5">
+                <div class="mt-10 flex flex-col md:flex-row items-center justify-center gap-4">
+                    <a href="{{ route('register') }}" class="w-full md:w-auto inline-flex h-11 items-center justify-center rounded-xl bg-background px-8 text-sm font-bold text-primary shadow-lg hover:bg-muted transition-all hover:scale-[1.02] hover:-translate-y-0.5">
                         Thử nghiệm miễn phí ngay
                     </a>
                 </div>

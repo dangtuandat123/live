@@ -6,9 +6,7 @@ export default function AdminLayout({ children }: PropsWithChildren) {
     return (
         <SidebarProvider>
             <AdminSidebar />
-            <SidebarInset>
-                {children}
-            </SidebarInset>
+            <SidebarInset>{children}</SidebarInset>
         </SidebarProvider>
     );
 }

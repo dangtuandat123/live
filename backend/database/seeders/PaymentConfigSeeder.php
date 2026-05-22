@@ -28,6 +28,11 @@ class PaymentConfigSeeder extends Seeder
                     'Content-Type' => 'application/json',
                 ],
                 'is_active' => true,
+                'bank_name' => 'MB Bank',
+                'bank_id' => '970416',
+                'account_no' => '11183041',
+                'account_name' => 'DANG TUAN DAT',
+                'qr_template' => 'https://api.vietqr.io/image/{bank_id}-{account_no}-rdXzPHV.jpg?accountName={account_name}&addInfo={Prefix}%20{userId}%20{Suffix}&amount={amount}',
             ]
         );
     }
