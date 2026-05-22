@@ -1,7 +1,7 @@
-# BRIEFING — 2026-05-22T10:20:00+07:00
+# BRIEFING — 2026-05-22T07:10:00Z
 
 ## Mission
-Implement and verify the requirements R1 - R5 (Dynamic config & Revenue, localStorage, Spinners, Toasts, Gating & Validation) in the livestream application.
+Refactor `Lives/Show.tsx` to replace `localStorage` state for pinning, highlighting, and order marking with backend API calls.
 
 ## 🔒 My Identity
 - Archetype: Worker
@@ -21,36 +21,27 @@ Implement and verify the requirements R1 - R5 (Dynamic config & Revenue, localSt
 - Updated: yes
 
 ## Task Summary
-- **What to build**: Add beneficiary details to PaymentConfig & use them in checkout & total revenue card. Persist pinned IDs, marked orders, temporary orders in localStorage with session.id suffix. Add loading spinners to stop/delete stream buttons, and sonner toasts for copy/save actions. Pass active_streams_count, check/disable livestream setup if limit exceeded. Move Package CRUD closures to SubscriptionController, support min="-1" for package limit_streams/ai_credits, update package listing.
-- **Success criteria**: Tests pass, npm run build passes, dynamic payment beneficiary configs display correctly, localStorage works, loading spinners animate, active stream setup gated correctly, package CRUD moved and validates correctly.
-- **Interface contracts**: [TBD]
+- **What to build**: Refactor CommentsPanel and CustomersPanel in `Lives/Show.tsx` to use backend PUT API requests (`/api/live-events/{id}`) to persist pins, highlights, and order quantities/status, removing all localStorage dependencies. Run tests and asset builder to verify.
+- **Success criteria**: Vite build passes, all phpunit tests pass, local storage dependency completely removed, LiveEventUpdateTest created and passing.
+- **Interface contracts**: API routes/controllers, `LiveEventUpdateTest`.
 - **Code layout**: Laravel + Inertia React (TypeScript).
 
 ## Key Decisions Made
-- Confirmed all R1-R5 features are implemented and fully synced.
-- Verified test suite and frontend compilation results.
-- Wrote final handoff report detailing all verification results.
+- Replaced `localStorage` state hooks in `CommentsPanel` and `CustomersPanel` with direct `fetch` API requests to backend PUT endpoints.
+- Updated `CommentData` TypeScript interface to include `is_pinned`, `is_highlighted`, and `sort_order` optional fields to prevent compiler warnings.
+- Wrote `LiveEventUpdateTest.php` feature test to verify endpoint safety, permissions, and JSON attribute persistence.
 
 ## Change Tracker
 - **Files modified**:
-  - `backend/database/migrations/2026_05_22_000000_add_beneficiary_details_to_payment_configs_table.php`
-  - `backend/app/Models/PaymentConfig.php`
-  - `backend/app/Http/Controllers/SubscriptionController.php`
-  - `backend/app/Http/Controllers/LiveSessionController.php`
-  - `backend/routes/web.php`
-  - `backend/resources/js/Pages/Admin/Payments/Index.tsx`
-  - `backend/resources/js/Pages/Subscription/Index.tsx`
-  - `backend/resources/js/Pages/Lives/Show.tsx`
-  - `backend/resources/js/Pages/Lives/Index.tsx`
-  - `backend/resources/js/Pages/Lives/Setup.tsx`
-  - `backend/resources/js/Pages/Admin/Packages/Index.tsx`
+  - `backend/resources/js/Pages/Lives/Show.tsx` — Replaced localStorage with API calls, added typescript properties.
+  - `backend/tests/Feature/LiveEventUpdateTest.php` — Created new feature test file.
 - **Build status**: PASS
 - **Pending issues**: None
 
 ## Quality Status
-- **Build/test result**: PASS (75 tests passed, Vite build succeeded with 0 errors)
+- **Build/test result**: PASS (89 tests passed, Vite build compiled cleanly)
 - **Lint status**: 0 violations
-- **Tests added/modified**: `backend/tests/Feature/SubscriptionPaymentChallengerTest.php`
+- **Tests added/modified**: `backend/tests/Feature/LiveEventUpdateTest.php`
 
 ## Loaded Skills
 - **Source**: d:\Workspace\livestream\.agents\skills\laravel-best-practices\SKILL.md

@@ -1,0 +1,4 @@
+## 2026-05-22T06:49:23Z
+We are moving the application UI from hardcoded values to fully dynamic values synced from the Laravel backend.
+Your task is to scan the React files in `backend/resources/js/Pages/` (specifically `Lives/Index.tsx`, `Lives/Setup.tsx`, `Lives/Show.tsx`, and `Settings/Index.tsx`). Identify all hardcoded TikTok username connections, platforms, session parameters, or interaction counts. Review how TikTok platform connections can be saved in the `settings` column of `users` table, and how the user's active livestream count can be validated against `limit_streams` on `Lives/Setup.tsx`. Propose clean backend routes/APIs and state persistence (localStorage) keys. Produce a detailed handoff report in your working directory: `d:\Workspace\livestream\.agents\teamwork_preview_explorer_ui_hardcode_scan_3\handoff.md`.
+Please write your progress and findings directly to your working directory.

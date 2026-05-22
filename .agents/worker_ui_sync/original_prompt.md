@@ -65,3 +65,8 @@ Audit, sync, and align Frontend React with Backend Laravel:
 3. Frontend React Pages (Subscription/Index, Admin/Payments/Index, Admin/Packages/Index, Lives/Setup, Lives/Show, Lives/Index)
 4. Testing & Validation
 
+## 2026-05-22T07:05:00Z
+
+Refactor Lives/Show.tsx to replace localStorage state for pinning, highlighting, and order marking with router.post/put calls to the newly created backend API. Execute php artisan test and npm run build for final validation.
+
+

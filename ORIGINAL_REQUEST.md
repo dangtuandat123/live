@@ -665,4 +665,41 @@ Integrity mode: development
 - [ ] Tất cả các test cases (`php artisan test`) đều chạy pass thành công.
 - [ ] Thêm unit test kiểm tra chức năng kết nối/ngắt kết nối TikTok.
 
+## Follow-up — 2026-05-22T06:47:57Z
+
+Quét toàn bộ giao diện ứng dụng (React Inertia.js + Laravel) trong thư mục `backend/resources/js/Pages` để phát hiện, loại bỏ dữ liệu tĩnh bị hardcode và chuyển đổi sang dữ liệu động được truyền từ Laravel backend thông qua props hoặc Inertia Shared Data.
+
+Working directory: `d:\Workspace\livestream`
+Integrity mode: development
+
+## Requirements
+
+### R1. Rà soát & Phát hiện Hardcode trên toàn bộ các trang giao diện
+- Quét toàn bộ các tệp React (`.tsx`, `.ts`) trong thư mục `backend/resources/js/Pages` bao gồm: `Dashboard.tsx`, `Subscription/Index.tsx`, `Reports/Index.tsx`, `Lives/Index.tsx`, `Lives/Setup.tsx`, `Lives/Show.tsx`, và các components dùng chung.
+- Tìm kiếm các chuỗi tĩnh hiển thị số liệu, biểu đồ mẫu, thông tin tài khoản, ngân hàng, hoặc cấu hình bị viết cứng (hardcoded) trong mã nguồn frontend.
+
+### R2. Động hóa dữ liệu từ Backend
+- Đối với mỗi vị trí phát hiện hardcode, cập nhật Controller Laravel tương ứng để truy vấn dữ liệu thực tế từ database (hoặc cấu hình `.env` / config) và truyền xuống qua Inertia props.
+- Trường hợp dữ liệu cần dùng chung cho nhiều trang (như thông tin người dùng, gói cước hiện tại, kết nối tài khoản), sử dụng cơ chế Inertia Shared Data thông qua middleware `HandleInertiaRequests.php`.
+- Đảm bảo các thông số nhạy cảm như ngân hàng thụ hưởng, số tài khoản, tên chủ tài khoản được cấu hình động (ví dụ: thông qua bảng `payment_configs` hoặc `.env`) thay vì fallback tĩnh ở client.
+
+### R3. Đảm bảo tính ổn định và hiệu năng
+- Giữ nguyên cấu trúc giao diện và trải nghiệm người dùng hiện tại, chỉ thay đổi luồng dữ liệu từ tĩnh sang động.
+- Không thay đổi cấu trúc bảng cơ sở dữ liệu hiện tại trừ khi được yêu cầu rõ ràng.
+- Đảm bảo không xảy ra lỗi compile/build frontend và backend test suite pass 100%.
+
+## Acceptance Criteria
+
+### Động hóa UI
+- [ ] Màn hình Cài đặt (`Settings/Index.tsx`) hiển thị thông tin gói cước, số luồng livestream, giới hạn và thông tin tài khoản TikTok động từ DB.
+- [ ] Màn hình Subscription (`Subscription/Index.tsx`) sử dụng thông tin ngân hàng, tài khoản thụ hưởng động từ backend (không có fallback tĩnh mb bank/DANG TUAN DAT cứng ở React code).
+- [ ] Màn hình Dashboard (`Dashboard.tsx`) và Reports (`Reports/Index.tsx`) hiển thị đúng dữ liệu thống kê, biểu đồ xu hướng và từ khóa từ dữ liệu live thực tế thay vì dữ liệu mock tĩnh.
+- [ ] Các màn hình Lives (`Setup.tsx`, `Show.tsx`, `Index.tsx`) hiển thị thông tin phiên live, danh sách sản phẩm, các số liệu tương tác thực tế từ TikTok Live Event.
+
+### Tổng thể & Kiểm thử
+- [ ] Lệnh build frontend `npm run build` chạy thành công không có lỗi TypeScript hay linter.
+- [ ] Toàn bộ các test suite backend (`php artisan test`) chạy thành công 100%.
+- [ ] Không có bug hoặc lỗi hiển thị trắng trang do dữ liệu động bị null/undefined (cần có cơ chế fallback an toàn ở React component khi dữ liệu chưa tải xong).
+
+
 

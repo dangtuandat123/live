@@ -1,52 +1,54 @@
-# BRIEFING — 2026-05-21T14:05:00Z
+# BRIEFING — 2026-05-22T13:53:26+07:00
 
 ## Mission
-Conduct a thorough static and dynamic evidence-based audit of the livestream comment analysis pipeline and generate a comprehensive Audit Report.
+Move the application UI from hardcoded values to fully dynamic values synced from the Laravel backend.
 
 ## 🔒 My Identity
 - Archetype: worker
 - Roles: implementer, qa, specialist
 - Working directory: d:\Workspace\livestream\.agents\worker_1
-- Original parent: d74b98dc-e0bd-4c10-ad7c-e7f6d6cd9d2c
-- Milestone: [TBD]
+- Original parent: dc3d3191-596d-4364-ab79-83c5438a4dd9
+- Milestone: Dynamic UI Migration
 
 ## 🔒 Key Constraints
-- Run the automated tests for the livestream comment analysis pipeline (`AnalyzeCommentsJobTest`).
-- Verify findings on target files:
-  - backend/app/Jobs/AnalyzeCommentsJob.php
-  - backend/app/Models/LiveSession.php
-  - backend/database/migrations/2026_05_21_202200_add_ai_context_summary_to_live_sessions.php
-  - backend/tests/Feature/AnalyzeCommentsJobTest.php
-- Compile final Audit Report at `C:\Users\ADMIN\.gemini\antigravity\brain\ceb621f4-d0ce-4f75-8004-5fb56b46b242\evidence_deep_audit_report.md` following RULE[strict-evidence-audit-v3-12k.md] (due to security/sandbox constraints on session directories).
-- Do not cheat, do not bypass verification.
+- Run all tests to make sure they pass (php artisan test).
+- Compile frontend asset successfully (npm run build).
+- Do not introduce breaking changes to existing working logic.
+- Follow the Laravel Best Practices skill.
 
 ## Current Parent
-- Conversation ID: d74b98dc-e0bd-4c10-ad7c-e7f6d6cd9d2c
-- Updated: 2026-05-21T14:05:00Z
+- Conversation ID: dc3d3191-596d-4364-ab79-83c5438a4dd9
+- Updated: 2026-05-22T13:53:26+07:00
 
 ## Task Summary
-- **What to build**: Comprehensive Evidence Deep Audit Report for the comment analysis pipeline.
-- **Success criteria**: Report matches RULE[strict-evidence-audit-v3-12k.md], includes real test outputs, traces code paths, and correctly classifies findings.
-- **Interface contracts**: [TBD]
-- **Code layout**: [TBD]
+- **What to build**:
+  1. Remove hardcoded bank details in backend checkout & frontend subscription index.
+  2. Dynamic subscription package features list backend logic & frontend iteration.
+  3. Dynamic revenue, KPI growth, user/session/active user growth in dashboard routes & DashboardController.
+  4. TikTok connection status dynamic backend (users settings column) & frontend prefill/status.
+  5. Comments pinning, marking, order DB persistence in migration, LiveSessionController, routes, and Lives/Show.tsx.
+- **Success criteria**:
+  - `php artisan test` passes.
+  - `npm run build` passes.
+  - Zero `localStorage` dependency for comments show page state.
+- **Interface contracts**: API routes for checkout, dashboard, settings, and live event pins/marks/orders.
+- **Code layout**: Laravel app / React resources.
 
 ## Key Decisions Made
-- Conduct static analysis and verify findings from explorer_1.
-- Run tests in backend directory to capture output.
-- Write the final report to the permitted session-specific brain folder (`ceb621f4-d0ce-4f75-8004-5fb56b46b242`) as enforce by the system's sandbox environment rules.
+- Initialized briefing and loaded Laravel best practices.
 
 ## Artifact Index
-- C:\Users\ADMIN\.gemini\antigravity\brain\ceb621f4-d0ce-4f75-8004-5fb56b46b242\evidence_deep_audit_report.md - Audit Report
-- d:\Workspace\livestream\.agents\worker_1\original_prompt.md - Original Prompt record
+- d:\Workspace\livestream\.agents\worker_1\original_prompt.md — User request and task definition.
+- d:\Workspace\livestream\.agents\worker_1\progress.md — Task heartbeat.
 
 ## Change Tracker
-- **Files modified**: None (Audit only)
-- **Build status**: Pass (7 tests passed)
+- **Files modified**: None yet.
+- **Build status**: TBD
 - **Pending issues**: None
 
 ## Quality Status
-- **Build/test result**: Pass
-- **Lint status**: N/A
+- **Build/test result**: TBD
+- **Lint status**: TBD
 - **Tests added/modified**: None
 
 ## Loaded Skills

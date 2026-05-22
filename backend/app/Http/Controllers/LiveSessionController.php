@@ -205,6 +205,8 @@ class LiveSessionController extends Controller
         // Lấy comments gần nhất từ DB
         $comments = $liveSession->events()
             ->where('event_type', 'comment')
+            ->orderByDesc('is_pinned')
+            ->orderByDesc('sort_order')
             ->orderByDesc('event_at')
             ->limit(200)
             ->get()
@@ -222,6 +224,9 @@ class LiveSessionController extends Controller
                 'product_tag' => $e->product_tag,
                 'has_phone' => $e->has_phone ?? false,
                 'ai_processed' => (bool) $e->ai_processed,
+                'is_pinned' => (bool) $e->is_pinned,
+                'is_highlighted' => (bool) $e->is_highlighted,
+                'sort_order' => (int) $e->sort_order,
             ]);
 
         // Sync status từ Python service nếu đang live
@@ -411,6 +416,8 @@ class LiveSessionController extends Controller
         if ($liveSession->status === 'error' || $liveSession->status === 'ended') {
             $latestComments = $liveSession->events()
                 ->where('event_type', 'comment')
+                ->orderByDesc('is_pinned')
+                ->orderByDesc('sort_order')
                 ->orderByDesc('event_at')
                 ->limit(200)
                 ->get()
@@ -428,6 +435,9 @@ class LiveSessionController extends Controller
                     'product_tag' => $e->product_tag,
                     'has_phone' => $e->has_phone ?? false,
                     'ai_processed' => (bool) $e->ai_processed,
+                    'is_pinned' => (bool) $e->is_pinned,
+                    'is_highlighted' => (bool) $e->is_highlighted,
+                    'sort_order' => (int) $e->sort_order,
                 ]);
 
             $liveSession->load('stats');
@@ -528,6 +538,8 @@ class LiveSessionController extends Controller
         // Lấy comments mới nhất cho frontend
         $latestComments = $liveSession->events()
             ->where('event_type', 'comment')
+            ->orderByDesc('is_pinned')
+            ->orderByDesc('sort_order')
             ->orderByDesc('event_at')
             ->limit(200)
             ->get()
@@ -545,6 +557,9 @@ class LiveSessionController extends Controller
                 'product_tag' => $e->product_tag,
                 'has_phone' => $e->has_phone ?? false,
                 'ai_processed' => (bool) $e->ai_processed,
+                'is_pinned' => (bool) $e->is_pinned,
+                'is_highlighted' => (bool) $e->is_highlighted,
+                'sort_order' => (int) $e->sort_order,
             ]);
 
         $liveSession->load('stats');
@@ -941,11 +956,18 @@ class LiveSessionController extends Controller
             ->limit(50)
             ->get()
             ->map(fn (LiveEvent $e) => [
+                'id' => $e->id,
                 'name' => $e->tiktok_nickname ?? 'Unknown',
                 'phone' => $e->has_phone ? $this->extractPhone($e->data['comment'] ?? '') : '',
                 'product' => $e->product_tag ?? '',
                 'comment' => $e->data['comment'] ?? '',
                 'time' => $e->event_at?->diffForHumans() ?? '',
+                'is_pinned' => (bool) $e->is_pinned,
+                'is_highlighted' => (bool) $e->is_highlighted,
+                'sort_order' => (int) $e->sort_order,
+                'qty' => $e->data['qty'] ?? 1,
+                'note' => $e->data['note'] ?? '',
+                'status' => $e->data['status'] ?? 'pending',
             ])
             ->toArray();
     }
@@ -1027,5 +1049,64 @@ class LiveSessionController extends Controller
                 ]);
             }
         }
+    }
+
+    public function updateEvent(Request $request, LiveEvent $liveEvent)
+    {
+        $liveSession = $liveEvent->liveSession;
+        if (!$liveSession || $liveSession->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'is_pinned' => ['nullable', 'boolean'],
+            'is_highlighted' => ['nullable', 'boolean'],
+            'sort_order' => ['nullable', 'integer'],
+            'qty' => ['nullable', 'integer'],
+            'note' => ['nullable', 'string', 'nullable'],
+            'status' => ['nullable', 'string'],
+        ]);
+
+        $updates = [];
+        if (isset($validated['is_pinned'])) {
+            $updates['is_pinned'] = $validated['is_pinned'];
+        }
+        if (isset($validated['is_highlighted'])) {
+            $updates['is_highlighted'] = $validated['is_highlighted'];
+        }
+        if (isset($validated['sort_order'])) {
+            $updates['sort_order'] = $validated['sort_order'];
+        }
+
+        if (!empty($updates)) {
+            $liveEvent->update($updates);
+        }
+
+        $orderUpdated = false;
+        $data = $liveEvent->data ?? [];
+        foreach (['qty', 'note', 'status'] as $field) {
+            if ($request->has($field)) {
+                $data[$field] = $request->input($field);
+                $orderUpdated = true;
+            }
+        }
+
+        if ($orderUpdated) {
+            $liveEvent->data = $data;
+            $liveEvent->save();
+        }
+
+        return response()->json([
+            'success' => true,
+            'event' => [
+                'id' => $liveEvent->id,
+                'is_pinned' => (bool) $liveEvent->is_pinned,
+                'is_highlighted' => (bool) $liveEvent->is_highlighted,
+                'sort_order' => (int) $liveEvent->sort_order,
+                'qty' => $liveEvent->data['qty'] ?? 1,
+                'note' => $liveEvent->data['note'] ?? '',
+                'status' => $liveEvent->data['status'] ?? 'pending',
+            ]
+        ]);
     }
 }

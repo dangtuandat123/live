@@ -66,10 +66,10 @@ class SubscriptionController extends Controller
         $user = $request->user();
 
         $paymentConfig = PaymentConfig::where('is_active', true)->first();
-        if (! $paymentConfig) {
+        if (! $paymentConfig || empty($paymentConfig->account_no) || empty($paymentConfig->bank_name)) {
             return response()->json([
                 'error' => 'Service Unavailable',
-                'message' => 'No active payment configuration found.',
+                'message' => 'Cấu hình thanh toán chưa đầy đủ. Vui lòng liên hệ Admin.',
             ], 503);
         }
 
@@ -143,11 +143,11 @@ class SubscriptionController extends Controller
         // Paid package: generate transaction and VietQR
         $transactionId = ($paymentConfig->prefix ?? 'TX_').strtoupper(Str::random(10));
 
-        $vietQrTemplate = $paymentConfig->qr_template ?? 'https://api.vietqr.io/image/970416-11183041-rdXzPHV.jpg?accountName=DANG%20TUAN%20DAT&addInfo={Prefix}%20{userId}%20{Suffix}&amount={amount}';
+        $vietQrTemplate = $paymentConfig->qr_template ?? 'https://api.vietqr.io/image/{bank_id}-{account_no}-rdXzPHV.jpg?accountName={account_name}&addInfo={Prefix}%20{userId}%20{Suffix}&amount={amount}';
 
         $bankIdVal = rawurlencode($paymentConfig->bank_id ?? '970416');
-        $accountNoVal = rawurlencode($paymentConfig->account_no ?? '11183041');
-        $accountNameVal = rawurlencode($paymentConfig->account_name ?? 'DANG TUAN DAT');
+        $accountNoVal = rawurlencode($paymentConfig->account_no);
+        $accountNameVal = rawurlencode($paymentConfig->account_name ?? '');
         $prefixVal = rawurlencode($paymentConfig->prefix ?? '');
         $userIdVal = rawurlencode((string) $user->id);
         $suffixVal = rawurlencode($paymentConfig->suffix ?? '');
@@ -172,9 +172,9 @@ class SubscriptionController extends Controller
         return response()->json([
             'transaction_id' => $transaction->transaction_id,
             'vietqr_url' => $transaction->vietqr_url,
-            'beneficiary_bank' => $paymentConfig->bank_name ?? 'MB Bank',
-            'beneficiary_account' => $paymentConfig->account_no ?? '11183041',
-            'beneficiary_name' => $paymentConfig->account_name ?? 'DANG TUAN DAT',
+            'beneficiary_bank' => $paymentConfig->bank_name,
+            'beneficiary_account' => $paymentConfig->account_no,
+            'beneficiary_name' => $paymentConfig->account_name,
         ]);
     }
 

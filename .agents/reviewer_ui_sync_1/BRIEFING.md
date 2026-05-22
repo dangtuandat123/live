@@ -1,62 +1,60 @@
-# BRIEFING — 2026-05-22T10:35:00+07:00
+# BRIEFING — 2026-05-22T14:08:00+07:00
 
 ## Mission
-Review modifications made by the Worker for requirements R1 - R5 and issue a verdict.
+Review the code changes made to sync the application UI dynamically from the Laravel backend.
 
 ## 🔒 My Identity
-- Archetype: reviewer_critic
+- Archetype: reviewer & critic
 - Roles: reviewer, critic
 - Working directory: d:\Workspace\livestream\.agents\reviewer_ui_sync_1
-- Original parent: ddd017b4-48bd-46a1-a53c-05a9021ed31f
-- Milestone: Worker review R1-R5
+- Original parent: dc3d3191-596d-4364-ab79-83c5438a4dd9
+- Milestone: UI Sync and Dynamic Config
 - Instance: 1 of 1
 
 ## 🔒 Key Constraints
-- Review-only — do NOT modify implementation code.
-- Adhere strictly to the Vietnamese language requirements for the user communication.
-- Run tests (`php artisan test`) and compilation (`npm run build`) to ensure system integrity.
+- Review-only — do NOT modify implementation code
+- Run build (`npm run build`) and test (`php artisan test`) commands.
+- Report final verdict: PASS or FAIL.
 
 ## Current Parent
-- Conversation ID: ddd017b4-48bd-46a1-a53c-05a9021ed31f
-- Updated: 2026-05-22T10:35:00+07:00
+- Conversation ID: dc3d3191-596d-4364-ab79-83c5438a4dd9
+- Updated: not yet
 
 ## Review Scope
 - **Files to review**:
-  - database/migrations/2026_05_22_000000_add_beneficiary_details_to_payment_configs_table.php
-  - app/Models/PaymentConfig.php
-  - app/Http/Controllers/SubscriptionController.php
-  - app/Http/Controllers/LiveSessionController.php
-  - routes/web.php
-  - resources/js/Pages/Subscription/Index.tsx
-  - resources/js/Pages/Admin/Payments/Index.tsx
-  - resources/js/Pages/Admin/Packages/Index.tsx
-  - resources/js/Pages/Lives/Show.tsx
-  - resources/js/Pages/Lives/Index.tsx
-  - resources/js/Pages/Lives/Setup.tsx
-- **Interface contracts**: PROJECT.md / SCOPE.md
-- **Review criteria**: Correctness, completeness, robustness, and UI sync.
-
-## Key Decisions Made
-- Confirmed that the compilation is successful (`npm run build` completed).
-- Confirmed that all 75 backend tests pass successfully (`php artisan test` completed).
-- Identified a logic bug in duration limits gating when `max_duration_hours` is set to `-1` (unlimited).
-
-## Artifact Index
-- d:\Workspace\livestream\.agents\reviewer_ui_sync_1\handoff.md — Handoff and review report.
+  - `backend/resources/js/Pages/Lives/Show.tsx`
+  - `backend/app/Http/Controllers/SubscriptionController.php`
+  - `backend/resources/js/Pages/Subscription/Index.tsx`
+  - `backend/app/Models/SubscriptionPackage.php`
+  - `backend/tests/Feature/LiveEventUpdateTest.php`
+- **Interface contracts**: API endpoints for LiveEvents and Subscriptions.
+- **Review criteria**: correctness, robustness, integrity, security.
 
 ## Review Checklist
 - **Items reviewed**:
-  - Migration file
-  - PaymentConfig model
-  - Controllers & Routes
-  - Front-end views (Subscription/Index, Admin/Payments/Index, Admin/Packages/Index, Lives/Show, Lives/Index, Lives/Setup)
-- **Verdict**: REQUEST_CHANGES (due to duration limit bug on -1)
-- **Unverified claims**: None. All features are verified via static code review and automated tests.
+  - `backend/resources/js/Pages/Lives/Show.tsx`
+  - `backend/app/Http/Controllers/SubscriptionController.php`
+  - `backend/resources/js/Pages/Subscription/Index.tsx`
+  - `backend/app/Models/SubscriptionPackage.php`
+  - `backend/tests/Feature/LiveEventUpdateTest.php`
+- **Verdict**: APPROVE
+- **Unverified claims**: none
 
 ## Attack Surface
 - **Hypotheses tested**:
-  - Tested that setting max duration to -1 will instantly trigger `checkAndStopIfDurationExceeded` ending the stream. (Confirmed bug)
-  - Tested packages deletion logic when subscription/transaction exists. (Success: blocked by DB associations)
-- **Vulnerabilities found**:
-  - Logic regression: Gated stream auto-stop logic evaluates to true if duration threshold is set to `-1` (unlimited).
-- **Untested angles**: None.
+  - Pinned and highlighted order features can bypass owner checks (Rejected, ownership validation is enforced in `LiveSessionController@updateEvent`).
+  - Missing bank configuration causes errors in subscription checkout (Rejected, 503 Service Unavailable is correctly returned).
+  - Free packages checkout can be abused repeatedly (Rejected, validation blocks concurrent or duplicate free subscription requests and transaction lock prevents concurrent checkout race conditions).
+- **Vulnerabilities found**: none
+- **Untested angles**: none
+
+## Key Decisions Made
+- Performed a static review of frontend React/Inertia pages (`Show.tsx`, `Subscription/Index.tsx`) and backend PHP controllers (`LiveSessionController.php`, `SubscriptionController.php`) and models.
+- Verified removal of hardcoded bank details in favor of dynamic VietQR template replacements.
+- Verified test suite passes successfully via `php artisan test` (89 tests).
+- Verified client build completes successfully via `npm run build`.
+
+## Artifact Index
+- d:\Workspace\livestream\.agents\reviewer_ui_sync_1\original_prompt.md — User Prompt Log
+- d:\Workspace\livestream\.agents\reviewer_ui_sync_1\handoff.md — Handoff and review report
+

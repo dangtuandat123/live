@@ -1,83 +1,206 @@
-# Review Report (R1 - R5)
+# Audit and Handoff Report
+
+## Verdict: FAIL (Request Changes)
+
+---
 
 ## 1. Observation
 
-We performed a comprehensive review of all modified files for requirements R1 - R5:
+### Observation A: Frontend PUT requests in `Show.tsx`
+In `backend/resources/js/Pages/Lives/Show.tsx`, the frontend component sends real-time updates to `/api/live-events/${id}` via three distinct fetch calls:
 
-- **Migration**: `database/migrations/2026_05_22_000000_add_beneficiary_details_to_payment_configs_table.php` adds `bank_name`, `bank_id`, `account_no`, `account_name`, and `qr_template` columns to `payment_configs`.
-- **Model**: `app/Models/PaymentConfig.php` exposes these fields in `$fillable`.
-- **Controller (Subscription)**: `app/Http/Controllers/SubscriptionController.php`:
-  - `checkout()` dynamically loads the bank details from the active/default `PaymentConfig` and renders the VietQR template dynamically (avoiding hardcoded values).
-  - Package store/update validation rules support `min:-1` for unlimited values on features:
-    ```php
-    'features.limit_streams' => ['nullable', 'integer', 'min:-1'],
-    'features.max_duration_hours' => ['nullable', 'integer', 'min:-1'],
-    'features.ai_credits' => ['nullable', 'integer', 'min:-1'],
-    ```
-- **Controller (LiveSession)**: `app/Http/Controllers/LiveSessionController.php`:
-  - Enforces active stream limits (preventing new live sessions when the subscription limits are met unless `limit_streams` is `-1`).
-  - Limits live session duration during background checks via `checkAndStopIfDurationExceeded()`.
-- **Routes**: `routes/web.php` provides dynamic `total_revenue` to the admin payments index view using:
-  ```php
-  $totalRevenue = Transaction::where('status', 'success')->sum('amount');
-  ```
-- **Frontend (Subscription/Index)**: `resources/js/Pages/Subscription/Index.tsx` uses dynamic checkout data and performs state reloading via `router.reload({ only: ['activeSubscription'] })` on successful checkout or polling completion.
-- **Frontend (Admin Payments)**: `resources/js/Pages/Admin/Payments/Index.tsx` permits configuring bank information and templates.
-- **Frontend (Admin Packages)**: `resources/js/Pages/Admin/Packages/Index.tsx` allows entering package details, accepting `-1` for unlimited settings.
-- **Frontend (Lives Setup & Show)**:
-  - `resources/js/Pages/Lives/Setup.tsx` disables creation and displays a warning banner when the active streams limit is reached.
-  - `resources/js/Pages/Lives/Show.tsx` gates lead export actions (`exportLeadsCSV` and `copyLeadsToClipboard`) by showing a package upgrade prompt dialog if `export_leads` is false.
+Line 578:
+```typescript
+        try {
+            await fetch(`/api/live-events/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN':
+                        document
+                            .querySelector('meta[name="csrf-token"]')
+                            ?.getAttribute('content') ?? '',
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify({ is_pinned: newPinned }),
+            });
+        } catch (e) {
+            console.error(e);
+        }
+```
 
-### Verification Commands & Results:
-- **Backend PHP Tests**: Executed `php artisan test` and all 75 tests (with 536 assertions) passed successfully:
-  ```
-  Tests:    75 passed (536 assertions)
-  Duration: 4.40s
-  ```
-- **Frontend Build**: Executed `npm run build` and it compiled client assets for production without errors:
-  ```
-  ✓ built in 6.54s
-  ```
+Line 607:
+```typescript
+        try {
+            await fetch(`/api/live-events/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN':
+                        document
+                            .querySelector('meta[name="csrf-token"]')
+                            ?.getAttribute('content') ?? '',
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify({ is_highlighted: newHighlighted }),
+            });
+        } catch (e) {
+            console.error(e);
+        }
+```
+
+Line 1435:
+```typescript
+    const saveOrder = async () => {
+        if (orderDialog.customerIdx === null) return;
+        const customer = filtered[orderDialog.customerIdx];
+        
+        try {
+            const res = await fetch(`/api/live-events/${customer.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN':
+                        document
+                            .querySelector('meta[name="csrf-token"]')
+                            ?.getAttribute('content') ?? '',
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify({
+                    qty: orderForm.qty,
+                    note: orderForm.note,
+                    status: orderForm.status,
+                }),
+            });
+```
+
+### Observation B: Backend route definition in `web.php`
+In `backend/routes/web.php` (line 51), the route is defined as follows:
+```php
+    Route::put('/live-events/{liveEvent}', [LiveSessionController::class, 'updateEvent'])->name('live-events.update');
+```
+This route is grouped under the standard web middleware group (`['auth', 'verified']`) and has no prefix.
+
+### Observation C: Output of `php artisan route:list`
+Running `php artisan route:list` confirms that the registered URI is exactly `live-events/{liveEvent}`:
+```
+  PUT       live-events/{liveEvent} ........................... live-events.update › LiveSessionController@updateEvent
+```
+
+### Observation D: Dynamic Bank Configuration
+In `backend/app/Http/Controllers/SubscriptionController.php` (lines 68-74 & 143-178), bank details are dynamic and verify the configuration is complete:
+```php
+        $paymentConfig = PaymentConfig::where('is_active', true)->first();
+        if (! $paymentConfig || empty($paymentConfig->account_no) || empty($paymentConfig->bank_name)) {
+            return response()->json([
+                'error' => 'Service Unavailable',
+                'message' => 'Cấu hình thanh toán chưa đầy đủ. Vui lòng liên hệ Admin.',
+            ], 503);
+        }
+```
+And in `backend/resources/js/Pages/Subscription/Index.tsx` (lines 765-772), the frontend renders a warning if bank credentials are empty:
+```typescript
+                                {(!checkoutData?.beneficiary_bank || !checkoutData?.beneficiary_account || !checkoutData?.beneficiary_name) ? (
+                                    <div className="flex gap-2 rounded-lg border border-red-500/20 bg-red-500/5 p-3.5 text-sm text-red-600">
+                                        <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-red-500" />
+                                        <p>
+                                            <span className="font-semibold">Lưu ý:</span> Không tìm thấy thông tin tài khoản ngân hàng thụ hưởng. Vui lòng liên hệ Admin để cấu hình thanh toán.
+                                        </p>
+                                    </div>
+                                ) : (
+```
+
+### Observation E: Localized Feature Casting
+In `backend/app/Models/SubscriptionPackage.php` (lines 39-91), package features are converted to dynamic Vietnamese descriptions via a computed attribute:
+```php
+    public function getFeaturesListAttribute(): array
+    {
+        ...
+    }
+```
 
 ---
 
 ## 2. Logic Chain
 
-1. **R1 (Dynamic Configuration Check)**:
-   - Observation: `SubscriptionController.php` fetches bank details dynamically from `$paymentConfig`. `web.php` computes revenue using transaction queries.
-   - Inference: Hardcoded credentials have been removed. Configuration edits on the Admin Payments page are immediately reflected on the user-facing Subscription Index page.
-2. **R2 (Subscription Reloading State Check)**:
-   - Observation: `SubscriptionIndex.tsx` calls `router.reload({ only: ['activeSubscription'] })` upon checkout or successful polling.
-   - Inference: The UI updates immediately to show active features (e.g. credits) and current status without triggering full-page browser refreshes.
-3. **R3 (Active Stream Limits Check)**:
-   - Observation: `LiveSessionController.php` counts active streams for the user and checks it against subscription limits before starting a new stream. `Setup.tsx` checks `isGated = limitStreams !== -1 && active_streams_count >= limitStreams` to block submission.
-   - Inference: Active stream limit gating is fully integrated on both frontend and backend.
-4. **R4 (Interface Gating Check)**:
-   - Observation: `Show.tsx` checks `auth?.subscription?.features?.export_leads` and triggers a Dialog prompting package upgrades instead of allowing CSV download or text copy.
-   - Inference: Access gating to premium CSV export/copy features is correctly enforced.
-5. **R5 (Backend Validation Check)**:
-   - Observation: `SubscriptionController.php` validation rules permit `min:-1` for streams, hours, and credits features.
-   - Inference: Infinite properties (-1) are allowed and do not throw validation errors.
+1. The frontend React page `Show.tsx` makes fetch requests to `/api/live-events/${id}` to persist changes to the database (Observation A).
+2. The Laravel backend routes file `routes/web.php` maps the event update endpoint to `/live-events/{liveEvent}` (Observation B), which register in the system routing table as exactly `live-events/{liveEvent}` (Observation C).
+3. Since `/api/live-events/{id}` is not defined or redirected anywhere in the Laravel routing structure, any HTTP request sent to it from the React client will trigger a `404 Not Found` response.
+4. Consequently, comment pinning and order highlighting updates will be visually changed on the client side but will fail silently to persist on the backend.
+5. In addition, when saving order metadata (qty, note, status), `res.ok` check evaluates to false, causing the UI to trigger a `"Có lỗi xảy ra khi lưu đơn hàng."` toast error and prevent the modal from closing.
+6. Therefore, the implementation breaks correctness, completeness, and user interaction.
 
 ---
 
 ## 3. Caveats
 
-- No caveats identified. All aspects of the implementation have been reviewed, audited, and tested.
+- We assumed that there are no additional HTTP server rewrites (e.g. via Nginx or Apache) that map `/api/live-events/*` to `/live-events/*`. Based on standard Laravel project structures and the local routing list, no such rewrites exist.
 
 ---
 
 ## 4. Conclusion
 
-The implementation of requirements R1 - R5 is **complete, correct, robust, and matches interface contracts**.
-The verification test suites fully cover edge cases, validation rules, and feature gating logic. 
-All assets compile cleanly. No integrity violations were found.
+- **Verdict**: **FAIL**
+- The dynamic sync of comments and order details from the backend is broken due to a route mismatch between the frontend API client (`/api/live-events/${id}`) and the backend routing table (`/live-events/{liveEvent}`).
+- The subscription configurations and Vietnamese localized package features casting work correctly.
+- Hardcoded bank credentials have been completely removed and are fully dynamic.
 
 ---
 
 ## 5. Verification Method
 
-To independently verify the implementation:
-1. Run `php artisan test` within the `backend/` directory to verify all backend logic and feature gating works.
-2. Run `npm run build` within the `backend/` directory to ensure frontend TypeScript and React code compiles.
-3. Inspect `routes/web.php` and `app/Http/Controllers/SubscriptionController.php` to verify backend DB logic.
+To verify the route mismatch:
+1. Try executing a mock PUT request to `/api/live-events/1` after authenticating:
+   ```bash
+   # Will output a 404 response
+   curl -X PUT http://localhost:8000/api/live-events/1
+   ```
+2. Inspect the registered routes:
+   ```bash
+   php artisan route:list --name=live-events.update
+   ```
+   Output lists the path as `live-events/{liveEvent}` without any `/api` prefix.
+
+---
+
+## 6. Review matrices (Strict Audit Guidelines)
+
+### Scope, Stack, and Source of Truth
+| Item | Value |
+|---|---|
+| Target | UI Sync Dynamic Integration |
+| Stack/framework | Laravel, React, Inertia, TypeScript |
+| Expected user behavior | Pin comment, highlight order, and save metadata updates real-time |
+| Expected backend/data behavior | Save updates to `live_events` table and return JSON response |
+| Source of truth | `routes/web.php`, `Show.tsx` |
+| Exclusions | None |
+
+### Coverage Ledger
+| Category | Found | Read | Not checked | Notes |
+|---|---:|---:|---:|---|
+| Screens/components | 2 | 2 | 0 | `Lives/Show.tsx`, `Subscription/Index.tsx` |
+| User actions | 3 | 3 | 0 | Pin comment, highlight comment, save order details |
+| API/actions | 4 | 4 | 0 | updateEvent, checkout, status, callback |
+| Services/domain | 1 | 1 | 0 | TikTokService |
+| DB/schema/config | 3 | 3 | 0 | LiveEvent model, SubscriptionPackage model, PaymentConfig model |
+| Auth/permissions | 1 | 1 | 0 | Owner checks in updateEvent |
+| State/cache | 1 | 1 | 0 | Cache gating in Lives controller |
+| Tests | 2 | 2 | 0 | `LiveEventUpdateTest.php`, `SubscriptionPaymentTest.php` |
+
+### Invariant and State Matrix
+| Invariant/Flow | Code locations | Attack case | Evidence | Result |
+|---|---|---|---|---|
+| User cannot update event owned by another | `LiveSessionController.php` line 1056 | Update event in another user's session | Verified via Owner test | **PASS** (403 returned) |
+| System returns 503 if payment configuration is missing | `SubscriptionController.php` line 69 | Set is_active config to false and check out paid plan | Verified via Subscription test | **PASS** (503 Service Unavailable) |
+| Dynamic VietQR info rendering | `SubscriptionController.php` line 143 | QR templates containing wildcards | Verified replacements manually | **PASS** |
+
+### Findings
+
+#### [Critical] Path Mismatch on LiveEvent Update API
+- **Type**: Confirmed Bug / Mismatch
+- **Location**: `backend/resources/js/Pages/Lives/Show.tsx` (lines 578, 607, 1435) vs `backend/routes/web.php` (line 51)
+- **Evidence**: Frontend uses `/api/live-events/${id}` while backend routes register `/live-events/{liveEvent}`.
+- **Cross-check**: `php artisan route:list` shows `PUT live-events/{liveEvent}`.
+- **Why wrong/risky**: All frontend PUT requests fail with `404 Not Found` in production/development, making live interactive features (pinning comments, highlighting orders, saving metadata) completely non-functional.
+- **Minimal fix**: Update `Show.tsx` fetch endpoints from `/api/live-events/` to `/live-events/` (or use the Ziggy helper `route('live-events.update', id)`).
+- **Validation**: Will show 200 OK after path is matched.

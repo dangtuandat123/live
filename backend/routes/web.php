@@ -48,6 +48,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/lives/{liveSession}/stop', [LiveSessionController::class, 'stop'])->name('lives.stop');
     Route::post('/lives/{liveSession}/fetch-events', [LiveSessionController::class, 'fetchEvents'])->name('lives.fetch-events');
     Route::delete('/lives/{liveSession}', [LiveSessionController::class, 'destroy'])->name('lives.destroy');
+    Route::put('/api/live-events/{liveEvent}', [LiveSessionController::class, 'updateEvent'])->name('live-events.update');
 
     // Reports
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
@@ -84,6 +85,66 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
         // Tổng doanh thu
         $revenueVal = Transaction::where('status', 'success')->sum('amount');
         $totalRevenueVal = $revenueVal;
+
+        // Dynamic KPI growth calculation
+        $currentMonthStart = now()->startOfMonth();
+        $currentMonthEnd = now()->endOfMonth();
+        $lastMonthStart = now()->subMonth()->startOfMonth();
+        $lastMonthEnd = now()->subMonth()->endOfMonth();
+
+        // Users Growth
+        $usersThisMonth = User::whereBetween('created_at', [$currentMonthStart, $currentMonthEnd])->count();
+        $usersLastMonth = User::whereBetween('created_at', [$lastMonthStart, $lastMonthEnd])->count();
+        if ($usersLastMonth > 0) {
+            $usersDiffPercent = (($usersThisMonth - $usersLastMonth) / $usersLastMonth) * 100;
+            $usersTrend = $usersDiffPercent >= 0 ? 'up' : 'down';
+            $usersChange = ($usersDiffPercent >= 0 ? '+' : '') . number_format($usersDiffPercent, 1) . '% so với tháng trước';
+        } else {
+            $usersTrend = 'up';
+            $usersChange = '+' . $usersThisMonth . ' tháng này';
+        }
+
+        // Sessions Growth
+        $sessionsThisMonth = LiveSession::whereBetween('created_at', [$currentMonthStart, $currentMonthEnd])->count();
+        $sessionsLastMonth = LiveSession::whereBetween('created_at', [$lastMonthStart, $lastMonthEnd])->count();
+        if ($sessionsLastMonth > 0) {
+            $sessionsDiffPercent = (($sessionsThisMonth - $sessionsLastMonth) / $sessionsLastMonth) * 100;
+            $sessionsTrend = $sessionsDiffPercent >= 0 ? 'up' : 'down';
+            $sessionsChange = ($sessionsDiffPercent >= 0 ? '+' : '') . number_format($sessionsDiffPercent, 1) . '% so với tháng trước';
+        } else {
+            $sessionsTrend = 'up';
+            $sessionsChange = '+' . $sessionsThisMonth . ' tháng này';
+        }
+
+        // Revenue Growth
+        $currentMonthRevenue = Transaction::where('status', 'success')
+            ->whereBetween('created_at', [$currentMonthStart, $currentMonthEnd])
+            ->sum('amount');
+        $lastMonthRevenue = Transaction::where('status', 'success')
+            ->whereBetween('created_at', [$lastMonthStart, $lastMonthEnd])
+            ->sum('amount');
+        if ($lastMonthRevenue > 0) {
+            $revenueDiffPercent = (($currentMonthRevenue - $lastMonthRevenue) / $lastMonthRevenue) * 100;
+            $revenueTrend = $revenueDiffPercent >= 0 ? 'up' : 'down';
+            $revenueChange = ($revenueDiffPercent >= 0 ? '+' : '') . number_format($revenueDiffPercent, 1) . '% so với tháng trước';
+        } else {
+            $revenueTrend = 'up';
+            $revenueChange = '+' . number_format($currentMonthRevenue) . 'đ tháng này';
+        }
+
+        // Active Users Growth
+        $activeUsersLast7Days = $activeUsers;
+        $activeUsersPrev7Days = LiveSession::whereBetween('created_at', [now()->subDays(14), now()->subDays(7)->subSecond()])
+            ->distinct('user_id')
+            ->count('user_id');
+        if ($activeUsersPrev7Days > 0) {
+            $activeDiffPercent = (($activeUsersLast7Days - $activeUsersPrev7Days) / $activeUsersPrev7Days) * 100;
+            $activeTrend = $activeDiffPercent >= 0 ? 'up' : 'down';
+            $activeChange = ($activeDiffPercent >= 0 ? '+' : '') . number_format($activeDiffPercent, 1) . '% so với 7 ngày trước';
+        } else {
+            $activeTrend = 'up';
+            $activeChange = 'Dựa trên phiên live gần đây';
+        }
 
         // Biểu đồ 5 tháng gần đây
         $revenueData = [];
@@ -133,26 +194,26 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
                 [
                     'title' => 'Tổng người dùng',
                     'value' => number_format($totalUsers),
-                    'change' => '+'.User::where('created_at', '>=', now()->startOfMonth())->count().' tháng này',
-                    'trend' => 'up',
+                    'change' => $usersChange,
+                    'trend' => $usersTrend,
                 ],
                 [
                     'title' => 'Tổng phiên Live',
                     'value' => number_format($totalSessions),
-                    'change' => '+'.LiveSession::where('created_at', '>=', now()->startOfMonth())->count().' tháng này',
-                    'trend' => 'up',
+                    'change' => $sessionsChange,
+                    'trend' => $sessionsTrend,
                 ],
                 [
                     'title' => 'Tổng doanh thu',
                     'value' => number_format($totalRevenueVal) . 'đ',
-                    'change' => '+15% so với tháng trước',
-                    'trend' => 'up',
+                    'change' => $revenueChange,
+                    'trend' => $revenueTrend,
                 ],
                 [
                     'title' => 'User hoạt động (7d)',
                     'value' => number_format($activeUsers),
-                    'change' => 'Dựa trên phiên live gần đây',
-                    'trend' => 'up',
+                    'change' => $activeChange,
+                    'trend' => $activeTrend,
                 ],
             ],
             'revenueData' => $revenueData,

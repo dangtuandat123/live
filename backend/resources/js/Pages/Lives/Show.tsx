@@ -216,6 +216,9 @@ interface CommentData {
     product_tag: string | null;
     has_phone: boolean;
     ai_processed: boolean;
+    is_pinned?: boolean;
+    is_highlighted?: boolean;
+    sort_order?: number;
 }
 
 interface TopProduct {
@@ -226,11 +229,18 @@ interface TopProduct {
 }
 
 interface PotentialCustomer {
+    id: number;
     name: string;
     phone: string;
     product: string;
     comment: string;
     time: string;
+    is_pinned?: boolean;
+    is_highlighted?: boolean;
+    sort_order?: number;
+    qty?: number;
+    note?: string;
+    status?: string;
 }
 
 interface TopQuestion {
@@ -265,6 +275,8 @@ const LiveContext = React.createContext<{
     potentialCustomers: PotentialCustomer[];
     topQuestions: TopQuestion[];
     statsHistory: StatsHistoryEntry[];
+    setComments?: React.Dispatch<React.SetStateAction<CommentData[]>>;
+    setPotentialCustomers?: React.Dispatch<React.SetStateAction<PotentialCustomer[]>>;
 }>(null!);
 
 function useLiveData() {
@@ -543,60 +555,72 @@ function SentimentBadge({ sentiment }: { sentiment: string }) {
 // --- Sub-components for each tab ---
 
 function CommentsPanel() {
-    const { session, comments: allComments } = useLiveData();
+    const { session, comments: allComments, setComments } = useLiveData();
     const BATCH = 50;
     const [filter, setFilter] = React.useState('all');
     const [search, setSearch] = React.useState('');
     const [visibleCount, setVisibleCount] = React.useState(BATCH);
 
-    const pinnedKey = `pinned_${session.id}`;
-    const markedKey = `marked_${session.id}`;
-
-    const [pinnedIds, setPinnedIds] = React.useState<Set<number>>(() => {
-        try {
-            const stored = localStorage.getItem(pinnedKey);
-            return stored ? new Set(JSON.parse(stored)) : new Set();
-        } catch {
-            return new Set();
-        }
-    });
-    const [markedOrderIds, setMarkedOrderIds] = React.useState<Set<number>>(
-        () => {
-            try {
-                const stored = localStorage.getItem(markedKey);
-                return stored ? new Set(JSON.parse(stored)) : new Set();
-            } catch {
-                return new Set();
-            }
-        },
-    );
     const [copiedId, setCopiedId] = React.useState<number | null>(null);
 
-    React.useEffect(() => {
-        localStorage.setItem(pinnedKey, JSON.stringify(Array.from(pinnedIds)));
-    }, [pinnedIds, pinnedKey]);
+    const togglePin = async (id: number) => {
+        const comment = allComments.find(c => c.id === id);
+        if (!comment) return;
+        const newPinned = !comment.is_pinned;
 
-    React.useEffect(() => {
-        localStorage.setItem(
-            markedKey,
-            JSON.stringify(Array.from(markedOrderIds)),
-        );
-    }, [markedOrderIds, markedKey]);
+        if (setComments) {
+            setComments((prev) =>
+                prev.map((c) => (c.id === id ? { ...c, is_pinned: newPinned } : c))
+            );
+        }
 
-    const togglePin = (id: number) => {
-        setPinnedIds((prev) => {
-            const next = new Set(prev);
-            next.has(id) ? next.delete(id) : next.add(id);
-            return next;
-        });
+        try {
+            await fetch(`/api/live-events/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN':
+                        document
+                            .querySelector('meta[name="csrf-token"]')
+                            ?.getAttribute('content') ?? '',
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify({ is_pinned: newPinned }),
+            });
+        } catch (e) {
+            console.error(e);
+        }
     };
-    const toggleOrder = (id: number) => {
-        setMarkedOrderIds((prev) => {
-            const next = new Set(prev);
-            next.has(id) ? next.delete(id) : next.add(id);
-            return next;
-        });
+
+    const toggleOrder = async (id: number) => {
+        const comment = allComments.find(c => c.id === id);
+        if (!comment) return;
+        const newHighlighted = !comment.is_highlighted;
+
+        if (setComments) {
+            setComments((prev) =>
+                prev.map((c) => (c.id === id ? { ...c, is_highlighted: newHighlighted } : c))
+            );
+        }
+
+        try {
+            await fetch(`/api/live-events/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN':
+                        document
+                            .querySelector('meta[name="csrf-token"]')
+                            ?.getAttribute('content') ?? '',
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify({ is_highlighted: newHighlighted }),
+            });
+        } catch (e) {
+            console.error(e);
+        }
     };
+
     const copyComment = (text: string, id: number) => {
         navigator.clipboard.writeText(text);
         setCopiedId(id);
@@ -604,10 +628,10 @@ function CommentsPanel() {
     };
 
     const filtered = allComments.filter((c) => {
-        if (filter === 'pinned' && !pinnedIds.has(c.id)) return false;
+        if (filter === 'pinned' && !c.is_pinned) return false;
         if (
             filter === 'order' &&
-            !markedOrderIds.has(c.id) &&
+            !c.is_highlighted &&
             c.intent_tag !== 'Chốt đơn'
         )
             return false;
@@ -703,7 +727,7 @@ function CommentsPanel() {
                             {
                                 key: 'pinned',
                                 label: '📌 Ghim',
-                                count: pinnedIds.size,
+                                count: allComments.filter((c) => c.is_pinned).length,
                             },
                             {
                                 key: 'order',
@@ -711,7 +735,7 @@ function CommentsPanel() {
                                 count: allComments.filter(
                                     (c) =>
                                         c.intent_tag === 'Chốt đơn' ||
-                                        markedOrderIds.has(c.id),
+                                        c.is_highlighted,
                                 ).length,
                             },
                             {
@@ -836,9 +860,9 @@ function CommentsPanel() {
                         </Empty>
                     ) : (
                         visible.map((comment) => {
-                            const isPinned = pinnedIds.has(comment.id);
+                            const isPinned = comment.is_pinned;
                             const isOrder =
-                                markedOrderIds.has(comment.id) ||
+                                comment.is_highlighted ||
                                 comment.intent_tag === 'Chốt đơn';
                             const isAnalyzing = !comment.ai_processed;
                             const sentimentColor = isPinned
@@ -1345,7 +1369,7 @@ function QuestionsPanel() {
 }
 
 function CustomersPanel() {
-    const { session, potentialCustomers } = useLiveData();
+    const { session, potentialCustomers, setPotentialCustomers } = useLiveData();
     const { auth } = usePage().props as unknown as {
         auth: {
             subscription: {
@@ -1362,21 +1386,6 @@ function CustomersPanel() {
     const [copiedPhone, setCopiedPhone] = React.useState<number | null>(null);
     const [copiedAll, setCopiedAll] = React.useState(false);
 
-    const ordersKey = `orders_${session.id}`;
-    const [orders, setOrders] = React.useState<
-        Record<number, { status: string; note: string; qty: number }>
-    >(() => {
-        try {
-            const stored = localStorage.getItem(ordersKey);
-            return stored ? JSON.parse(stored) : {};
-        } catch {
-            return {};
-        }
-    });
-
-    React.useEffect(() => {
-        localStorage.setItem(ordersKey, JSON.stringify(orders));
-    }, [orders, ordersKey]);
     const [orderDialog, setOrderDialog] = React.useState<{
         open: boolean;
         customerIdx: number | null;
@@ -1410,22 +1419,59 @@ function CustomersPanel() {
         toast.success('Đã sao chép danh sách khách hàng tiềm năng!');
     };
     const openOrderDialog = (idx: number) => {
-        const existing = orders[idx];
+        const customer = filtered[idx];
         setOrderForm({
-            qty: existing?.qty ?? 1,
-            note: existing?.note ?? '',
-            status: existing?.status ?? 'pending',
+            qty: customer.qty ?? 1,
+            note: customer.note ?? '',
+            status: customer.status ?? 'pending',
         });
         setOrderDialog({ open: true, customerIdx: idx });
     };
-    const saveOrder = () => {
+    const saveOrder = async () => {
         if (orderDialog.customerIdx === null) return;
-        setOrders((prev) => ({
-            ...prev,
-            [orderDialog.customerIdx!]: { ...orderForm },
-        }));
-        setOrderDialog({ open: false, customerIdx: null });
-        toast.success('Đã lưu đơn hàng tạm thời thành công!');
+        const customer = filtered[orderDialog.customerIdx];
+        
+        try {
+            const res = await fetch(`/api/live-events/${customer.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN':
+                        document
+                            .querySelector('meta[name="csrf-token"]')
+                            ?.getAttribute('content') ?? '',
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify({
+                    qty: orderForm.qty,
+                    note: orderForm.note,
+                    status: orderForm.status,
+                }),
+            });
+            if (res.ok) {
+                if (setPotentialCustomers) {
+                    setPotentialCustomers((prev) =>
+                        prev.map((c) =>
+                            c.id === customer.id
+                                ? {
+                                      ...c,
+                                      qty: orderForm.qty,
+                                      note: orderForm.note,
+                                      status: orderForm.status,
+                                  }
+                                : c
+                        )
+                    );
+                }
+                setOrderDialog({ open: false, customerIdx: null });
+                toast.success('Đã lưu đơn hàng thành công!');
+            } else {
+                toast.error('Có lỗi xảy ra khi lưu đơn hàng.');
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error('Có lỗi kết nối mạng.');
+        }
     };
     const orderCustomer =
         orderDialog.customerIdx !== null
@@ -1440,7 +1486,7 @@ function CustomersPanel() {
                         <CardDescription>
                             Trích xuất SĐT/địa chỉ từ bình luận ·{' '}
                             {filtered.length} khách ·{' '}
-                            {Object.keys(orders).length} đơn
+                            {potentialCustomers.filter(c => c.status && c.status !== '').length} đơn
                         </CardDescription>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -1554,7 +1600,6 @@ function CustomersPanel() {
                                 </tr>
                             ) : (
                                 filtered.map((c, i) => {
-                                    const order = orders[i];
                                     return (
                                         <tr
                                             key={i}
@@ -1622,7 +1667,7 @@ function CustomersPanel() {
                                                 {renderCommentText(c.comment)}
                                             </td>
                                             <td className="p-2 text-center">
-                                                {order ? (
+                                                {c.status && c.status !== '' ? (
                                                     <button
                                                         onClick={() =>
                                                             openOrderDialog(i)
@@ -1630,11 +1675,9 @@ function CustomersPanel() {
                                                         className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-500 transition-colors hover:bg-emerald-500/20"
                                                     >
                                                         <CheckIcon className="size-2.5" />
-                                                        {order.status ===
-                                                        'pending'
+                                                        {c.status === 'pending'
                                                             ? 'Chờ'
-                                                            : order.status ===
-                                                                'confirmed'
+                                                            : c.status === 'confirmed'
                                                               ? 'Xác nhận'
                                                               : 'Ship'}
                                                     </button>
@@ -2733,6 +2776,8 @@ export default function LivesShow({
                     potentialCustomers,
                     topQuestions,
                     statsHistory,
+                    setComments,
+                    setPotentialCustomers,
                 }}
             >
                 <Head title={`${session.name} — Live`} />

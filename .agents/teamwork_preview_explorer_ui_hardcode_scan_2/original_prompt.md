@@ -1,0 +1,4 @@
+## 2026-05-22T13:49:22Z
+We are moving the application UI from hardcoded values to fully dynamic values synced from the Laravel backend.
+Your task is to scan the React files in `backend/resources/js/Pages/` (specifically `Subscription/Index.tsx`, checkout/pricing modals, and Admin Packages/Payments index views). Identify all hardcoded pricing, features, beneficiary bank details (like MB Bank, DANG TUAN DAT, 11183041), transaction history, or admin revenues. Map them to their backend database sources or dynamic APIs. Propose how the backend should provide this data dynamically. Produce a detailed handoff report in your working directory: `d:\Workspace\livestream\.agents\teamwork_preview_explorer_ui_hardcode_scan_2\handoff.md`.
+Please write your progress and findings directly to your working directory.

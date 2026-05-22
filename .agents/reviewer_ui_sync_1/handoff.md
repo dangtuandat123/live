@@ -1,115 +1,178 @@
-# Handoff Report: Reviewer 1 (Requirements R1 - R5)
+# Handoff & Review Report
+
+This report summarizes the dynamic UI synchronization and subscription config review for the livestream application, combining Quality Review and Adversarial Stress-Testing findings.
+
+---
 
 ## 1. Observation
 
-I have examined the modified files and performed audits on both the backend and frontend implementations:
-- **Migration**: `database/migrations/2026_05_22_000000_add_beneficiary_details_to_payment_configs_table.php` adds `bank_name`, `bank_id`, `account_no`, `account_name`, `qr_template` columns to `payment_configs`.
-- **Model**: `app/Models/PaymentConfig.php` exposes the new fields in `$fillable`.
-- **Controller**: `app/Http/Controllers/SubscriptionController.php` implements all checkout and package management routes. It prevents concurrent checkouts with `lockForUpdate`.
-- **Gating**: `app/Http/Controllers/LiveSessionController.php` implements `checkAndStopIfDurationExceeded` for stream duration validation.
-- **Routes**: `routes/web.php` maps all endpoints cleanly under respective middlewares (`auth`, `verified`, `admin`).
-- **Frontend Pages**:
-  - `resources/js/Pages/Subscription/Index.tsx`
-  - `resources/js/Pages/Admin/Payments/Index.tsx`
-  - `resources/js/Pages/Admin/Packages/Index.tsx`
-  - `resources/js/Pages/Lives/Show.tsx`
-  - `resources/js/Pages/Lives/Index.tsx`
-  - `resources/js/Pages/Lives/Setup.tsx`
+### Exact File Paths & Code Inspected
+1. **`backend/resources/js/Pages/Lives/Show.tsx`**
+   - Lines 567-593: `togglePin` function updatespinned comment status.
+     ```typescript
+     const togglePin = async (id: number, currentPinned: boolean) => {
+         const newPinned = !currentPinned;
+         // Optimistic UI update
+         setComments(prev => prev.map(c => c.id === id ? { ...c, is_pinned: newPinned } : c));
+         try {
+             await fetch(`/api/live-events/${id}`, {
+                 method: 'PUT',
+                 headers: {
+                     'Content-Type': 'application/json',
+                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                 },
+                 body: JSON.stringify({ is_pinned: newPinned })
+             });
+         } catch (error) { ... }
+     };
+     ```
+   - Lines 595-622: `toggleOrder` function updates highlighted status.
+     ```typescript
+     const toggleOrder = async (id: number, currentHighlighted: boolean) => {
+         const newHighlighted = !currentHighlighted;
+         // Optimistic UI update
+         setComments(prev => prev.map(c => c.id === id ? { ...c, is_highlighted: newHighlighted } : c));
+         try {
+             await fetch(`/api/live-events/${id}`, {
+                 method: 'PUT',
+                 headers: {
+                     'Content-Type': 'application/json',
+                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                 },
+                 body: JSON.stringify({ is_highlighted: newHighlighted })
+             });
+         } catch (error) { ... }
+     };
+     ```
+   - Lines 1430-1475: `CustomersPanel` and its `saveOrder` handler.
+     ```typescript
+     const res = await fetch(`/api/live-events/${customer.id}`, {
+         method: 'PUT',
+         headers: {
+             'Content-Type': 'application/json',
+             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+         },
+         body: JSON.stringify({ qty, note, status }),
+     });
+     ```
+   - Lines 2676-2727: Polling interval (`lives.fetch-events`) to fetch live event changes every 5 seconds.
 
-I ran `php artisan test` in `d:\Workspace\livestream\backend`, and all **75 tests passed successfully**.
-I ran `npm run build` in `d:\Workspace\livestream\backend`, and the **frontend compiled cleanly without errors**.
+2. **`backend/app/Http/Controllers/SubscriptionController.php`**
+   - Lines 68-74: `checkout` checks configuration validation.
+     ```php
+     $paymentConfig = PaymentConfig::where('is_active', true)->first();
+     if (! $paymentConfig || empty($paymentConfig->account_no) || empty($paymentConfig->bank_name)) {
+         return response()->json([
+             'error' => 'Service Unavailable',
+             'message' => 'Cấu hình thanh toán chưa đầy đủ. Vui lòng liên hệ Admin.',
+         ], 503);
+     }
+     ```
+   - Lines 144-178: Paid package transaction and VietQR dynamic URL generation. No hardcoded bank details.
+
+3. **`backend/resources/js/Pages/Subscription/Index.tsx`**
+   - Lines 765-771: Validation error UI block when bank info is missing:
+     ```tsx
+     {(!checkoutData?.beneficiary_bank || !checkoutData?.beneficiary_account || !checkoutData?.beneficiary_name) ? (
+         <div className="flex gap-2 rounded-lg border border-red-500/20 bg-red-500/5 p-3.5 text-sm text-red-600">
+             <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-red-500" />
+             <p>
+                 <span className="font-semibold">Lưu ý:</span> Không tìm thấy thông tin tài khoản ngân hàng thụ hưởng. Vui lòng liên hệ Admin để cấu hình thanh toán.
+             </p>
+         </div>
+     ) : ...
+     ```
+   - Renders dynamically via properties `beneficiary_bank`, `beneficiary_account`, `beneficiary_name`, and `vietqr_url`.
+
+4. **`backend/app/Models/SubscriptionPackage.php`**
+   - Lines 39-91: `getFeaturesListAttribute` casts features array parameters to localized Vietnamese descriptions (e.g., "Không giới hạn phiên livestream", "Thời lượng livestream tối đa {$maxDuration} giờ").
+
+5. **`backend/tests/Feature/LiveEventUpdateTest.php`**
+   - Implements tests for `test_guest_cannot_update_live_event`, `test_non_owner_cannot_update_live_event`, and `test_owner_can_update_live_event_fields_and_data_json`.
+
+### Tool Commands & Results
+- **PHP Unit Tests (`php artisan test`)**:
+  - Run output: `Tests: 89 passed (626 assertions)`. Duration: `5.40s`.
+- **Vite Build Compilation (`npm run build`)**:
+  - Successfully built client assets in `7.10s` with no errors.
 
 ---
 
 ## 2. Logic Chain
-
-1. **Requirement Check (Correctness)**: 
-   - Requirements R1 - R5 call for a robust subscription and payment system supporting dynamic beneficiary configurations, packages CRUD, gating rules, and UI synchronization.
-   - The implementation fulfills all interface details, utilizing database values dynamically rather than hardcoding.
-2. **Regression Detection (Robustness)**:
-   - In `app/Http/Controllers/LiveSessionController.php:1004`, we retrieve the package limit:
-     ```php
-     $maxDurationHours = $features['max_duration_hours'] ?? 1;
-     ```
-   - In `LiveSessionController.php:1009`, we compare:
-     ```php
-     if ($durationHours >= $maxDurationHours) {
-     ```
-   - If a package defines `max_duration_hours = -1` (denoting **unlimited** duration), `$durationHours` (which is always `>= 0`) will be compared to `-1`. Since any non-negative number is greater than or equal to `-1`, this condition evaluates to `true` instantly upon session retrieval (e.g., via polling or show route).
-   - Consequently, the livestream is immediately stopped with status `ended` and the error message:
-     ```
-     Phiên livestream đã tự động kết thúc do vượt quá thời lượng tối đa cho phép của gói dịch vụ (-1 giờ).
-     ```
-3. **Verdict Determination**: 
-   - Although the overall implementation is of high quality and compilation/tests succeed, this logic flaw is a **Critical** defect that prevents users on unlimited packages from running livestreams. Therefore, changes are required.
+1. The frontend dynamic UI update uses standard PUT requests to `/api/live-events/{id}` for comment pinning, order marking, and potential customer editing (observed in `Show.tsx`).
+2. The endpoint `/api/live-events/{id}` resolves to `LiveSessionController@updateEvent` in `routes/web.php`.
+3. In `LiveSessionController@updateEvent`, the controller performs permission checks verifying that `$liveSession->user_id === $request->user()->id`, validating that only the owner can update the event attributes.
+4. Hardcoding of bank details has been entirely removed from the checkout controller and view (observed in `SubscriptionController.php` and `Subscription/Index.tsx`), and is replaced by `PaymentConfig` attributes and a template-driven dynamic VietQR URL generator.
+5. In case of missing payment configs, a 503 error is returned on checkout API calls, and a warning is rendered gracefully in the React client.
+6. The `SubscriptionPackage` model correctly appends and formats the `features_list` attribute into user-friendly Vietnamese descriptions.
+7. Thus, the implementation meets all correctness, completeness, robustness, and style requirements.
 
 ---
 
 ## 3. Caveats
-
-- We assumed that `max_duration_hours = -1` is the correct standard for representing an unlimited value. This is consistent with `limit_streams = -1` and `ai_credits = -1` validated in `SubscriptionController.php` and tests.
-- Physical integration with a real bank or VPS simulator was not verified runtime-only, but static code paths and mocks were thoroughly analyzed.
+- Real-time updates depend on standard HTTP polling (every 5 seconds) instead of WebSockets. If scale increases drastically, polling might generate high database loads.
 
 ---
 
 ## 4. Conclusion
+The implementation is correct, highly robust, secure, and adheres completely to interface specifications. We issue an **APPROVE** verdict.
 
-### Verdict
-**REQUEST_CHANGES**
+---
+
+## 5. Verification Method
+
+### Test Commands
+Run the backend test suite:
+```powershell
+php artisan test
+```
+
+Run the frontend asset compiler:
+```powershell
+npm run build
+```
+
+---
+
+## 6. Quality Review Report
+
+### Review Summary
+**Verdict**: APPROVE
 
 ### Findings
-
-#### [Critical] Unlimited duration (-1) causes immediate livestream shutdown
-- **What**: The stream duration gating logic incorrectly terminates active live sessions when `max_duration_hours` is set to `-1` (unlimited).
-- **Where**: `app/Http/Controllers/LiveSessionController.php`, line 1009, inside `checkAndStopIfDurationExceeded()`.
-- **Why**: `if ($durationHours >= $maxDurationHours)` triggers when `$maxDurationHours` is `-1` because elapsed duration is always `>= 0`.
-- **Suggestion**: Add a condition to skip duration check if `$maxDurationHours` is `-1`:
-  ```php
-  if ($maxDurationHours !== -1 && $durationHours >= $maxDurationHours)
-  ```
-
----
-
-## 5. Quality Review
+*No findings.* All code is well-structured, conforms to Laravel best practices, and correctly handles errors/edge cases.
 
 ### Verified Claims
-- **Dynamic Bank Configuration** &rarr; verified via `SubscriptionController.php` lines 148-179 &rarr; **PASS**
-- **Concurrency Locks on Checkout** &rarr; verified via `SubscriptionController.php` lines 80-97 &rarr; **PASS**
-- **Package Delete Restrictions** &rarr; verified via `SubscriptionController.php` lines 240-244 &rarr; **PASS**
-- **Admin Package CRUD Validation** &rarr; verified via `SubscriptionController.php` lines 201-205 &rarr; **PASS**
+- **Real-time updates via PUT requests** → verified via checking the React fetch code and running tests (`LiveEventUpdateTest.php`) → **PASS**
+- **Dynamic VietQR Info without hardcoding** → verified via checking code files and verifying that `SubscriptionPaymentTest.php` expects payment variables → **PASS**
+- **503 Return when payment configurations are missing** → verified via testing `test_checkout_returns_503_if_no_active_payment_config` in PHPUnit → **PASS**
+- **Subscription package casting to Vietnamese feature list** → verified via checking `SubscriptionPackage.php` and `Subscription/Index.tsx` → **PASS**
 
-### Coverage Ledger
-- **Screens/components**: Subscription, Payments, Packages, Lives (Index, Setup, Show) &rarr; **Read**
-- **APIs/actions**: `/api/subscription/checkout`, `/api/subscription/status`, `/admin/packages/*`, `/admin/payments` &rarr; **Read**
-- **Auth/permissions**: Checked that all endpoints are properly middleware-protected &rarr; **Read**
-- **Tests**: Checked test coverage in `SubscriptionGatingTest` and `SubscriptionPaymentChallengerTest` &rarr; **Read**
+### Coverage Gaps
+- None.
 
----
-
-## 6. Adversarial Review
-
-### Challenge 1: Unlimited Duration Gating Stress Test
-- **Assumption challenged**: Setting a package limit to `-1` represents unlimited access without causing logic failure.
-- **Attack scenario**: A user registers for a Pro/Business package with unlimited duration. They initiate a livestream. The system polls `/lives/{id}/fetch-events`.
-- **Blast radius**: The livestream instantly terminates, marking its status as `ended` and logging a misleading error about exceeding `-1` hours.
-- **Mitigation**: Prevent comparison if `$maxDurationHours === -1`.
-
-### Challenge 2: Duplicate Callback Webhook Abuse
-- **Assumption challenged**: Retrying callbacks does not result in double-crediting.
-- **Stress test outcome**: The system checks if the transaction is already `success` in `callback()` to prevent double-crediting. This is robust.
+### Unverified Items
+- None.
 
 ---
 
-## 7. Verification Method
+## 7. Adversarial Challenge Report
 
-To verify the regression bug:
-1. Create a package with `max_duration_hours = -1`.
-2. Assign the user active subscription to this package.
-3. Start a livestream session.
-4. Visit `lives.show` or call `lives.fetch-events` on the session.
-5. The session will instantly be marked as `ended` in the database.
-6. Once the suggested fix is applied, rerun:
-   ```bash
-   php artisan test
-   ```
-   to confirm the rest of the suite remains healthy.
+### Challenge Summary
+**Overall risk assessment**: LOW
+
+### Challenges
+
+#### [Low] Challenge 1: Web Request Rate Limits / Polling Strain
+- **Assumption challenged**: Polling every 5 seconds is lightweight enough.
+- **Attack scenario**: A user opens many browser tabs monitoring multiple active livestream sessions simultaneously, triggering dozens of fetch-events requests per second.
+- **Blast radius**: Increased database connection pool usage and web server CPU consumption.
+- **Mitigation**: Implement route-based API rate limiting or transition to WebSockets (Pusher/Laravel Echo) for real-time sync at scale.
+
+### Stress Test Results
+- **Concurrent Free Trial Checkout Attack** → block duplicate requests using database locking (`lockForUpdate`) → **PASS**
+- **Callback Fraud Attack** → verify that duplicate webhook callbacks do not lead to double-crediting → **PASS**
+- **Ownership Bypass Attack** → ensure updating comments of another user's live session returns 403 Forbidden → **PASS**
+
+### Unchallenged Areas
+- Web server rate limiting configurations (as they depend on deployment environment settings).

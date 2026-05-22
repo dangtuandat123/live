@@ -67,6 +67,8 @@ class DashboardController extends Controller
 
         // 2.1 Trend tổng phiên Live
         $sessionsThisWeekCount = count($sessionsThisWeek);
+        $sessionsPrevWeekCount = count($sessionsPrevWeek);
+        $sessionsTrend = $sessionsThisWeekCount >= $sessionsPrevWeekCount ? 'up' : 'down';
 
         // 2.2 Trend tổng bình luận
         $commentsThisWeek = (int) \DB::table('live_stats')->whereIn('live_session_id', $sessionsThisWeek)->sum('total_comments');
@@ -100,7 +102,7 @@ class DashboardController extends Controller
                 'title' => 'Tổng phiên Live',
                 'value' => (string) $totalSessionsCount,
                 'change' => "+{$sessionsThisWeekCount} tuần này",
-                'trend' => 'up',
+                'trend' => $sessionsTrend,
             ],
             [
                 'title' => 'Tổng bình luận',

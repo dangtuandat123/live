@@ -102,6 +102,7 @@ export default function SettingsIndex({ settings, activeStreamsCount, totalSessi
         e.preventDefault();
         tiktokForm.post(route('settings.tiktok.connect'), {
             preserveScroll: true,
+            preserveState: true,
             onSuccess: () => {
                 setConnectOpen(false);
                 tiktokForm.reset();
@@ -113,6 +114,7 @@ export default function SettingsIndex({ settings, activeStreamsCount, totalSessi
         if (confirm('Bạn có chắc chắn muốn ngắt kết nối tài khoản TikTok?')) {
             router.post(route('settings.tiktok.disconnect'), {}, {
                 preserveScroll: true,
+                preserveState: true,
             });
         }
     }

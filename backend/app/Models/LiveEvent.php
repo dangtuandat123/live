@@ -24,6 +24,9 @@ class LiveEvent extends Model
         'product_tag',
         'has_phone',
         'ai_processed',
+        'is_pinned',
+        'is_highlighted',
+        'sort_order',
     ];
 
     protected function casts(): array
@@ -33,6 +36,9 @@ class LiveEvent extends Model
             'event_at' => 'datetime',
             'has_phone' => 'boolean',
             'ai_processed' => 'boolean',
+            'is_pinned' => 'boolean',
+            'is_highlighted' => 'boolean',
+            'sort_order' => 'integer',
         ];
     }
 

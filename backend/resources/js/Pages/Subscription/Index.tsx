@@ -64,6 +64,7 @@ interface SubscriptionPackage {
     price: number;
     duration_days: number;
     features: PackageFeatures | null;
+    features_list?: string[];
 }
 
 interface ActiveSubscription {
@@ -460,81 +461,13 @@ export default function SubscriptionIndex({
                                             Tính năng đi kèm:
                                         </span>
                                         <ul className="text-muted-foreground space-y-2 text-sm">
-                                            {pkg.features ? (
-                                                <>
-                                                    <li className="flex items-start gap-2">
+                                            {pkg.features_list && pkg.features_list.length > 0 ? (
+                                                pkg.features_list.map((feature, idx) => (
+                                                    <li key={idx} className="flex items-start gap-2">
                                                         <CheckIcon className="mt-0.5 size-4 shrink-0 text-emerald-500" />
-                                                        <span>
-                                                            {pkg.features
-                                                                .limit_streams ===
-                                                            -1
-                                                                ? 'Vô hạn phiên livestream'
-                                                                : `Tối đa ${pkg.features.limit_streams} phiên livestream`}
-                                                        </span>
+                                                        <span>{feature}</span>
                                                     </li>
-                                                    <li className="flex items-start gap-2">
-                                                        <CheckIcon className="mt-0.5 size-4 shrink-0 text-emerald-500" />
-                                                        <span>
-                                                            {pkg.features
-                                                                .max_duration_hours ===
-                                                            -1
-                                                                ? 'Không giới hạn thời lượng phiên'
-                                                                : `Thời lượng tối đa ${pkg.features.max_duration_hours} giờ / phiên`}
-                                                        </span>
-                                                    </li>
-                                                    <li className="flex items-start gap-2">
-                                                        <CheckIcon className="mt-0.5 size-4 shrink-0 text-emerald-500" />
-                                                        <span>
-                                                            {pkg.features
-                                                                .ai_credits ===
-                                                            -1
-                                                                ? 'Vô hạn AI Credits'
-                                                                : `${pkg.features.ai_credits.toLocaleString()} AI Credits`}
-                                                        </span>
-                                                    </li>
-                                                    <li className="flex items-start gap-2">
-                                                        {pkg.features
-                                                            .audio_analysis ? (
-                                                            <CheckIcon className="mt-0.5 size-4 shrink-0 text-emerald-500" />
-                                                        ) : (
-                                                            <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center font-bold text-red-500">
-                                                                ×
-                                                            </span>
-                                                        )}
-                                                        <span
-                                                            className={
-                                                                pkg.features
-                                                                    .audio_analysis
-                                                                    ? ''
-                                                                    : 'text-muted-foreground/60 line-through'
-                                                            }
-                                                        >
-                                                            Phân tích âm thanh
-                                                            nâng cao
-                                                        </span>
-                                                    </li>
-                                                    <li className="flex items-start gap-2">
-                                                        {pkg.features
-                                                            .export_leads ? (
-                                                            <CheckIcon className="mt-0.5 size-4 shrink-0 text-emerald-500" />
-                                                        ) : (
-                                                            <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center font-bold text-red-500">
-                                                                ×
-                                                            </span>
-                                                        )}
-                                                        <span
-                                                            className={
-                                                                pkg.features
-                                                                    .export_leads
-                                                                    ? ''
-                                                                    : 'text-muted-foreground/60 line-through'
-                                                            }
-                                                        >
-                                                            Xuất danh sách lead
-                                                            (CSV)
-                                                        </span>
-                                                    </li>
-                                                </>
+                                                ))
                                             ) : (
                                                 <li className="flex items-start gap-2 italic">
                                                     <span>
@@ -829,68 +762,74 @@ export default function SubscriptionIndex({
                                 )}
 
                                 {/* Thông tin chuyển khoản */}
-                                <div className="bg-muted/50 border-border/40 w-full space-y-2 rounded-xl border p-3.5 text-sm">
-                                    <div className="border-border/40 flex items-center justify-between border-b py-1">
-                                        <span className="text-muted-foreground">
-                                            Ngân hàng:
-                                        </span>
-                                        <span className="text-foreground font-semibold">
-                                            {checkoutData?.beneficiary_bank ||
-                                                'MB Bank'}
-                                        </span>
+                                {(!checkoutData?.beneficiary_bank || !checkoutData?.beneficiary_account || !checkoutData?.beneficiary_name) ? (
+                                    <div className="flex gap-2 rounded-lg border border-red-500/20 bg-red-500/5 p-3.5 text-sm text-red-600">
+                                        <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-red-500" />
+                                        <p>
+                                            <span className="font-semibold">Lưu ý:</span> Không tìm thấy thông tin tài khoản ngân hàng thụ hưởng. Vui lòng liên hệ Admin để cấu hình thanh toán.
+                                        </p>
                                     </div>
-                                    <div className="border-border/40 flex items-center justify-between border-b py-1">
-                                        <span className="text-muted-foreground">
-                                            Số tài khoản:
-                                        </span>
-                                        <span className="text-foreground font-semibold">
-                                            {checkoutData?.beneficiary_account ||
-                                                '11183041'}
-                                        </span>
-                                    </div>
-                                    <div className="border-border/40 flex items-center justify-between border-b py-1">
-                                        <span className="text-muted-foreground">
-                                            Chủ tài khoản:
-                                        </span>
-                                        <span className="text-foreground font-semibold">
-                                            {checkoutData?.beneficiary_name ||
-                                                'DANG TUAN DAT'}
-                                        </span>
-                                    </div>
-                                    <div className="border-border/40 flex items-center justify-between border-b py-1">
-                                        <span className="text-muted-foreground">
-                                            Số tiền:
-                                        </span>
-                                        <span className="text-primary font-bold tabular-nums">
-                                            {formatMoney(
-                                                selectedPkg?.price || 0,
-                                            )}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between py-1">
-                                        <span className="text-muted-foreground">
-                                            Nội dung chuyển khoản:
-                                        </span>
-                                        <div className="flex items-center gap-1">
-                                            <code className="bg-background border-border text-primary rounded border px-2 py-0.5 font-mono text-xs font-bold">
-                                                {transferContent}
-                                            </code>
-                                            <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                className="hover:bg-background/80 size-7"
-                                                onClick={handleCopyContent}
-                                                disabled={timeLeft === 0}
-                                            >
-                                                {copied ? (
-                                                    <CheckCircle2Icon className="size-3.5 text-emerald-500" />
-                                                ) : (
-                                                    <CopyIcon className="text-muted-foreground size-3.5" />
+                                ) : (
+                                    <div className="bg-muted/50 border-border/40 w-full space-y-2 rounded-xl border p-3.5 text-sm">
+                                        <div className="border-border/40 flex items-center justify-between border-b py-1">
+                                            <span className="text-muted-foreground">
+                                                Ngân hàng:
+                                            </span>
+                                            <span className="text-foreground font-semibold">
+                                                {checkoutData.beneficiary_bank}
+                                            </span>
+                                        </div>
+                                        <div className="border-border/40 flex items-center justify-between border-b py-1">
+                                            <span className="text-muted-foreground">
+                                                Số tài khoản:
+                                            </span>
+                                            <span className="text-foreground font-semibold">
+                                                {checkoutData.beneficiary_account}
+                                            </span>
+                                        </div>
+                                        <div className="border-border/40 flex items-center justify-between border-b py-1">
+                                            <span className="text-muted-foreground">
+                                                Chủ tài khoản:
+                                            </span>
+                                            <span className="text-foreground font-semibold">
+                                                {checkoutData.beneficiary_name}
+                                            </span>
+                                        </div>
+                                        <div className="border-border/40 flex items-center justify-between border-b py-1">
+                                            <span className="text-muted-foreground">
+                                                Số tiền:
+                                            </span>
+                                            <span className="text-primary font-bold tabular-nums">
+                                                {formatMoney(
+                                                    selectedPkg?.price || 0,
                                                 )}
-                                            </Button>
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between py-1">
+                                            <span className="text-muted-foreground">
+                                                Nội dung chuyển khoản:
+                                            </span>
+                                            <div className="flex items-center gap-1">
+                                                <code className="bg-background border-border text-primary rounded border px-2 py-0.5 font-mono text-xs font-bold">
+                                                    {transferContent}
+                                                </code>
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="hover:bg-background/80 size-7"
+                                                    onClick={handleCopyContent}
+                                                    disabled={timeLeft === 0}
+                                                >
+                                                    {copied ? (
+                                                        <CheckCircle2Icon className="size-3.5 text-emerald-500" />
+                                                    ) : (
+                                                        <CopyIcon className="text-muted-foreground size-3.5" />
+                                                    )}
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                )}
 
                                 {/* Hướng dẫn an toàn */}
                                 <div className="text-muted-foreground flex gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5 text-xs">
