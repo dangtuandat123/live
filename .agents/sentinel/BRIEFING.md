@@ -1,29 +1,29 @@
-# BRIEFING — 2026-05-22T15:52:40Z
+# BRIEFING — 2026-05-22T09:55:00Z
 
 ## Mission
-Transition the "Top Keywords" feature from manual configuration to AI Auto-Discovery Keywords, standardizing/storing them with a limit of 30, and rendering real-time counts.
+Improve AI Insights & Alerts on Livestream Dashboard, optimizing LLM prompt details, throttle trigger, manual button, and enhanced UX.
 
 ## 🔒 My Identity
 - Archetype: sentinel
 - Working directory: d:\Workspace\livestream\.agents\sentinel
-- Orchestrator: 786d91c8-eb73-4c7e-87dc-6dd8e044bfa3
-- Victory Auditor: d6220f85-a676-4e6e-8921-e3c65c21bc85
+- Orchestrator: 5182db82-58f4-44b3-bcb7-745968896b56
+- Victory Auditor: TBD
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
 - Victory Audit is MANDATORY before reporting completion
 
 ## User Context
-- **Last user request**: Convert "Top Keywords" feature from manual config to AI auto-discovery, saving up to 30 keywords per session and counting them using SQL LIKE query.
-- **Pending clarifications**: none
-- **Delivered results**: Transitioned manual keyword configuration to AI Auto-Discovery Keywords, standardized and stored in database, and displayed real-time counts on the Show dashboard.
+- **Last user request**: Improve AI Insights (Summary) and AI Alerts on Livestream Dashboard: add DB columns, LiveSessionAnalyzer agent, 30s throttle with cache lock, manual refresh button, frontend Show.tsx updates, and keep existing features & tests passing.
+- **Pending clarifications**: [none]
+- **Delivered results**: [none]
 
 ## Project Status
-- **Phase**: complete
+- **Phase**: in progress
 
 ## Victory Audit Status
-- **Triggered**: yes
-- **Verdict**: VICTORY CONFIRMED
+- **Triggered**: no
+- **Verdict**: pending
 - **Retry count**: 0
 
 ## Artifact Index

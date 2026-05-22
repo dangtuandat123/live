@@ -12,7 +12,6 @@ use App\Models\PaymentConfig;
 use App\Models\SubscriptionPackage;
 use App\Models\Transaction;
 use App\Models\User;
-use App\Models\UserSubscription;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -47,6 +46,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/lives/{liveSession}', [LiveSessionController::class, 'show'])->name('lives.show');
     Route::post('/lives/{liveSession}/stop', [LiveSessionController::class, 'stop'])->name('lives.stop');
     Route::post('/lives/{liveSession}/fetch-events', [LiveSessionController::class, 'fetchEvents'])->name('lives.fetch-events');
+    Route::post('/lives/{liveSession}/refresh-insights', [LiveSessionController::class, 'refreshInsights'])->name('lives.refresh-insights');
     Route::delete('/lives/{liveSession}', [LiveSessionController::class, 'destroy'])->name('lives.destroy');
     Route::put('/api/live-events/{liveEvent}', [LiveSessionController::class, 'updateEvent'])->name('live-events.update');
 
@@ -98,10 +98,10 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
         if ($usersLastMonth > 0) {
             $usersDiffPercent = (($usersThisMonth - $usersLastMonth) / $usersLastMonth) * 100;
             $usersTrend = $usersDiffPercent >= 0 ? 'up' : 'down';
-            $usersChange = ($usersDiffPercent >= 0 ? '+' : '') . number_format($usersDiffPercent, 1) . '% so với tháng trước';
+            $usersChange = ($usersDiffPercent >= 0 ? '+' : '').number_format($usersDiffPercent, 1).'% so với tháng trước';
         } else {
             $usersTrend = 'up';
-            $usersChange = '+' . $usersThisMonth . ' tháng này';
+            $usersChange = '+'.$usersThisMonth.' tháng này';
         }
 
         // Sessions Growth
@@ -110,10 +110,10 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
         if ($sessionsLastMonth > 0) {
             $sessionsDiffPercent = (($sessionsThisMonth - $sessionsLastMonth) / $sessionsLastMonth) * 100;
             $sessionsTrend = $sessionsDiffPercent >= 0 ? 'up' : 'down';
-            $sessionsChange = ($sessionsDiffPercent >= 0 ? '+' : '') . number_format($sessionsDiffPercent, 1) . '% so với tháng trước';
+            $sessionsChange = ($sessionsDiffPercent >= 0 ? '+' : '').number_format($sessionsDiffPercent, 1).'% so với tháng trước';
         } else {
             $sessionsTrend = 'up';
-            $sessionsChange = '+' . $sessionsThisMonth . ' tháng này';
+            $sessionsChange = '+'.$sessionsThisMonth.' tháng này';
         }
 
         // Revenue Growth
@@ -126,10 +126,10 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
         if ($lastMonthRevenue > 0) {
             $revenueDiffPercent = (($currentMonthRevenue - $lastMonthRevenue) / $lastMonthRevenue) * 100;
             $revenueTrend = $revenueDiffPercent >= 0 ? 'up' : 'down';
-            $revenueChange = ($revenueDiffPercent >= 0 ? '+' : '') . number_format($revenueDiffPercent, 1) . '% so với tháng trước';
+            $revenueChange = ($revenueDiffPercent >= 0 ? '+' : '').number_format($revenueDiffPercent, 1).'% so với tháng trước';
         } else {
             $revenueTrend = 'up';
-            $revenueChange = '+' . number_format($currentMonthRevenue) . 'đ tháng này';
+            $revenueChange = '+'.number_format($currentMonthRevenue).'đ tháng này';
         }
 
         // Active Users Growth
@@ -140,7 +140,7 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
         if ($activeUsersPrev7Days > 0) {
             $activeDiffPercent = (($activeUsersLast7Days - $activeUsersPrev7Days) / $activeUsersPrev7Days) * 100;
             $activeTrend = $activeDiffPercent >= 0 ? 'up' : 'down';
-            $activeChange = ($activeDiffPercent >= 0 ? '+' : '') . number_format($activeDiffPercent, 1) . '% so với 7 ngày trước';
+            $activeChange = ($activeDiffPercent >= 0 ? '+' : '').number_format($activeDiffPercent, 1).'% so với 7 ngày trước';
         } else {
             $activeTrend = 'up';
             $activeChange = 'Dựa trên phiên live gần đây';
@@ -205,7 +205,7 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
                 ],
                 [
                     'title' => 'Tổng doanh thu',
-                    'value' => number_format($totalRevenueVal) . 'đ',
+                    'value' => number_format($totalRevenueVal).'đ',
                     'change' => $revenueChange,
                     'trend' => $revenueTrend,
                 ],
@@ -228,6 +228,7 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
             ->map(function ($u) {
                 $activeSub = $u->resolveActiveSubscription();
                 $u->plan_name = $activeSub && $activeSub->package ? $activeSub->package->name : 'Free';
+
                 return $u;
             });
 

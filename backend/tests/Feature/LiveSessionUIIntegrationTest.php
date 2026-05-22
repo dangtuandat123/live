@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\LiveEvent;
 use App\Models\LiveSession;
-use App\Models\LiveStat;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;

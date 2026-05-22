@@ -553,6 +553,8 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
             ->with('analyze-comments-lock-'.$session->id, 120)
             ->andReturn($mockLock);
         Cache::shouldReceive('forget')->zeroOrMoreTimes();
+        Cache::shouldReceive('get')->zeroOrMoreTimes()->andReturn(null);
+        Cache::shouldReceive('put')->zeroOrMoreTimes();
 
         $job = new AnalyzeCommentsJob($session->id);
         app()->call([$job, 'handle']);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Ai\Agents\LiveSessionAnalyzer;
 use App\Exceptions\TikTokSessionNotFoundException;
 use App\Jobs\AnalyzeCommentsJob;
 use App\Jobs\CaptureThumbnailJob;
@@ -10,6 +11,7 @@ use App\Models\LiveSession;
 use App\Models\LiveSessionStatsHistory;
 use App\Models\LiveStat;
 use App\Models\Product;
+use App\Services\RunwareAiService;
 use App\Services\TikTokService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
@@ -157,7 +159,6 @@ class LiveSessionController extends Controller
                 ->pluck('id');
             $session->products()->attach($validProductIds);
         }
-
 
         // Tạo stats record
         LiveStat::create(['live_session_id' => $session->id]);
@@ -379,6 +380,132 @@ class LiveSessionController extends Controller
     }
 
     /**
+     * Refresh AI insights manually.
+     */
+    public function refreshInsights(Request $request, LiveSession $liveSession, RunwareAiService $runware)
+    {
+        if ($liveSession->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        // Cache Throttle Check
+        $cacheKey = "live_session_{$liveSession->id}_last_insight_time";
+        $lastInsightTime = Cache::get($cacheKey);
+        if ($lastInsightTime !== null) {
+            $elapsed = now()->timestamp - $lastInsightTime;
+            if ($elapsed < 30) {
+                $secondsRemaining = 30 - $elapsed;
+
+                return response()->json(['error' => "Vui lòng đợi {$secondsRemaining} giây trước khi yêu cầu làm mới tiếp theo."], 429);
+            }
+        }
+
+        // Credit Limit Check
+        $user = $request->user();
+        $activeSub = $user->resolveActiveSubscription();
+        $features = $user->getSubscriptionFeatures();
+        $aiCreditsLimit = $features['ai_credits'] ?? 1000;
+        if ($aiCreditsLimit !== -1 && $activeSub !== null) {
+            if ($activeSub->used_ai_credits >= $aiCreditsLimit) {
+                return response()->json(['error' => 'Đã hết tín dụng AI của gói dịch vụ.'], 402);
+            }
+        }
+
+        // Fetch recent 150 comments
+        $comments = $liveSession->events()
+            ->where('event_type', 'comment')
+            ->orderByDesc('event_at')
+            ->limit(150)
+            ->get()
+            ->map(fn ($e) => [
+                'user' => $e->tiktok_nickname ?? 'Unknown',
+                'text' => $e->data['comment'] ?? '',
+                'time' => $e->event_at?->toISOString() ?? '',
+            ])
+            ->toArray();
+
+        // Stats
+        $liveSession->load('stats');
+        $stats = $liveSession->stats ? [
+            'total_views' => $liveSession->stats->total_views,
+            'total_comments' => $liveSession->stats->total_comments,
+            'total_likes' => $liveSession->stats->total_likes,
+            'total_gifts' => $liveSession->stats->total_gifts,
+            'total_follows' => $liveSession->stats->total_follows,
+            'total_shares' => $liveSession->stats->total_shares,
+            'viewer_count' => $liveSession->stats->viewer_count,
+            'leads_count' => $liveSession->stats->leads_count,
+        ] : [];
+
+        // Products
+        $products = $liveSession->products->map(fn ($p) => [
+            'name' => $p->name,
+            'sku' => $p->sku,
+            'price' => $p->price,
+            'keywords' => $p->keywords ?? [],
+        ])->toArray();
+
+        // Keywords
+        $keywords = $liveSession->keywords->pluck('keyword')->toArray();
+
+        // Memory
+        $oldMemory = $liveSession->ai_context_summary ?? '';
+
+        $inputData = [
+            'comments' => $comments,
+            'stats' => $stats,
+            'products' => $products,
+            'keywords' => $keywords,
+            'old_memory' => $oldMemory,
+        ];
+
+        $userMessage = json_encode($inputData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+
+        $analyzer = (new LiveSessionAnalyzer)
+            ->withComments($comments)
+            ->withStats($stats)
+            ->withProducts($products)
+            ->withKeywords($keywords)
+            ->withOldMemory($oldMemory);
+
+        try {
+            $response = $runware->chatJson(
+                systemPrompt: $analyzer->instructions(),
+                userMessage: $userMessage,
+                temperature: 0,
+                maxTokens: 4096,
+            );
+        } catch (\Throwable $e) {
+            Log::error('Failed to refresh AI insights: '.$e->getMessage());
+
+            return response()->json(['error' => 'Dịch vụ AI hiện đang bận. Vui lòng thử lại sau.'], 500);
+        }
+
+        if ($response) {
+            $liveSession->update([
+                'ai_insights' => $response['summary'] ?? $liveSession->ai_insights,
+                'ai_alerts' => $response['alerts'] ?? $liveSession->ai_alerts,
+            ]);
+
+            if ($activeSub !== null) {
+                $activeSub->used_ai_credits += count($comments);
+                $activeSub->save();
+            }
+        }
+
+        // Updates the cache key
+        Cache::put($cacheKey, now()->timestamp);
+
+        // Clears/updates session cache
+        $this->clearSessionCache($liveSession->id);
+
+        return response()->json([
+            'ai_insights' => $liveSession->ai_insights,
+            'ai_alerts' => $liveSession->ai_alerts,
+        ]);
+    }
+
+    /**
      * AJAX: Fetch events mới từ Python service và lưu vào DB.
      */
     public function fetchEvents(Request $request, LiveSession $liveSession)
@@ -464,6 +591,8 @@ class LiveSessionController extends Controller
                 'statsHistory' => $statsHistory,
                 'potentialCustomersCount' => $potentialCustomersCount,
                 'topKeywords' => $topKeywords,
+                'ai_insights' => $liveSession->ai_insights,
+                'ai_alerts' => $liveSession->ai_alerts,
             ]);
         }
 
@@ -590,6 +719,8 @@ class LiveSessionController extends Controller
             'statsHistory' => $statsHistory,
             'potentialCustomersCount' => $potentialCustomersCount,
             'topKeywords' => $topKeywords,
+            'ai_insights' => $liveSession->ai_insights,
+            'ai_alerts' => $liveSession->ai_alerts,
         ]);
     }
 
@@ -1074,7 +1205,7 @@ class LiveSessionController extends Controller
     public function updateEvent(Request $request, LiveEvent $liveEvent)
     {
         $liveSession = $liveEvent->liveSession;
-        if (!$liveSession || $liveSession->user_id !== $request->user()->id) {
+        if (! $liveSession || $liveSession->user_id !== $request->user()->id) {
             abort(403);
         }
 
@@ -1098,7 +1229,7 @@ class LiveSessionController extends Controller
             $updates['sort_order'] = $validated['sort_order'];
         }
 
-        if (!empty($updates)) {
+        if (! empty($updates)) {
             $liveEvent->update($updates);
         }
 
@@ -1128,7 +1259,7 @@ class LiveSessionController extends Controller
                 'qty' => $liveEvent->data['qty'] ?? 1,
                 'note' => $liveEvent->data['note'] ?? '',
                 'status' => $liveEvent->data['status'] ?? 'pending',
-            ]
+            ],
         ]);
     }
 
@@ -1140,7 +1271,7 @@ class LiveSessionController extends Controller
             ->where('tiktok_user_id', '!=', '')
             ->where(function ($q) {
                 $q->where('intent_tag', 'Chốt đơn')
-                  ->orWhere('has_phone', true);
+                    ->orWhere('has_phone', true);
             })
             ->distinct('tiktok_user_id')
             ->count('tiktok_user_id');
@@ -1150,7 +1281,7 @@ class LiveSessionController extends Controller
     {
         $setupKeywords = $session->keywords()->pluck('keyword')->toArray();
         $keywordCounts = [];
-        
+
         foreach ($setupKeywords as $kw) {
             $kw = trim($kw);
             if ($kw === '') {

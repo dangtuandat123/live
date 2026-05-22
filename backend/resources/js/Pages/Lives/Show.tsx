@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -80,6 +81,7 @@ import {
     PhoneIcon,
     PinIcon,
     PinOffIcon,
+    RefreshCw,
     SearchIcon,
     Share2Icon,
     ShoppingCartIcon,
@@ -185,6 +187,15 @@ interface SessionData {
         price: number;
         image: string | null;
     }[];
+    ai_insights?: string | null;
+    ai_alerts?:
+        | {
+              type: 'danger' | 'warning' | 'info' | 'success';
+              title: string;
+              desc: string;
+              action: string;
+          }[]
+        | null;
 }
 
 interface StatsData {
@@ -275,6 +286,7 @@ interface PageProps {
 // --- Context for sharing data across sub-components ---
 const LiveContext = React.createContext<{
     session: SessionData;
+    setSession?: React.Dispatch<React.SetStateAction<SessionData>>;
     stats: StatsData;
     comments: CommentData[];
     topProducts: TopProduct[];
@@ -570,7 +582,9 @@ function CommentsPanel() {
     const [filter, setFilter] = React.useState('all');
     const [search, setSearch] = React.useState('');
     const [visibleCount, setVisibleCount] = React.useState(BATCH);
-    const [selectedQuestionTag, setSelectedQuestionTag] = React.useState<string | null>(null);
+    const [selectedQuestionTag, setSelectedQuestionTag] = React.useState<
+        string | null
+    >(null);
 
     const questionTagsInComments = React.useMemo(() => {
         const tags: { [key: string]: number } = {};
@@ -667,12 +681,14 @@ function CommentsPanel() {
         if (filter === 'question') {
             if (selectedQuestionTag) {
                 if (selectedQuestionTag === 'Chưa phân loại') {
-                    if (c.question_tag || c.intent_tag !== 'Hỏi thông tin') return false;
+                    if (c.question_tag || c.intent_tag !== 'Hỏi thông tin')
+                        return false;
                 } else if (c.question_tag !== selectedQuestionTag) {
                     return false;
                 }
             } else {
-                if (!c.question_tag && c.intent_tag !== 'Hỏi thông tin') return false;
+                if (!c.question_tag && c.intent_tag !== 'Hỏi thông tin')
+                    return false;
             }
         }
         if (
@@ -834,12 +850,12 @@ function CommentsPanel() {
                     ))}
                 </div>
                 {filter === 'question' && questionTagsInComments.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-3 border-t border-border/50">
+                    <div className="border-border/50 flex flex-wrap gap-1.5 border-t pt-3">
                         <button
                             onClick={() => setSelectedQuestionTag(null)}
                             className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors ${
                                 selectedQuestionTag === null
-                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                                    ? 'border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400'
                                     : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 border border-transparent'
                             }`}
                         >
@@ -851,12 +867,14 @@ function CommentsPanel() {
                                 onClick={() => setSelectedQuestionTag(tag)}
                                 className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors ${
                                     selectedQuestionTag === tag
-                                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                                        ? 'border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400'
                                         : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 border border-transparent'
                                 }`}
                             >
                                 {tag}
-                                <span className="text-[9px] opacity-70">({count})</span>
+                                <span className="text-[9px] opacity-70">
+                                    ({count})
+                                </span>
                             </button>
                         ))}
                     </div>
@@ -1692,7 +1710,10 @@ function CustomersPanel() {
                                             key={i}
                                             className="hover:bg-muted/50 border-b transition-colors"
                                         >
-                                            <td className="truncate p-2 font-medium" title={c.name}>
+                                            <td
+                                                className="truncate p-2 font-medium"
+                                                title={c.name}
+                                            >
                                                 {c.name}
                                             </td>
                                             <td className="p-2">
@@ -1729,7 +1750,10 @@ function CustomersPanel() {
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="truncate p-2" title={c.time}>
+                                            <td
+                                                className="truncate p-2"
+                                                title={c.time}
+                                            >
                                                 {c.time || (
                                                     <span className="text-muted-foreground">
                                                         —
@@ -1750,7 +1774,10 @@ function CustomersPanel() {
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="text-muted-foreground truncate p-2 text-sm" title={c.comment}>
+                                            <td
+                                                className="text-muted-foreground truncate p-2 text-sm"
+                                                title={c.comment}
+                                            >
                                                 {renderCommentText(c.comment)}
                                             </td>
                                             <td className="p-2 text-center">
@@ -1975,8 +2002,54 @@ function CustomersPanel() {
 }
 
 function AIInsightsPanel() {
-    const { stats, topProducts, topQuestions, potentialCustomers } =
-        useLiveData();
+    const {
+        session,
+        setSession,
+        stats,
+        topProducts,
+        topQuestions,
+        potentialCustomers,
+    } = useLiveData();
+
+    const [isRefreshing, setIsRefreshing] = React.useState(false);
+
+    const handleRefresh = async () => {
+        if (!setSession) return;
+        setIsRefreshing(true);
+        try {
+            const res = await fetch(
+                route('lives.refresh-insights', session.id),
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN':
+                            document
+                                .querySelector('meta[name="csrf-token"]')
+                                ?.getAttribute('content') ?? '',
+                        Accept: 'application/json',
+                    },
+                },
+            );
+            if (res.ok) {
+                const data = await res.json();
+                setSession((prev) => ({
+                    ...prev,
+                    ai_insights: data.ai_insights,
+                    ai_alerts: data.ai_alerts,
+                }));
+                toast.success('Đã làm mới tổng kết và cảnh báo AI!');
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                toast.error(errData.error || 'Không thể làm mới dữ liệu AI.');
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error('Có lỗi xảy ra khi kết nối máy chủ.');
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     const sentimentTotal =
         stats.sentiment_positive +
@@ -2068,6 +2141,44 @@ function AIInsightsPanel() {
         });
     }
 
+    const alertTypeConfig: Record<
+        'danger' | 'warning' | 'info' | 'success',
+        {
+            icon: React.ComponentType<{ className?: string }>;
+            alertClass: string;
+            actionClass: string;
+        }
+    > = {
+        danger: {
+            icon: AlertTriangleIcon,
+            alertClass:
+                'border-destructive/30 bg-destructive/5 text-destructive [&>svg]:text-destructive/90',
+            actionClass:
+                'bg-destructive/10 text-destructive-foreground dark:text-red-300 border border-destructive/20',
+        },
+        warning: {
+            icon: AlertTriangleIcon,
+            alertClass:
+                'border-amber-500/30 bg-amber-500/5 text-amber-600 dark:text-amber-400 [&>svg]:text-amber-500',
+            actionClass:
+                'bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/20',
+        },
+        info: {
+            icon: LightbulbIcon,
+            alertClass:
+                'border-blue-500/30 bg-blue-500/5 text-blue-600 dark:text-blue-400 [&>svg]:text-blue-500',
+            actionClass:
+                'bg-blue-500/10 text-blue-800 dark:text-blue-300 border border-blue-500/20',
+        },
+        success: {
+            icon: SparklesIcon,
+            alertClass:
+                'border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 [&>svg]:text-emerald-500',
+            actionClass:
+                'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/20',
+        },
+    };
+
     return (
         <div className="grid h-full min-h-0 gap-4 md:grid-cols-2">
             {/* Tổng kết */}
@@ -2078,22 +2189,40 @@ function AIInsightsPanel() {
                             <SparklesIcon className="size-5" />
                             Tổng kết AI
                         </CardTitle>
-                        {sentimentTotal < stats.total_comments && (
-                            <Badge
-                                variant="secondary"
-                                className="animate-pulse gap-1 text-[10px] font-normal"
+                        <div className="flex items-center gap-2">
+                            {sentimentTotal < stats.total_comments && (
+                                <Badge
+                                    variant="secondary"
+                                    className="animate-pulse gap-1 text-[10px] font-normal"
+                                >
+                                    <LoaderIcon className="size-2.5 animate-spin" />
+                                    Đang xử lý{' '}
+                                    {stats.total_comments - sentimentTotal} bình
+                                    luận...
+                                </Badge>
+                            )}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleRefresh}
+                                disabled={isRefreshing}
+                                className="h-8 gap-1.5 px-2.5"
                             >
-                                <LoaderIcon className="size-2.5 animate-spin" />
-                                Đang xử lý{' '}
-                                {stats.total_comments - sentimentTotal} bình
-                                luận...
-                            </Badge>
-                        )}
+                                <RefreshCw
+                                    className={`size-3.5 ${isRefreshing ? 'animate-spin' : ''}`}
+                                />
+                                Làm mới
+                            </Button>
+                        </div>
                     </div>
                 </CardHeader>
                 <FadeScrollArea>
                     <div className="text-muted-foreground space-y-3 px-4 text-sm">
-                        {sentimentTotal > 0 ? (
+                        {session.ai_insights ? (
+                            <p className="text-sm whitespace-pre-line">
+                                {session.ai_insights}
+                            </p>
+                        ) : sentimentTotal > 0 ? (
                             <>
                                 <p>
                                     <strong className="text-foreground">
@@ -2155,82 +2284,98 @@ function AIInsightsPanel() {
                     </CardTitle>
                 </CardHeader>
                 <FadeScrollArea>
-                    <div className="space-y-2 px-4">
-                        {dynamicAlerts.map((alert) => {
-                            const colorMap: Record<
-                                string,
-                                {
-                                    icon: string;
-                                    border: string;
-                                    bg: string;
-                                    badge: string;
-                                    badgeBg: string;
-                                }
-                            > = {
-                                amber: {
-                                    icon: 'text-amber-500',
-                                    border: 'border-l-amber-500',
-                                    bg: 'hover:bg-amber-500/5',
-                                    badge: 'text-amber-600',
-                                    badgeBg: 'bg-amber-500/10',
-                                },
-                                emerald: {
-                                    icon: 'text-emerald-500',
-                                    border: 'border-l-emerald-500',
-                                    bg: 'hover:bg-emerald-500/5',
-                                    badge: 'text-emerald-600',
-                                    badgeBg: 'bg-emerald-500/10',
-                                },
-                                blue: {
-                                    icon: 'text-blue-500',
-                                    border: 'border-l-blue-500',
-                                    bg: 'hover:bg-blue-500/5',
-                                    badge: 'text-blue-600',
-                                    badgeBg: 'bg-blue-500/10',
-                                },
-                                red: {
-                                    icon: 'text-red-500',
-                                    border: 'border-l-red-500',
-                                    bg: 'hover:bg-red-500/5',
-                                    badge: 'text-red-600',
-                                    badgeBg: 'bg-red-500/10',
-                                },
-                                cyan: {
-                                    icon: 'text-cyan-500',
-                                    border: 'border-l-cyan-500',
-                                    bg: 'hover:bg-cyan-500/5',
-                                    badge: 'text-cyan-600',
-                                    badgeBg: 'bg-cyan-500/10',
-                                },
-                            };
-                            const c = colorMap[alert.color] ?? colorMap.blue;
-                            const Icon = alert.icon;
-                            return (
-                                <div
-                                    key={alert.title}
-                                    className={`flex items-start gap-3 rounded-lg border-l-[3px] ${c.border} p-3 transition-colors ${c.bg}`}
-                                >
-                                    <div
-                                        className={`bg-muted/50 flex size-8 shrink-0 items-center justify-center rounded-md ${c.icon}`}
-                                    >
-                                        <Icon className="size-4" />
-                                    </div>
-                                    <div className="min-w-0 flex-1 space-y-0.5">
-                                        <span className="text-sm font-semibold">
-                                            {alert.title}
-                                        </span>
-                                        <p className="text-muted-foreground text-xs leading-relaxed">
-                                            {alert.desc}
-                                        </p>
-                                        <span
-                                            className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${c.badge} ${c.badgeBg}`}
-                                        >
-                                            {alert.severity}
-                                        </span>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                    <div className="space-y-3 px-4">
+                        {session.ai_alerts && session.ai_alerts.length > 0
+                            ? session.ai_alerts.map((alert, idx) => {
+                                  const c =
+                                      alertTypeConfig[alert.type] ??
+                                      alertTypeConfig.info;
+                                  const Icon = c.icon;
+                                  return (
+                                      <Alert
+                                          key={idx}
+                                          className={c.alertClass}
+                                      >
+                                          <Icon className="size-4" />
+                                          <AlertTitle className="text-sm font-semibold">
+                                              {alert.title}
+                                          </AlertTitle>
+                                          <AlertDescription className="text-xs leading-relaxed">
+                                              <p>{alert.desc}</p>
+                                              {alert.action && (
+                                                  <div
+                                                      className={`mt-2 rounded p-2 text-xs font-medium ${c.actionClass}`}
+                                                  >
+                                                      Gợi ý hành động:{' '}
+                                                      {alert.action}
+                                                  </div>
+                                              )}
+                                          </AlertDescription>
+                                      </Alert>
+                                  );
+                              })
+                            : dynamicAlerts.map((alert) => {
+                                  const colorMap: Record<
+                                      string,
+                                      {
+                                          alertClass: string;
+                                          badgeClass: string;
+                                      }
+                                  > = {
+                                      amber: {
+                                          alertClass:
+                                              'border-amber-500/20 bg-amber-500/5 text-amber-600 dark:text-amber-400 [&>svg]:text-amber-500',
+                                          badgeClass:
+                                              'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+                                      },
+                                      emerald: {
+                                          alertClass:
+                                              'border-emerald-500/20 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 [&>svg]:text-emerald-500',
+                                          badgeClass:
+                                              'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
+                                      },
+                                      blue: {
+                                          alertClass:
+                                              'border-blue-500/20 bg-blue-500/5 text-blue-600 dark:text-blue-400 [&>svg]:text-blue-500',
+                                          badgeClass:
+                                              'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20',
+                                      },
+                                      red: {
+                                          alertClass:
+                                              'border-red-500/20 bg-red-500/5 text-red-600 dark:text-red-400 [&>svg]:text-red-500',
+                                          badgeClass:
+                                              'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20',
+                                      },
+                                      cyan: {
+                                          alertClass:
+                                              'border-cyan-500/20 bg-cyan-500/5 text-cyan-600 dark:text-cyan-400 [&>svg]:text-cyan-500',
+                                          badgeClass:
+                                              'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20',
+                                      },
+                                  };
+                                  const c =
+                                      colorMap[alert.color] ?? colorMap.blue;
+                                  const Icon = alert.icon;
+                                  return (
+                                      <Alert
+                                          key={alert.title}
+                                          className={c.alertClass}
+                                      >
+                                          <Icon className="size-4" />
+                                          <AlertTitle className="text-sm font-semibold">
+                                              {alert.title}
+                                          </AlertTitle>
+                                          <AlertDescription className="text-xs leading-relaxed">
+                                              <p>{alert.desc}</p>
+                                              <span
+                                                  className={`mt-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${c.badgeClass}`}
+                                              >
+                                                  {alert.severity}
+                                              </span>
+                                          </AlertDescription>
+                                      </Alert>
+                                  );
+                              })}
                     </div>
                 </FadeScrollArea>
             </Card>
@@ -2813,6 +2958,14 @@ export default function LivesShow({
                                     ? (data.error_message ?? prev.error_message)
                                     : prev.error_message,
                             duration: data.duration ?? prev.duration,
+                            ai_insights:
+                                data.ai_insights !== undefined
+                                    ? data.ai_insights
+                                    : prev.ai_insights,
+                            ai_alerts:
+                                data.ai_alerts !== undefined
+                                    ? data.ai_alerts
+                                    : prev.ai_alerts,
                         }));
                     }
                 } else {
@@ -2870,6 +3023,7 @@ export default function LivesShow({
             <LiveContext.Provider
                 value={{
                     session,
+                    setSession,
                     stats,
                     comments,
                     topProducts,

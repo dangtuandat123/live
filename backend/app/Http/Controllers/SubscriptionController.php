@@ -251,4 +251,3 @@ class SubscriptionController extends Controller
         return back()->with('success', 'Đã xóa gói dịch vụ thành công.');
     }
 }
-

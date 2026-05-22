@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\LiveSession;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -34,18 +35,18 @@ class HandleInertiaRequests extends Middleware
 
         // Skip resolving active subscription for non-Inertia JSON requests (e.g. API endpoints under web middleware)
         // to avoid auto-subscribing users during checkout API calls.
-        $isInertiaRequest = !$request->expectsJson() || $request->hasHeader('X-Inertia');
+        $isInertiaRequest = ! $request->expectsJson() || $request->hasHeader('X-Inertia');
 
         if ($user && $isInertiaRequest) {
             $user->resolveActiveSubscription();
             $activeSub = $user->activeSubscription;
 
-            $activeStreamsCount = \App\Models\LiveSession::forUser($user->id)
+            $activeStreamsCount = LiveSession::forUser($user->id)
                 ->whereIn('status', ['connecting', 'live'])
                 ->count();
 
             $cycleStart = $activeSub?->starts_at ?? now()->startOfMonth();
-            $totalSessionsInCycle = \App\Models\LiveSession::forUser($user->id)
+            $totalSessionsInCycle = LiveSession::forUser($user->id)
                 ->where('created_at', '>=', $cycleStart)
                 ->count();
 

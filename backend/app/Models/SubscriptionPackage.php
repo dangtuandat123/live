@@ -39,7 +39,7 @@ class SubscriptionPackage extends Model
     public function getFeaturesListAttribute(): array
     {
         $features = $this->features;
-        if (!is_array($features)) {
+        if (! is_array($features)) {
             return [];
         }
 
@@ -71,19 +71,19 @@ class SubscriptionPackage extends Model
             if ($aiCredits === -1) {
                 $list[] = 'Không giới hạn bình luận phân tích AI';
             } else {
-                $list[] = "Tối đa " . number_format($aiCredits) . " bình luận phân tích AI";
+                $list[] = 'Tối đa '.number_format($aiCredits).' bình luận phân tích AI';
             }
         }
 
         // 4. Audio analysis
         $audioAnalysis = $features['audio_analysis'] ?? null;
-        if (!empty($audioAnalysis)) {
+        if (! empty($audioAnalysis)) {
             $list[] = 'Hỗ trợ phân tích âm thanh';
         }
 
         // 5. Export leads
         $exportLeads = $features['export_leads'] ?? null;
-        if (!empty($exportLeads)) {
+        if (! empty($exportLeads)) {
             $list[] = 'Hỗ trợ xuất Leads báo cáo';
         }
 

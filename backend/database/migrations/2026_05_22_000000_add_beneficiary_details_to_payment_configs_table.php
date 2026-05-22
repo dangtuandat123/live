@@ -20,7 +20,7 @@ return new class extends Migration
         });
 
         // Seed default beneficiary details for existing configs
-        \DB::table('payment_configs')->update([
+        DB::table('payment_configs')->update([
             'bank_name' => 'MB Bank',
             'bank_id' => '970416',
             'account_no' => '11183041',

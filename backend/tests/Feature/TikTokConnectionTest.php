@@ -86,7 +86,7 @@ class TikTokConnectionTest extends TestCase
             'settings' => [
                 'tiktok_username' => '@some_user',
                 'ai_language' => 'vi',
-            ]
+            ],
         ]);
 
         $this->actingAs($user);

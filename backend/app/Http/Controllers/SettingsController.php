@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\LiveSession;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use App\Models\LiveSession;
 
 class SettingsController extends Controller
 {
@@ -66,7 +66,7 @@ class SettingsController extends Controller
 
         $username = $validated['tiktok_username'];
         if (! str_starts_with($username, '@')) {
-            $username = '@' . $username;
+            $username = '@'.$username;
         }
 
         $user = $request->user();

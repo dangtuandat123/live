@@ -557,3 +557,56 @@ Integrity mode: development
 ### Chất lượng mã nguồn
 - [ ] Không làm hỏng hoặc thay đổi bất kỳ code logic AI nào đang hoạt động tốt (trừ khi có sự đồng ý hoặc phát hiện lỗi nghiêm trọng cần sửa).
 - [ ] Toàn bộ các test suite hiện có của Laravel (php artisan test) vẫn phải chạy qua thành công.
+
+## 2026-05-22T09:54:48Z
+
+Cải thiện chất lượng phân tích của AI Insights (Tổng kết) và Cảnh báo AI trên Dashboard Livestream, giúp thông tin thực tế, mang lại giá trị vận hành cao hơn, đồng thời tối ưu hóa cơ chế tự động phân tích định kỳ.
+
+Working directory: d:/Workspace/livestream/backend
+Integrity mode: development
+
+## Requirements
+
+### R1. Phân tích AI Insights thực tế (Tổng kết & Cảnh báo sinh từ LLM)
+- **Database**: Thêm cột `ai_insights` (text, nullable) và `ai_alerts` (json, nullable) vào bảng `live_sessions` để lưu trữ dữ liệu phân tích chi tiết.
+- **Agent AI**: Thiết kế một agent AI mới là `App\Ai\Agents\LiveSessionAnalyzer.php` (hoặc cấu trúc tương đương) kế thừa cấu trúc Laravel Ai để phân tích tổng thể phiên live. Agent này sẽ đọc:
+  - Danh sách 150 bình luận gần đây nhất của phiên live.
+  - Các thống kê thô hiện tại từ `live_stats` (tổng view, comment, likes, follows, chốt đơn, cảm xúc tích cực/tiêu cực/trung lập thô).
+  - Bộ nhớ ngữ cảnh cũ (`ai_context_summary` hoặc `session_note`).
+  - Danh sách sản phẩm đang bán và từ khóa đang theo dõi.
+- **Output của LLM**: Trả về cấu trúc JSON duy nhất:
+  - `summary`: Một đoạn tóm tắt sâu sắc (tối đa 400 ký tự) về diễn biến phiên live, thái độ của khách hàng với sản phẩm, các vấn đề nổi cộm.
+  - `alerts`: Danh sách các cảnh báo thực tế (tối đa 5 cảnh báo). Mỗi cảnh báo chứa:
+    - `type`: `danger` | `warning` | `info` | `success`
+    - `title`: Tiêu đề cảnh báo (ví dụ: "Nhu cầu size L tăng cao", "Khiếu nại về ship")
+    - `desc`: Mô tả chi tiết vấn đề
+    - `action`: Gợi ý hành động chi tiết và thực tế cho streamer (ví dụ: "Streamer nên giải thích rõ chính sách miễn phí vận chuyển cho đơn trên 500k", "Nhắc nhở khách mua size XL thay thế do size L đã hết hàng").
+
+### R2. Tối ưu hóa cơ chế Trigger phân tích định kỳ
+- **Tần suất phân tích**: Việc phân tích Live Insights tổng hợp (gọi `LiveSessionAnalyzer`) tiêu tốn nhiều credit hơn nên cần được giới hạn tần suất (throttle). Chỉ tự động kích hoạt phân tích insights khi có bình luận mới chưa phân tích VÀ thời gian kể từ lần phân tích insights gần nhất của phiên live này tối thiểu là **30 giây** (sử dụng Cache để lưu timestamp lần chạy gần nhất `live_session_{id}_last_insight_time`).
+- **Nút bấm thủ công**: Tạo thêm một API endpoint (hoặc phương thức trong controller) cho phép streamer chủ động bấm nút "Làm mới Insights" trên UI để kích hoạt phân tích insights ngay lập tức, bỏ qua thời gian chờ 30 giây.
+
+### R3. Cập nhật giao diện Dashboard (Frontend)
+- **Hiển thị Insights**: Chỉnh sửa file Show.tsx (d:/Workspace/livestream/backend/resources/js/Pages/Lives/Show.tsx) để render trực tiếp dữ liệu `ai_insights` và `ai_alerts` từ API trả về.
+- **Nút bấm manual**: Thêm nút bấm "Cập nhật AI Insights" (với hiệu ứng loading và disabled khi đang xử lý) ở góc panel Tổng kết AI để streamer có thể click yêu cầu phân tích ngay.
+- **UX cải tiến**: Hiển thị rõ ràng phần "Gợi ý hành động" (`action`) cho mỗi cảnh báo trong danh sách Cảnh báo AI với màu sắc và icon tương ứng theo `type`.
+- **Fallback**: Giữ logic hiển thị thống kê thô cũ làm fallback nếu dữ liệu `ai_insights` chưa được sinh ra.
+
+## Acceptance Criteria
+
+### Backend & Database
+- [ ] Có file migration tạo các trường `ai_insights` và `ai_alerts` trong bảng `live_sessions` (hoặc bảng liên quan).
+- [ ] Chạy migration thành công (`php artisan migrate`).
+- [ ] Agent `LiveSessionAnalyzer` được định nghĩa chính xác, gửi prompt hệ thống chất lượng và bắt buộc đầu ra đúng định dạng JSON cấu trúc.
+- [ ] Tần suất tự động phân tích Live Insights được kiểm soát bằng Cache lock/timestamp (tối thiểu 30 giây một lần).
+- [ ] API endpoint `lives.fetch-events` trả về đầy đủ `ai_insights` và `ai_alerts` mới nhất của session. Có API route riêng hoặc option để trigger phân tích thủ công.
+
+### Frontend
+- [ ] Nút bấm "Cập nhật AI Insights" hoạt động tốt, gửi request trigger phân tích thành công và cập nhật lại UI ngay lập tức.
+- [ ] Panel "Tổng kết AI" hiển thị văn bản phân tích thực tế sinh từ AI.
+- [ ] Panel "Cảnh báo AI" hiển thị đúng danh sách cảnh báo sinh từ AI, hiển thị rõ ràng tiêu đề, mô tả và hành động gợi ý với style màu tương ứng (`danger` -> đỏ, `warning` -> vàng/amber, `info` -> xanh dương/cyan, `success` -> xanh lá/emerald).
+- [ ] Chạy build frontend thành công (`npm run build` hoặc typecheck không lỗi).
+
+### Kiểm thử & Tương thích
+- [ ] Các tính năng cũ (phân tích comment đơn lẻ, chốt đơn, ghim bình luận) hoạt động bình thường, không bị ảnh hưởng.
+- [ ] Unit/Integration tests chạy pass (`php artisan test`).

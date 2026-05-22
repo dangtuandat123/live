@@ -255,7 +255,7 @@ class SubscriptionPaymentChallengerTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin', 'email_verified_at' => now()]);
 
         // 1. Check creating package with stream limit -1 succeeds
-        $response1 = $this->actingAs($admin)->post("/admin/packages", [
+        $response1 = $this->actingAs($admin)->post('/admin/packages', [
             'name' => 'Unlimited Stream Pack',
             'price' => 500000,
             'duration_days' => 30,
@@ -265,7 +265,7 @@ class SubscriptionPaymentChallengerTest extends TestCase
                 'ai_credits' => 5000,
                 'audio_analysis' => true,
                 'export_leads' => true,
-            ]
+            ],
         ]);
         $response1->assertSessionHas('success');
         $this->assertDatabaseHas('subscription_packages', [
@@ -274,7 +274,7 @@ class SubscriptionPaymentChallengerTest extends TestCase
         ]);
 
         // 2. Check creating package with limit_streams -2 fails validation
-        $response2 = $this->actingAs($admin)->post("/admin/packages", [
+        $response2 = $this->actingAs($admin)->post('/admin/packages', [
             'name' => 'Invalid Stream Pack',
             'price' => 500000,
             'duration_days' => 30,
@@ -284,7 +284,7 @@ class SubscriptionPaymentChallengerTest extends TestCase
                 'ai_credits' => 5000,
                 'audio_analysis' => true,
                 'export_leads' => true,
-            ]
+            ],
         ]);
         $response2->assertSessionHasErrors(['features.limit_streams']);
 
@@ -300,7 +300,7 @@ class SubscriptionPaymentChallengerTest extends TestCase
                 'ai_credits' => 10000,
                 'audio_analysis' => true,
                 'export_leads' => true,
-            ]
+            ],
         ]);
         $response3->assertSessionHas('success');
         $this->assertDatabaseHas('subscription_packages', [
@@ -310,4 +310,3 @@ class SubscriptionPaymentChallengerTest extends TestCase
         ]);
     }
 }
-

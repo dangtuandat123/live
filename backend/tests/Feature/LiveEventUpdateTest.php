@@ -104,8 +104,8 @@ class LiveEventUpdateTest extends TestCase
         $response->assertJsonPath('event.status', 'confirmed');
 
         $event->refresh();
-        $this->assertTrue((bool)$event->is_pinned);
-        $this->assertTrue((bool)$event->is_highlighted);
+        $this->assertTrue((bool) $event->is_pinned);
+        $this->assertTrue((bool) $event->is_highlighted);
         $this->assertEquals(42, $event->sort_order);
         $this->assertEquals(5, $event->data['qty']);
         $this->assertEquals('Customer wants blue color', $event->data['note']);
@@ -171,4 +171,3 @@ class LiveEventUpdateTest extends TestCase
         $response->assertJsonValidationErrors(['is_pinned', 'qty']);
     }
 }
-

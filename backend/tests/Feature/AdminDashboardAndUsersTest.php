@@ -110,7 +110,7 @@ class AdminDashboardAndUsersTest extends TestCase
 
         // Verify recent users mapping has the resolved plan name
         $recentUsers = $response->viewData('page')['props']['recentUsers'];
-        
+
         $u1Data = collect($recentUsers)->firstWhere('email', $user1->email);
         $this->assertEquals('Pro', $u1Data['plan']);
 

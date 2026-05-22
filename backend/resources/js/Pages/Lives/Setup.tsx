@@ -291,7 +291,6 @@ export default function LivesSetup({
                     </CardContent>
                 </Card>
 
-
                 {/* Submit */}
                 <div className="flex items-center gap-3">
                     <Button

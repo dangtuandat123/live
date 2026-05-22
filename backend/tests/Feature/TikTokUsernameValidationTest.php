@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
-use App\Models\LiveSession;
 use App\Models\SubscriptionPackage;
+use App\Models\User;
+use App\Services\TikTokService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -43,7 +43,7 @@ class TikTokUsernameValidationTest extends TestCase
     public function test_create_session_with_invalid_tiktok_username()
     {
         // Mock TikTokService to avoid actual connection
-        $this->mock(\App\Services\TikTokService::class, function ($mock) {
+        $this->mock(TikTokService::class, function ($mock) {
             $mock->shouldReceive('startSession')->andReturn([
                 'session_id' => 'mock-session-id',
                 'status' => 'connecting',

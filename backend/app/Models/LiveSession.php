@@ -24,6 +24,8 @@ class LiveSession extends Model
         'ended_at',
         'error_message',
         'ai_context_summary',
+        'ai_insights',
+        'ai_alerts',
     ];
 
     protected function casts(): array
@@ -32,6 +34,7 @@ class LiveSession extends Model
             'started_at' => 'datetime',
             'ended_at' => 'datetime',
             'duration_seconds' => 'integer',
+            'ai_alerts' => 'array',
         ];
     }
 
