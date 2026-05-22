@@ -911,4 +911,79 @@ class AnalyzeCommentsJobTest extends TestCase
         $this->assertTrue($session->keywords()->where('keyword', 'new2')->exists());
         $this->assertFalse($session->keywords()->where('keyword', 'new3')->exists());
     }
+
+    public function test_it_analyzes_customer_inquiries_as_neutral_and_info_intent(): void
+    {
+        $user = User::factory()->create();
+        $session = LiveSession::create([
+            'user_id' => $user->id,
+            'name' => 'Inquiry Test Session',
+            'status' => 'live',
+            'tiktok_username' => 'testuser',
+        ]);
+
+        $comment1 = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now(),
+            'tiktok_user_id' => 'user_1',
+            'data' => ['comment' => 'ban đầu e bôi hơi rát k sao dk ạ'],
+            'ai_processed' => false,
+        ]);
+
+        $comment2 = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now()->addSecond(),
+            'tiktok_user_id' => 'user_2',
+            'data' => ['comment' => 'sao e vào giỏ hàng k có ạ'],
+            'ai_processed' => false,
+        ]);
+
+        $this->mock(TikTokService::class);
+        $this->mock(RunwareAiService::class, function ($mock) use ($comment1, $comment2) {
+            $mock->shouldReceive('chatMultimodal')
+                ->once()
+                ->andReturn([
+                    'results' => [
+                        [
+                            'id' => $comment1->id,
+                            'sentiment' => 'neutral',
+                            'intent_tag' => 'Hỏi thông tin',
+                            'question_tag' => 'Hỏi công dụng',
+                            'product_tag' => null,
+                            'has_phone' => false,
+                        ],
+                        [
+                            'id' => $comment2->id,
+                            'sentiment' => 'neutral',
+                            'intent_tag' => 'Hỏi thông tin',
+                            'question_tag' => 'Hỏi tồn kho',
+                            'product_tag' => null,
+                            'has_phone' => false,
+                        ],
+                    ],
+                    'session_note' => 'Khách hỏi thăm sản phẩm và tồn kho giỏ hàng.',
+                ]);
+        });
+
+        $job = new AnalyzeCommentsJob($session->id);
+        app()->call([$job, 'handle']);
+
+        $this->assertDatabaseHas('live_events', [
+            'id' => $comment1->id,
+            'sentiment' => 'neutral',
+            'intent_tag' => 'Hỏi thông tin',
+            'question_tag' => 'Hỏi công dụng',
+            'ai_processed' => true,
+        ]);
+
+        $this->assertDatabaseHas('live_events', [
+            'id' => $comment2->id,
+            'sentiment' => 'neutral',
+            'intent_tag' => 'Hỏi thông tin',
+            'question_tag' => 'Hỏi tồn kho',
+            'ai_processed' => true,
+        ]);
+    }
 }

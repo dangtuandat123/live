@@ -66,14 +66,15 @@ Không kèm bất kỳ giải thích nào ngoài JSON.
 
 **sentiment** — Cảm xúc mà người bình luận thể hiện:
 - "positive": Cảm xúc tích cực hướng về sản phẩm hoặc shop (khen, hài lòng, yêu thích, ủng hộ).
-- "negative": Cảm xúc tiêu cực (phàn nàn, thất vọng, tức giận, yêu cầu hủy/trả).
-- "neutral": Không thể hiện cảm xúc rõ ràng hoặc trung lập (hỏi thông tin, chào, tương tác xã hội).
+- "negative": Cảm xúc tiêu cực (chỉ dùng khi thực sự phàn nàn gay gắt, chê bai sản phẩm tệ/không tốt, bày tỏ sự thất vọng, tức giận, hoặc đòi trả hàng/hoàn tiền).
+- "neutral": Không thể hiện cảm xúc rõ ràng hoặc trung lập.
+  *Lưu ý đặc biệt*: Các thắc mắc, câu hỏi thông thường nhờ tư vấn về việc tìm kiếm sản phẩm trong giỏ hàng (ví dụ: "sao e vào giỏ hàng k có ạ"), cách sử dụng sản phẩm hoặc phản ứng nhẹ trong quá trình sử dụng (ví dụ: "ban đầu e bôi hơi rát k sao dk ạ") phải được phân loại là "neutral" (trung lập). Một câu hỏi thắc mắc nhờ tư vấn KHÔNG bao giờ được coi là "negative" trừ khi chứa từ ngữ tức giận, chửi bới rõ rệt.
 
 **intent_tag** — Ý định thực sự đằng sau bình luận. Hãy tự hỏi: "Người này đang muốn gì?"
 - "Chốt đơn": Người bình luận đang thể hiện RÕ RÀNG ý định đặt mua. Tín hiệu đáng tin: cung cấp SĐT/địa chỉ giao hàng, nêu rõ sản phẩm kèm size/màu/số lượng và yêu cầu mua/ship, hoặc sử dụng cú pháp đặt hàng mà shop quy định (ví dụ "Mã...", "M...", "MS..."). Lưu ý: cú pháp đặt hàng phải có tiền tố rõ ràng thể hiện hành động đặt hàng, không phải bất kỳ ký tự/số nào cũng là mã đơn.
-- "Hỏi thông tin": Bình luận chứa câu hỏi thực sự hoặc yêu cầu tìm hiểu về sản phẩm (giá, tồn kho, công dụng, thành phần, cách dùng, ship...).
-- "Phản hồi SP": Chia sẻ trải nghiệm cá nhân sau khi đã sử dụng sản phẩm (tốt hoặc xấu).
-- "Yêu cầu hỗ trợ": Vấn đề phát sinh sau mua (đổi trả, hoàn tiền, lỗi vận chuyển, hủy đơn).
+- "Hỏi thông tin": Bình luận chứa câu hỏi thực sự hoặc yêu cầu tìm hiểu về sản phẩm (giá cả, tồn kho, tìm sản phẩm trong giỏ hàng, công dụng, thành phần, cách dùng, phản ứng nhẹ khi bôi/dùng sản phẩm, ship...). Ví dụ: các câu hỏi "sao e vào giỏ hàng k có ạ" (Hỏi tồn kho) hoặc "ban đầu e bôi hơi rát k sao dk ạ" (Hỏi công dụng/cách dùng) là "Hỏi thông tin".
+- "Phản hồi SP": Chia sẻ trải nghiệm cá nhân sau khi đã sử dụng sản phẩm (khen tốt hoặc chê xấu).
+- "Yêu cầu hỗ trợ": Chỉ áp dụng đối với các vấn đề phát sinh cụ thể sau mua cần shop giải quyết (yêu cầu đổi trả hàng, đòi hoàn tiền, báo lỗi vận chuyển giao chậm/mất hàng, hoặc yêu cầu hủy đơn hàng đã đặt). Đừng nhầm lẫn câu hỏi thắc mắc/xin tư vấn của khách là yêu cầu hỗ trợ sau mua.
 - null: Tất cả các bình luận KHÔNG mang ý định mua bán hoặc hỏi cụ thể. Bao gồm: lời chào, cổ vũ, tương tác xã hội, tham gia trò chơi/minigame, hoặc nội dung quá ngắn gọn/mơ hồ không đủ ngữ cảnh để xác định ý định.
 
 Nguyên tắc quan trọng: Khi nội dung bình luận mơ hồ, thiếu ngữ cảnh, hoặc không có tín hiệu mua hàng rõ ràng → intent_tag = null. Tốt hơn là bỏ sót một đơn hàng thật còn hơn tạo ra nhiều đơn ảo từ bình luận giải trí.

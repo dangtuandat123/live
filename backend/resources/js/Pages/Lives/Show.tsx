@@ -2001,6 +2001,29 @@ function CustomersPanel() {
     );
 }
 
+interface AiInsightsData {
+    overview?: string;
+    trends?: string;
+    recommendations?: string;
+}
+
+function parseAiInsights(insights: string | null | undefined): AiInsightsData | null {
+    if (!insights) return null;
+    try {
+        const parsed = JSON.parse(insights);
+        if (
+            parsed &&
+            typeof parsed === 'object' &&
+            ('overview' in parsed || 'trends' in parsed || 'recommendations' in parsed)
+        ) {
+            return parsed as AiInsightsData;
+        }
+    } catch (e) {
+        // Not a JSON string
+    }
+    return null;
+}
+
 function AIInsightsPanel() {
     const {
         session,
@@ -2145,19 +2168,20 @@ function AIInsightsPanel() {
         'danger' | 'warning' | 'info' | 'success',
         {
             icon: React.ComponentType<{ className?: string }>;
+            variant: 'default' | 'destructive';
             alertClass: string;
             actionClass: string;
         }
     > = {
         danger: {
             icon: AlertTriangleIcon,
-            alertClass:
-                'border-destructive/30 bg-destructive/5 text-destructive [&>svg]:text-destructive/90',
-            actionClass:
-                'bg-destructive/10 text-destructive-foreground dark:text-red-300 border border-destructive/20',
+            variant: 'destructive',
+            alertClass: 'border-destructive/20 bg-destructive/5',
+            actionClass: 'mt-2 rounded p-2 text-xs font-medium bg-destructive/10 text-destructive dark:text-red-300 border border-destructive/20',
         },
         warning: {
             icon: AlertTriangleIcon,
+            variant: 'default',
             alertClass:
                 'border-amber-500/30 bg-amber-500/5 text-amber-600 dark:text-amber-400 [&>svg]:text-amber-500',
             actionClass:
@@ -2165,6 +2189,7 @@ function AIInsightsPanel() {
         },
         info: {
             icon: LightbulbIcon,
+            variant: 'default',
             alertClass:
                 'border-blue-500/30 bg-blue-500/5 text-blue-600 dark:text-blue-400 [&>svg]:text-blue-500',
             actionClass:
@@ -2172,6 +2197,7 @@ function AIInsightsPanel() {
         },
         success: {
             icon: SparklesIcon,
+            variant: 'default',
             alertClass:
                 'border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 [&>svg]:text-emerald-500',
             actionClass:
@@ -2219,9 +2245,53 @@ function AIInsightsPanel() {
                 <FadeScrollArea>
                     <div className="text-muted-foreground space-y-3 px-4 text-sm">
                         {session.ai_insights ? (
-                            <p className="text-sm whitespace-pre-line">
-                                {session.ai_insights}
-                            </p>
+                            (() => {
+                                const parsed = parseAiInsights(session.ai_insights);
+                                if (parsed) {
+                                    return (
+                                        <div className="space-y-3">
+                                            {parsed.overview && (
+                                                <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3 shadow-sm transition-all hover:shadow-md">
+                                                    <div className="mb-1.5 flex items-center gap-2 font-semibold text-indigo-600 dark:text-indigo-400">
+                                                        <SparklesIcon className="size-4" />
+                                                        <span>Tổng quan diễn biến</span>
+                                                    </div>
+                                                    <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
+                                                        {parsed.overview}
+                                                    </p>
+                                                </div>
+                                            )}
+                                            {parsed.trends && (
+                                                <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 shadow-sm transition-all hover:shadow-md">
+                                                    <div className="mb-1.5 flex items-center gap-2 font-semibold text-amber-600 dark:text-amber-400">
+                                                        <FlameIcon className="size-4" />
+                                                        <span>Xu hướng mua hàng & sản phẩm</span>
+                                                    </div>
+                                                    <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
+                                                        {parsed.trends}
+                                                    </p>
+                                                </div>
+                                            )}
+                                            {parsed.recommendations && (
+                                                <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 shadow-sm transition-all hover:shadow-md">
+                                                    <div className="mb-1.5 flex items-center gap-2 font-semibold text-emerald-600 dark:text-emerald-400">
+                                                        <LightbulbIcon className="size-4" />
+                                                        <span>Khuyến nghị cho streamer</span>
+                                                    </div>
+                                                    <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
+                                                        {parsed.recommendations}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                }
+                                return (
+                                    <p className="text-sm whitespace-pre-line">
+                                        {session.ai_insights}
+                                    </p>
+                                );
+                            })()
                         ) : sentimentTotal > 0 ? (
                             <>
                                 <p>
@@ -2294,6 +2364,7 @@ function AIInsightsPanel() {
                                   return (
                                       <Alert
                                           key={idx}
+                                          variant={c.variant}
                                           className={c.alertClass}
                                       >
                                           <Icon className="size-4" />
@@ -2318,39 +2389,40 @@ function AIInsightsPanel() {
                                   const colorMap: Record<
                                       string,
                                       {
+                                          variant: 'default' | 'destructive';
                                           alertClass: string;
-                                          badgeClass: string;
+                                          badgeVariant: 'default' | 'destructive' | 'secondary' | 'outline';
                                       }
                                   > = {
                                       amber: {
+                                          variant: 'default',
                                           alertClass:
                                               'border-amber-500/20 bg-amber-500/5 text-amber-600 dark:text-amber-400 [&>svg]:text-amber-500',
-                                          badgeClass:
-                                              'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+                                          badgeVariant: 'secondary',
                                       },
                                       emerald: {
+                                          variant: 'default',
                                           alertClass:
                                               'border-emerald-500/20 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 [&>svg]:text-emerald-500',
-                                          badgeClass:
-                                              'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
+                                          badgeVariant: 'secondary',
                                       },
                                       blue: {
+                                          variant: 'default',
                                           alertClass:
                                               'border-blue-500/20 bg-blue-500/5 text-blue-600 dark:text-blue-400 [&>svg]:text-blue-500',
-                                          badgeClass:
-                                              'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20',
+                                          badgeVariant: 'secondary',
                                       },
                                       red: {
+                                          variant: 'destructive',
                                           alertClass:
-                                              'border-red-500/20 bg-red-500/5 text-red-600 dark:text-red-400 [&>svg]:text-red-500',
-                                          badgeClass:
-                                              'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20',
+                                              'border-destructive/20 bg-destructive/5',
+                                          badgeVariant: 'destructive',
                                       },
                                       cyan: {
+                                          variant: 'default',
                                           alertClass:
                                               'border-cyan-500/20 bg-cyan-500/5 text-cyan-600 dark:text-cyan-400 [&>svg]:text-cyan-500',
-                                          badgeClass:
-                                              'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20',
+                                          badgeVariant: 'secondary',
                                       },
                                   };
                                   const c =
@@ -2359,6 +2431,7 @@ function AIInsightsPanel() {
                                   return (
                                       <Alert
                                           key={alert.title}
+                                          variant={c.variant}
                                           className={c.alertClass}
                                       >
                                           <Icon className="size-4" />
@@ -2367,11 +2440,12 @@ function AIInsightsPanel() {
                                           </AlertTitle>
                                           <AlertDescription className="text-xs leading-relaxed">
                                               <p>{alert.desc}</p>
-                                              <span
-                                                  className={`mt-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${c.badgeClass}`}
+                                              <Badge
+                                                  variant={c.badgeVariant}
+                                                  className="mt-1.5 text-[10px] font-medium"
                                               >
                                                   {alert.severity}
-                                              </span>
+                                              </Badge>
                                           </AlertDescription>
                                       </Alert>
                                   );
@@ -3436,17 +3510,21 @@ export default function LivesShow({
                                             {topKeywords &&
                                             topKeywords.length > 0 ? (
                                                 topKeywords.map((item) => (
-                                                    <div
+                                                    <Badge
                                                         key={`k-${item.keyword}`}
-                                                        className="bg-primary/10 text-primary flex items-center gap-1 rounded-md px-2 py-0.5 text-xs"
+                                                        variant="secondary"
+                                                        className="flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium border border-primary/10 text-foreground"
                                                     >
                                                         <span>
                                                             {item.keyword}
                                                         </span>
-                                                        <span className="font-bold tabular-nums">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="h-4 min-w-4 p-0 px-1 text-[10px] font-bold tabular-nums flex items-center justify-center bg-background/50 border-primary/20 text-muted-foreground"
+                                                        >
                                                             {item.count}
-                                                        </span>
-                                                    </div>
+                                                        </Badge>
+                                                    </Badge>
                                                 ))
                                             ) : (
                                                 <div className="text-muted-foreground text-xs">
