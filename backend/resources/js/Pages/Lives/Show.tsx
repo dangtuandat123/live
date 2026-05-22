@@ -1369,7 +1369,25 @@ function QuestionsPanel() {
                                                                 : q.question ===
                                                                     'Hỏi bảo hành'
                                                                   ? 'Tư vấn chính sách bảo hành'
-                                                                  : 'Tư vấn & hỗ trợ khách hàng'}
+                                                                  : q.question ===
+                                                                      'Hỏi cấu hình'
+                                                                    ? 'Nêu rõ cấu hình/thông số kỹ thuật'
+                                                                    : q.question ===
+                                                                        'Hỏi trả góp'
+                                                                      ? 'Tư vấn chính sách trả góp'
+                                                                      : q.question ===
+                                                                          'Hỏi xuất xứ'
+                                                                        ? 'Nêu rõ xuất xứ/thương hiệu'
+                                                                        : q.question ===
+                                                                            'Hỏi phụ kiện'
+                                                                          ? 'Liệt kê phụ kiện đi kèm'
+                                                                          : q.question ===
+                                                                              'Hỏi tình trạng'
+                                                                            ? 'Báo rõ độ mới/tình trạng sản phẩm'
+                                                                            : q.question ===
+                                                                                'Hỏi quà tặng'
+                                                                              ? 'Báo các phần quà/khuyến mãi kèm theo'
+                                                                              : 'Tư vấn & hỗ trợ khách hàng'}
                                             </span>
                                         </td>
                                     </tr>
@@ -1499,7 +1517,7 @@ function CustomersPanel() {
                     <div>
                         <CardTitle>Khách hàng tiềm năng</CardTitle>
                         <CardDescription>
-                            Trích xuất SĐT/địa chỉ từ bình luận ·{' '}
+                            Khách chốt đơn hoặc có SĐT/địa chỉ từ bình luận ·{' '}
                             {filtered.length} khách ·{' '}
                             {
                                 potentialCustomers.filter(
@@ -1553,12 +1571,12 @@ function CustomersPanel() {
             <div className="px-4">
                 <table className="w-full table-fixed text-sm">
                     <colgroup>
+                        <col className="w-[20%]" />
+                        <col className="w-[13%]" />
+                        <col className="w-[15%]" />
                         <col className="w-[16%]" />
-                        <col className="w-[16%]" />
-                        <col className="w-[14%]" />
-                        <col className="w-[18%]" />
-                        <col className="w-[22%]" />
-                        <col className="w-[14%]" />
+                        <col className="w-[24%]" />
+                        <col className="w-[12%]" />
                     </colgroup>
                     <thead className="[&_tr]:border-b">
                         <tr className="border-b">
@@ -1588,12 +1606,12 @@ function CustomersPanel() {
                 <div className="px-4">
                     <table className="w-full table-fixed text-sm">
                         <colgroup>
+                            <col className="w-[20%]" />
+                            <col className="w-[13%]" />
+                            <col className="w-[15%]" />
                             <col className="w-[16%]" />
-                            <col className="w-[16%]" />
-                            <col className="w-[14%]" />
-                            <col className="w-[18%]" />
-                            <col className="w-[22%]" />
-                            <col className="w-[14%]" />
+                            <col className="w-[24%]" />
+                            <col className="w-[12%]" />
                         </colgroup>
                         <tbody className="[&_tr:last-child]:border-0">
                             {filtered.length === 0 ? (
@@ -1625,7 +1643,7 @@ function CustomersPanel() {
                                             key={i}
                                             className="hover:bg-muted/50 border-b transition-colors"
                                         >
-                                            <td className="truncate p-2 font-medium">
+                                            <td className="truncate p-2 font-medium" title={c.name}>
                                                 {c.name}
                                             </td>
                                             <td className="p-2">
@@ -1662,7 +1680,7 @@ function CustomersPanel() {
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="truncate p-2">
+                                            <td className="truncate p-2" title={c.time}>
                                                 {c.time || (
                                                     <span className="text-muted-foreground">
                                                         —
@@ -1683,7 +1701,7 @@ function CustomersPanel() {
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="text-muted-foreground truncate p-2 text-sm">
+                                            <td className="text-muted-foreground truncate p-2 text-sm" title={c.comment}>
                                                 {renderCommentText(c.comment)}
                                             </td>
                                             <td className="p-2 text-center">

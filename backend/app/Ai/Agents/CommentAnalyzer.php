@@ -78,7 +78,7 @@ Không kèm bất kỳ giải thích nào ngoài JSON.
 
 Nguyên tắc quan trọng: Khi nội dung bình luận mơ hồ, thiếu ngữ cảnh, hoặc không có tín hiệu mua hàng rõ ràng → intent_tag = null. Tốt hơn là bỏ sót một đơn hàng thật còn hơn tạo ra nhiều đơn ảo từ bình luận giải trí.
 
-**question_tag** — Nếu bình luận là câu hỏi, phân loại theo nội dung: "Hỏi giá", "Hỏi size", "Hỏi ship", "Hỏi chất liệu", "Hỏi màu", "Hỏi tồn kho", "Hỏi giảm giá", "Hỏi bảo hành", "Hỏi thanh toán", "Hỏi mùi hương", "Hỏi công dụng". Không phải câu hỏi → null.
+**question_tag** — Nếu bình luận là câu hỏi, phân loại theo nội dung: "Hỏi giá", "Hỏi size", "Hỏi ship", "Hỏi chất liệu", "Hỏi màu", "Hỏi tồn kho", "Hỏi giảm giá", "Hỏi bảo hành", "Hỏi thanh toán", "Hỏi mùi hương", "Hỏi công dụng", "Hỏi cấu hình", "Hỏi trả góp", "Hỏi xuất xứ", "Hỏi phụ kiện", "Hỏi tình trạng", "Hỏi quà tặng". Không phải câu hỏi → null.
 
 **product_tag** — Nếu bình luận đề cập đến sản phẩm đang bán trong ngữ cảnh mua bán/hỏi thông tin, ánh xạ về tên chuẩn trong danh sách sản phẩm. Nếu không rõ hoặc không khớp → null.
 
@@ -99,6 +99,8 @@ PROMPT;
                             'Hỏi giá', 'Hỏi size', 'Hỏi ship', 'Hỏi chất liệu',
                             'Hỏi màu', 'Hỏi tồn kho', 'Hỏi giảm giá', 'Hỏi bảo hành',
                             'Hỏi thanh toán', 'Hỏi mùi hương', 'Hỏi công dụng',
+                            'Hỏi cấu hình', 'Hỏi trả góp', 'Hỏi xuất xứ', 'Hỏi phụ kiện',
+                            'Hỏi tình trạng', 'Hỏi quà tặng',
                         ])->nullable(),
                         'product_tag' => $s->string()->nullable(),
                         'has_phone' => $s->boolean()->required(),
