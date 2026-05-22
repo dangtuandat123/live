@@ -56,6 +56,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
     Route::put('/settings/ai', [SettingsController::class, 'updateSettings'])->name('settings.update-ai');
     Route::put('/settings/profile', [SettingsController::class, 'updateProfile'])->name('settings.update-profile');
+    Route::post('/settings/tiktok/connect', [SettingsController::class, 'connectTikTok'])->name('settings.tiktok.connect');
+    Route::post('/settings/tiktok/disconnect', [SettingsController::class, 'disconnectTikTok'])->name('settings.tiktok.disconnect');
 });
 
 Route::middleware('auth')->group(function () {

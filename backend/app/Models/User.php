@@ -25,6 +25,7 @@ class User extends Authenticatable
         'auto_extract_phone' => true,
         'auto_extract_address' => true,
         'realtime_alerts' => true,
+        'tiktok_username' => null,
     ];
 
     protected $fillable = [

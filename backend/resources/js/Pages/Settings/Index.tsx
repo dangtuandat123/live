@@ -29,7 +29,16 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Switch } from '@/components/ui/switch';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import type { PageProps } from '@/types';
-import { Head, useForm, usePage } from '@inertiajs/react';
+import { Head, useForm, usePage, router } from '@inertiajs/react';
+import { useState } from 'react';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     CheckCircle2Icon,
     CheckIcon,
@@ -45,18 +54,18 @@ interface SettingsData {
     auto_extract_phone: boolean;
     auto_extract_address: boolean;
     realtime_alerts: boolean;
+    tiktok_username?: string | null;
 }
 
 interface Props extends PageProps {
     settings: SettingsData;
+    activeStreamsCount: number;
+    totalSessionsInCycle: number;
 }
 
-const platforms = [
-    { name: 'TikTok', connected: true, account: '@shopthoitrang_abc' },
-];
-
-export default function SettingsIndex({ settings }: Props) {
+export default function SettingsIndex({ settings, activeStreamsCount, totalSessionsInCycle }: Props) {
     const { auth } = usePage<Props>().props;
+    const [connectOpen, setConnectOpen] = useState(false);
 
     // AI Settings Form
     const aiForm = useForm({
@@ -72,6 +81,11 @@ export default function SettingsIndex({ settings }: Props) {
         email: auth.user.email,
     });
 
+    // TikTok Connect Form
+    const tiktokForm = useForm({
+        tiktok_username: '',
+    });
+
     function submitAiSettings(e: React.FormEvent) {
         e.preventDefault();
         aiForm.put(route('settings.update-ai'), { preserveScroll: true });
@@ -83,6 +97,31 @@ export default function SettingsIndex({ settings }: Props) {
             preserveScroll: true,
         });
     }
+
+    function submitConnectTikTok(e: React.FormEvent) {
+        e.preventDefault();
+        tiktokForm.post(route('settings.tiktok.connect'), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setConnectOpen(false);
+                tiktokForm.reset();
+            },
+        });
+    }
+
+    function handleDisconnectTikTok() {
+        if (confirm('Bạn có chắc chắn muốn ngắt kết nối tài khoản TikTok?')) {
+            router.post(route('settings.tiktok.disconnect'), {}, {
+                preserveScroll: true,
+            });
+        }
+    }
+
+    const tiktokUsername = settings.tiktok_username;
+    const isConnected = !!tiktokUsername;
+    const platforms = [
+        { name: 'TikTok', connected: isConnected, account: tiktokUsername || 'Chưa kết nối' },
+    ];
 
     return (
         <AuthenticatedLayout>
@@ -136,31 +175,52 @@ export default function SettingsIndex({ settings }: Props) {
                             <div>
                                 <div className="flex items-center gap-2">
                                     <span className="font-semibold">
-                                        Gói Pro
+                                        {auth.subscription?.package_name ?? 'Free'}
                                     </span>
-                                    <Badge>Đang sử dụng</Badge>
+                                    {auth.subscription?.active && (
+                                        <Badge>Đang sử dụng</Badge>
+                                    )}
                                 </div>
-                                <p className="text-muted-foreground mt-1 text-sm">
-                                    30 phiên live/tháng · Phân tích cảm xúc ·
-                                    Trích xuất SĐT · Xuất PDF
-                                </p>
+                                <div className="text-muted-foreground mt-2 text-sm space-y-1">
+                                    <div>• Số luồng Live đồng thời: {auth.subscription?.features?.limit_streams === -1 ? 'Không giới hạn' : auth.subscription?.features?.limit_streams ?? 1}</div>
+                                    <div>• Thời lượng live tối đa: {auth.subscription?.features?.max_duration_hours ?? 1} giờ</div>
+                                    <div>• Tín dụng AI: {(auth.subscription?.features?.ai_credits ?? 1000).toLocaleString('vi-VN')} credits</div>
+                                    <div>• Phân tích âm thanh: {auth.subscription?.features?.audio_analysis ? 'Có' : 'Không'}</div>
+                                    <div>• Xuất danh sách khách hàng tiềm năng (Leads): {auth.subscription?.features?.export_leads ? 'Có' : 'Không'}</div>
+                                </div>
                             </div>
                             <div className="text-right">
-                                <div className="text-2xl font-bold">299K</div>
+                                <div className="text-2xl font-bold">
+                                    {auth.subscription ? (auth.subscription.price === 0 ? 'Miễn phí' : `${(auth.subscription.price ?? 0).toLocaleString('vi-VN')}đ`) : '0đ'}
+                                </div>
                                 <div className="text-muted-foreground text-xs">
-                                    VNĐ/tháng
+                                    /{auth.subscription?.duration_days ?? 30} ngày
                                 </div>
                             </div>
                         </div>
                         <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground">
-                                Phiên live đã dùng tháng này
+                                Số livestream đang hoạt động / tối đa của gói
                             </span>
-                            <span className="font-medium">18 / 30 phiên</span>
+                            <span className="font-medium">
+                                {activeStreamsCount} / {auth.subscription?.features?.limit_streams === -1 ? '∞' : auth.subscription?.features?.limit_streams ?? 1}
+                            </span>
                         </div>
-                        <Button variant="outline" className="gap-2">
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">
+                                Tổng số phiên live đã thực hiện trong chu kỳ
+                            </span>
+                            <span className="font-medium">
+                                {totalSessionsInCycle} phiên
+                            </span>
+                        </div>
+                        <Button
+                            variant="outline"
+                            className="gap-2"
+                            onClick={() => router.get(route('subscription.index'))}
+                        >
                             <SparklesIcon className="size-4" />
-                            Nâng cấp lên Business
+                            Nâng cấp gói dịch vụ
                         </Button>
                     </CardContent>
                 </Card>
@@ -201,10 +261,10 @@ export default function SettingsIndex({ settings }: Props) {
                                     </div>
                                 </div>
                                 <Button
-                                    variant={
-                                        p.connected ? 'outline' : 'default'
-                                    }
+                                    variant={p.connected ? 'outline' : 'default'}
                                     size="sm"
+                                    onClick={p.connected ? handleDisconnectTikTok : () => setConnectOpen(true)}
+                                    type="button"
                                 >
                                     {p.connected ? (
                                         'Ngắt kết nối'
@@ -393,6 +453,50 @@ export default function SettingsIndex({ settings }: Props) {
                     </Card>
                 </form>
             </div>
+
+            <Dialog open={connectOpen} onOpenChange={setConnectOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <form onSubmit={submitConnectTikTok}>
+                        <DialogHeader>
+                            <DialogTitle>Kết nối tài khoản TikTok</DialogTitle>
+                            <DialogDescription>
+                                Nhập username kênh TikTok của bạn (ví dụ: @username hoặc username) để AI bắt đầu đồng bộ dữ liệu.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="tiktok_username">Tên người dùng TikTok</Label>
+                                <Input
+                                    id="tiktok_username"
+                                    value={tiktokForm.data.tiktok_username}
+                                    onChange={(e) =>
+                                        tiktokForm.setData('tiktok_username', e.target.value)
+                                    }
+                                    placeholder="Ví dụ: @kenhcuaban"
+                                    required
+                                />
+                                {tiktokForm.errors.tiktok_username && (
+                                    <span className="text-destructive text-xs">
+                                        {tiktokForm.errors.tiktok_username}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setConnectOpen(false)}
+                            >
+                                Hủy
+                            </Button>
+                            <Button type="submit" disabled={tiktokForm.processing}>
+                                {tiktokForm.processing ? 'Đang kết nối...' : 'Kết nối'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </AuthenticatedLayout>
     );
 }

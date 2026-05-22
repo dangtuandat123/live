@@ -137,7 +137,7 @@ export default function LivesSetup({
 
             <form
                 onSubmit={handleSubmit}
-                className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 p-4 pt-4"
+                className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 p-6"
             >
                 {/* Header */}
                 <div>
@@ -374,7 +374,7 @@ export default function LivesSetup({
                         ) : (
                             <VideoIcon className="mr-2 size-4" />
                         )}
-                        Bắt đầu phân tích
+                        {isGated ? 'Đã đạt giới hạn gói' : 'Bắt đầu phân tích'}
                     </Button>
                     <Button variant="outline" size="lg" asChild>
                         <Link href={route('lives.index')}>Hủy</Link>

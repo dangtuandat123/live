@@ -2812,12 +2812,12 @@ export default function LivesShow({
                                 <div className="mt-1 flex items-center gap-2">
                                     <Badge variant="default">TikTok</Badge>
                                     {session.status === 'live' ? (
-                                        <Badge className="gap-1.5 border border-red-500/20 bg-red-500/10 px-2.5 py-0.5 text-xs font-semibold text-red-500 shadow-xs backdrop-blur-md">
+                                        <Badge className="bg-destructive text-destructive-foreground gap-1.5 px-2.5 py-0.5 text-xs font-semibold shadow-xs">
                                             <span className="relative flex size-2">
-                                                <span className="absolute inline-flex size-full animate-ping rounded-full bg-red-500 opacity-75" />
-                                                <span className="relative inline-flex size-2 rounded-full bg-red-500" />
+                                                <span className="absolute inline-flex size-full animate-ping rounded-full bg-white opacity-75" />
+                                                <span className="relative inline-flex size-2 rounded-full bg-white" />
                                             </span>
-                                            Đang Live
+                                            Đang phát trực tiếp
                                         </Badge>
                                     ) : session.status === 'disconnected' ? (
                                         <Badge className="animate-pulse gap-1.5 border border-amber-500/20 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-500 shadow-xs backdrop-blur-md">
@@ -2828,12 +2828,12 @@ export default function LivesShow({
                                             Mất kết nối · Đang thử lại...
                                         </Badge>
                                     ) : session.status === 'connecting' ? (
-                                        <Badge className="animate-pulse gap-1.5 border border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-semibold text-blue-400 shadow-xs backdrop-blur-md">
+                                        <Badge className="bg-primary text-primary-foreground gap-1.5 px-2.5 py-0.5 text-xs font-semibold shadow-xs">
                                             <span className="relative flex size-2">
-                                                <span className="absolute inline-flex size-full animate-ping rounded-full bg-blue-500 opacity-75" />
-                                                <span className="relative inline-flex size-2 rounded-full bg-blue-500" />
+                                                <span className="absolute inline-flex size-full animate-ping rounded-full bg-white opacity-75" />
+                                                <span className="relative inline-flex size-2 rounded-full bg-white" />
                                             </span>
-                                            Đang kết nối...
+                                            Đang kết nối
                                         </Badge>
                                     ) : session.status === 'error' ? (
                                         <Badge className="border border-red-500/20 bg-red-500/10 px-2.5 py-0.5 text-xs font-semibold text-red-500 backdrop-blur-md">

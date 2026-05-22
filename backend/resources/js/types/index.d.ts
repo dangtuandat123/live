@@ -1,3 +1,11 @@
+export interface UserSettings {
+    ai_language?: string;
+    auto_extract_phone?: boolean;
+    auto_extract_address?: boolean;
+    realtime_alerts?: boolean;
+    tiktok_username?: string | null;
+}
+
 export interface User {
     id: number;
     name: string;
@@ -6,6 +14,7 @@ export interface User {
     created_at?: string;
     role: 'user' | 'admin';
     plan_name?: string;
+    settings?: UserSettings;
 }
 
 export interface UserSubscriptionFeatures {
@@ -20,8 +29,12 @@ export interface UserSubscription {
     active: boolean;
     package_id: number | null;
     package_name: string;
+    price?: number;
+    duration_days?: number;
     expires_at: string | null;
     used_ai_credits: number;
+    active_streams_count?: number;
+    total_sessions_in_cycle?: number;
     features: UserSubscriptionFeatures;
 }
 

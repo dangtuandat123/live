@@ -40,12 +40,25 @@ class HandleInertiaRequests extends Middleware
             $user->resolveActiveSubscription();
             $activeSub = $user->activeSubscription;
 
+            $activeStreamsCount = \App\Models\LiveSession::forUser($user->id)
+                ->whereIn('status', ['connecting', 'live'])
+                ->count();
+
+            $cycleStart = $activeSub?->starts_at ?? now()->startOfMonth();
+            $totalSessionsInCycle = \App\Models\LiveSession::forUser($user->id)
+                ->where('created_at', '>=', $cycleStart)
+                ->count();
+
             $subscription = [
                 'active' => (bool) $activeSub?->isActive(),
                 'package_id' => $activeSub?->subscription_package_id,
                 'package_name' => $activeSub?->package?->name ?? 'Free',
+                'price' => $activeSub?->package?->price ?? 0,
+                'duration_days' => $activeSub?->package?->duration_days ?? 30,
                 'expires_at' => $activeSub?->expires_at?->toISOString(),
                 'used_ai_credits' => $activeSub?->used_ai_credits ?? 0,
+                'active_streams_count' => $activeStreamsCount,
+                'total_sessions_in_cycle' => $totalSessionsInCycle,
                 'features' => $user->getSubscriptionFeatures(),
             ];
         }

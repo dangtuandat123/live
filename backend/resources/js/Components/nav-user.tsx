@@ -182,15 +182,6 @@ export function NavUser({
                                     <span>Tài khoản</span>
                                 </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                                <Link
-                                    href="/subscription"
-                                    className="flex w-full cursor-pointer items-center gap-2"
-                                >
-                                    <CreditCardIcon className="size-4" />
-                                    <span>Thanh toán</span>
-                                </Link>
-                            </DropdownMenuItem>
                             <DropdownMenuItem>
                                 <BellIcon className="size-4" />
                                 <span>Thông báo</span>

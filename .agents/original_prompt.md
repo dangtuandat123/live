@@ -306,3 +306,51 @@ Integrity mode: development
 - [ ] Biên dịch frontend bằng `npm run build` thành công, không gặp lỗi TypeScript.
 - [ ] Tất cả các test cases chạy bằng `php artisan test` đều pass.
 
+## 2026-05-22T05:38:33Z
+
+Chuyển trang Cài đặt (`/settings`) của dự án livestream từ giao diện hardcode tĩnh sang giao diện động hoàn toàn, đồng bộ dữ liệu thực tế từ Laravel Backend (thông tin gói cước, số lượng live session đã dùng, trạng thái kết nối tài khoản TikTok).
+
+Working directory: `d:\Workspace\livestream`
+Integrity mode: development
+
+## Requirements
+
+### R1. Động hóa Gói đăng ký (Subscription Card)
+- Đồng bộ thông tin gói đăng ký từ `auth.subscription` (được chia sẻ qua Inertia Shared Data).
+- Cập nhật backend (ví dụ: `HandleInertiaRequests.php` hoặc `SettingsController.php`) để bổ sung thêm giá (`price`) và chu kỳ (`duration_days`) của gói cước hiện tại của người dùng vào props, tránh hardcode giá.
+- Liệt kê động các tính năng đi kèm gói cước (số luồng livestream tối đa `limit_streams`, thời lượng live tối đa `max_duration_hours`, AI credits `ai_credits`, v.v.) dựa trên thông tin gói hiện tại.
+
+### R2. Động hóa và Quản lý kết nối TikTok (Platform Connections Card)
+- Hiện tại danh sách platform đang bị hardcode. Cần chuyển trạng thái kết nối TikTok thành động.
+- Lưu thông tin tài khoản TikTok liên kết vào cột `settings` (JSON) của bảng `users` dưới khóa `tiktok_username` (hoặc cấu trúc tương đương trong `settings`).
+- Hỗ trợ API (hoặc dùng các routes/controllers hiện có của settings) để:
+  - Kết nối tài khoản TikTok mới: Cho phép người dùng nhập username TikTok (ví dụ qua một Dialog/Modal đơn giản hoặc input trực tiếp) và lưu lại.
+  - Ngắt kết nối tài khoản TikTok: Xóa username TikTok đã liên kết.
+- Cập nhật giao diện để hiển thị đúng trạng thái "Đã kết nối" + username (nếu có `settings.tiktok_username`) hoặc "Chưa kết nối".
+
+### R3. Thống kê sử dụng động
+- Tính toán và hiển thị số lượng livestream đang chạy hiện tại của user (`status` là `connecting` hoặc `live`) so với giới hạn luồng của gói cước (`limit_streams`).
+- Tính toán và hiển thị tổng số phiên livestream user đã tạo trong chu kỳ hiện tại (từ `starts_at` của subscription) hoặc trong tháng này.
+
+## Acceptance Criteria
+
+### Gói đăng ký
+- [ ] Card "Gói đăng ký" hiển thị đúng tên gói cước đang hoạt động của người dùng (Free, Pro, Enterprise).
+- [ ] Hiển thị chính xác giá tiền của gói (ví dụ: "0đ", "299.000đ/tháng"...) và ngày hết hạn.
+- [ ] Liệt kê chính xác giới hạn luồng của gói (ví dụ: "1 luồng", "5 luồng", "Không giới hạn luồng").
+
+### Kết nối nền tảng
+- [ ] Người dùng có thể nhấn nút "Kết nối" trên dòng TikTok, nhập username TikTok (ví dụ: `@shopabc`), bấm lưu và giao diện cập nhật ngay lập tức thành "Đã kết nối" kèm username.
+- [ ] Người dùng có thể nhấn nút "Ngắt kết nối" và xác nhận để xóa tài khoản liên kết, giao diện chuyển về "Chưa kết nối".
+- [ ] Thông tin kết nối được lưu trữ bền vững trong cột `settings` của User ở cơ sở dữ liệu.
+
+### Thống kê sử dụng
+- [ ] Hiển thị chính xác tỷ lệ số luồng live đang chạy trên tổng số luồng được phép (ví dụ: `0 / 1 luồng`).
+- [ ] Hiển thị tổng số phiên livestream đã tạo trong chu kỳ hiện tại hoặc tháng này.
+
+### Tổng thể & Độ tin cậy
+- [ ] Frontend build (`npm run build`) thành công 100% không lỗi lầm.
+- [ ] Tất cả các test cases (`php artisan test`) đều chạy pass thành công.
+- [ ] Thêm unit test kiểm tra chức năng kết nối/ngắt kết nối TikTok.
+
+

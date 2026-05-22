@@ -789,6 +789,10 @@ export default function SubscriptionIndex({
                     <div className="flex-1 space-y-3 overflow-y-auto p-4">
                         {checkoutData?.vietqr_url && (
                             <div className="flex flex-col items-center gap-3">
+                                <div className="text-center space-y-1">
+                                    <h4 className="font-bold text-base text-foreground">Chuyển khoản QR</h4>
+                                    <p className="text-xs text-muted-foreground">Vui lòng quét mã QR dưới đây để thực hiện thanh toán</p>
+                                </div>
                                 {/* VietQR Code Frame */}
                                 <div className="border-border/40 group relative flex aspect-square max-h-[155px] max-w-[155px] items-center justify-center overflow-hidden rounded-2xl border bg-white p-2 shadow-md">
                                     <img
