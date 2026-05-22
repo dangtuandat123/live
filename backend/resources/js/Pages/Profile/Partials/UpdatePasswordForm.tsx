@@ -1,8 +1,10 @@
 import { useForm } from '@inertiajs/react';
 import { FormEventHandler, useRef } from 'react';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Button } from '@/components/ui/button';
+import { KeyRound, LoaderIcon, CheckIcon } from 'lucide-react';
 
 export default function UpdatePasswordForm() {
     const passwordInput = useRef<HTMLInputElement>(null);
@@ -33,59 +35,72 @@ export default function UpdatePasswordForm() {
     };
 
     return (
-        <form onSubmit={submit} className="flex flex-col gap-6">
-            <FieldGroup>
-                <div className="flex flex-col gap-0.5">
-                    <h2 className="text-lg font-semibold">Đổi mật khẩu</h2>
-                    <p className="text-sm text-muted-foreground">
+        <form onSubmit={submit}>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <KeyRound className="size-5 text-primary" />
+                        Đổi mật khẩu
+                    </CardTitle>
+                    <CardDescription>
                         Sử dụng mật khẩu dài và ngẫu nhiên để bảo mật tài khoản.
-                    </p>
-                </div>
-                <Field>
-                    <FieldLabel htmlFor="current_password">Mật khẩu hiện tại</FieldLabel>
-                    <Input
-                        id="current_password"
-                        ref={currentPasswordInput}
-                        type="password"
-                        className="bg-background"
-                        autoComplete="current-password"
-                        value={data.current_password}
-                        onChange={(e) => setData('current_password', e.target.value)}
-                    />
-                    {errors.current_password && <FieldDescription className="text-destructive font-medium">{errors.current_password}</FieldDescription>}
-                </Field>
-                <Field>
-                    <FieldLabel htmlFor="password">Mật khẩu mới</FieldLabel>
-                    <Input
-                        id="password"
-                        ref={passwordInput}
-                        type="password"
-                        className="bg-background"
-                        autoComplete="new-password"
-                        value={data.password}
-                        onChange={(e) => setData('password', e.target.value)}
-                    />
-                    {errors.password && <FieldDescription className="text-destructive font-medium">{errors.password}</FieldDescription>}
-                </Field>
-                <Field>
-                    <FieldLabel htmlFor="password_confirmation">Xác nhận mật khẩu mới</FieldLabel>
-                    <Input
-                        id="password_confirmation"
-                        type="password"
-                        className="bg-background"
-                        autoComplete="new-password"
-                        value={data.password_confirmation}
-                        onChange={(e) => setData('password_confirmation', e.target.value)}
-                    />
-                    {errors.password_confirmation && <FieldDescription className="text-destructive font-medium">{errors.password_confirmation}</FieldDescription>}
-                </Field>
-                <div className="flex items-center gap-4">
-                    <Button type="submit" disabled={processing}>Lưu</Button>
-                    {recentlySuccessful && (
-                        <span className="text-sm text-muted-foreground">Đã lưu.</span>
-                    )}
-                </div>
-            </FieldGroup>
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid gap-2">
+                        <Label htmlFor="current_password">Mật khẩu hiện tại</Label>
+                        <Input
+                            id="current_password"
+                            ref={currentPasswordInput}
+                            type="password"
+                            autoComplete="current-password"
+                            value={data.current_password}
+                            onChange={(e) => setData('current_password', e.target.value)}
+                        />
+                        {errors.current_password && (
+                            <p className="text-sm text-destructive font-medium">{errors.current_password}</p>
+                        )}
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label htmlFor="password">Mật khẩu mới</Label>
+                        <Input
+                            id="password"
+                            ref={passwordInput}
+                            type="password"
+                            autoComplete="new-password"
+                            value={data.password}
+                            onChange={(e) => setData('password', e.target.value)}
+                        />
+                        {errors.password && (
+                            <p className="text-sm text-destructive font-medium">{errors.password}</p>
+                        )}
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label htmlFor="password_confirmation">Xác nhận mật khẩu mới</Label>
+                        <Input
+                            id="password_confirmation"
+                            type="password"
+                            autoComplete="new-password"
+                            value={data.password_confirmation}
+                            onChange={(e) => setData('password_confirmation', e.target.value)}
+                        />
+                        {errors.password_confirmation && (
+                            <p className="text-sm text-destructive font-medium">{errors.password_confirmation}</p>
+                        )}
+                    </div>
+
+                    <Button type="submit" disabled={processing} className="gap-2">
+                        {processing ? (
+                            <LoaderIcon className="size-4 animate-spin" />
+                        ) : recentlySuccessful ? (
+                            <CheckIcon className="size-4" />
+                        ) : null}
+                        {recentlySuccessful ? "Đã lưu" : "Cập nhật mật khẩu"}
+                    </Button>
+                </CardContent>
+            </Card>
         </form>
     );
 }

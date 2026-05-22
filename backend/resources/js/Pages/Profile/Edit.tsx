@@ -1,7 +1,16 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { PageProps } from '@/types';
 import { Head } from '@inertiajs/react';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
 import { Separator } from '@/components/ui/separator';
+import { SidebarTrigger } from "@/components/ui/sidebar"
 import DeleteUserForm from './Partials/DeleteUserForm';
 import UpdatePasswordForm from './Partials/UpdatePasswordForm';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm';
@@ -10,19 +19,34 @@ export default function Edit({ mustVerifyEmail, status }: PageProps<{ mustVerify
     return (
         <AuthenticatedLayout>
             <Head title="Hồ sơ" />
-            <div className="flex flex-1 flex-col gap-6 p-6 pt-0">
-                <div className="flex flex-col gap-0.5">
+            
+            <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 border-b border-border/40 bg-background/95 backdrop-blur-md sticky top-0 z-40">
+                <div className="flex items-center gap-2 px-4">
+                    <SidebarTrigger className="-ml-1" />
+                    <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
+                    <Breadcrumb>
+                        <BreadcrumbList>
+                            <BreadcrumbItem className="hidden md:block">
+                                <BreadcrumbLink href={route("dashboard")}>Trang chủ</BreadcrumbLink>
+                            </BreadcrumbItem>
+                            <BreadcrumbSeparator className="hidden md:block" />
+                            <BreadcrumbItem>
+                                <BreadcrumbPage>Hồ sơ</BreadcrumbPage>
+                            </BreadcrumbItem>
+                        </BreadcrumbList>
+                    </Breadcrumb>
+                </div>
+            </header>
+
+            <div className="mx-auto w-full max-w-4xl flex flex-1 flex-col gap-6 p-4 pt-4 md:pt-0">
+                <div>
                     <h1 className="text-2xl font-bold tracking-tight">Hồ sơ</h1>
-                    <p className="text-muted-foreground">Quản lý thông tin tài khoản của bạn.</p>
+                    <p className="text-muted-foreground">Quản lý thông tin tài khoản và bảo mật</p>
                 </div>
-                <Separator />
-                <div className="flex flex-col gap-8 max-w-2xl">
-                    <UpdateProfileInformationForm mustVerifyEmail={mustVerifyEmail} status={status} />
-                    <Separator />
-                    <UpdatePasswordForm />
-                    <Separator />
-                    <DeleteUserForm />
-                </div>
+
+                <UpdateProfileInformationForm mustVerifyEmail={mustVerifyEmail} status={status} />
+                <UpdatePasswordForm />
+                <DeleteUserForm />
             </div>
         </AuthenticatedLayout>
     );

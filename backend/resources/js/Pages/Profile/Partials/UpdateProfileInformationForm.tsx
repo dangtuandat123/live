@@ -1,8 +1,10 @@
 import { Link, useForm, usePage } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Button } from '@/components/ui/button';
+import { User, LoaderIcon, CheckIcon } from 'lucide-react';
 
 export default function UpdateProfileInformation({
     mustVerifyEmail,
@@ -20,69 +22,81 @@ export default function UpdateProfileInformation({
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        patch(route('profile.update'));
+        patch(route('profile.update'), { preserveScroll: true });
     };
 
     return (
-        <form onSubmit={submit} className="flex flex-col gap-6">
-            <FieldGroup>
-                <div className="flex flex-col gap-0.5">
-                    <h2 className="text-lg font-semibold">Thông tin cá nhân</h2>
-                    <p className="text-sm text-muted-foreground">
+        <form onSubmit={submit}>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <User className="size-5 text-primary" />
+                        Thông tin cá nhân
+                    </CardTitle>
+                    <CardDescription>
                         Cập nhật tên và địa chỉ email của bạn.
-                    </p>
-                </div>
-                <Field>
-                    <FieldLabel htmlFor="name">Họ và tên</FieldLabel>
-                    <Input
-                        id="name"
-                        className="bg-background"
-                        required
-                        autoFocus
-                        autoComplete="name"
-                        value={data.name}
-                        onChange={(e) => setData('name', e.target.value)}
-                    />
-                    {errors.name && <FieldDescription className="text-destructive font-medium">{errors.name}</FieldDescription>}
-                </Field>
-                <Field>
-                    <FieldLabel htmlFor="email">Email</FieldLabel>
-                    <Input
-                        id="email"
-                        type="email"
-                        className="bg-background"
-                        required
-                        autoComplete="username"
-                        value={data.email}
-                        onChange={(e) => setData('email', e.target.value)}
-                    />
-                    {errors.email && <FieldDescription className="text-destructive font-medium">{errors.email}</FieldDescription>}
-                </Field>
-                {mustVerifyEmail && user.email_verified_at === null && (
-                    <div className="text-sm text-muted-foreground">
-                        Email của bạn chưa được xác thực.{' '}
-                        <Link
-                            href={route('verification.send')}
-                            method="post"
-                            as="button"
-                            className="underline underline-offset-4 hover:text-foreground font-medium text-foreground"
-                        >
-                            Nhấn vào đây để gửi lại email xác thực.
-                        </Link>
-                        {status === 'verification-link-sent' && (
-                            <span className="block mt-1 text-green-600 font-medium">
-                                Liên kết xác thực mới đã được gửi đến email của bạn.
-                            </span>
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid gap-2">
+                        <Label htmlFor="name">Họ và tên</Label>
+                        <Input
+                            id="name"
+                            required
+                            autoFocus
+                            autoComplete="name"
+                            value={data.name}
+                            onChange={(e) => setData('name', e.target.value)}
+                        />
+                        {errors.name && (
+                            <p className="text-sm text-destructive font-medium">{errors.name}</p>
                         )}
                     </div>
-                )}
-                <div className="flex items-center gap-4">
-                    <Button type="submit" disabled={processing}>Lưu</Button>
-                    {recentlySuccessful && (
-                        <span className="text-sm text-muted-foreground">Đã lưu.</span>
+
+                    <div className="grid gap-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                            id="email"
+                            type="email"
+                            required
+                            autoComplete="username"
+                            value={data.email}
+                            onChange={(e) => setData('email', e.target.value)}
+                        />
+                        {errors.email && (
+                            <p className="text-sm text-destructive font-medium">{errors.email}</p>
+                        )}
+                    </div>
+
+                    {mustVerifyEmail && user.email_verified_at === null && (
+                        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4 text-sm text-yellow-600 dark:text-yellow-400">
+                            Email của bạn chưa được xác thực.{' '}
+                            <Link
+                                href={route('verification.send')}
+                                method="post"
+                                as="button"
+                                className="underline underline-offset-4 hover:text-yellow-700 dark:hover:text-yellow-300 font-medium"
+                            >
+                                Nhấn vào đây để gửi lại email xác thực.
+                            </Link>
+                            {status === 'verification-link-sent' && (
+                                <span className="block mt-2 text-green-600 dark:text-green-400 font-medium">
+                                    Liên kết xác thực mới đã được gửi đến email của bạn.
+                                </span>
+                            )}
+                        </div>
                     )}
-                </div>
-            </FieldGroup>
+
+                    <Button type="submit" disabled={processing} className="gap-2">
+                        {processing ? (
+                            <LoaderIcon className="size-4 animate-spin" />
+                        ) : recentlySuccessful ? (
+                            <CheckIcon className="size-4" />
+                        ) : null}
+                        {recentlySuccessful ? "Đã lưu" : "Lưu thay đổi"}
+                    </Button>
+                </CardContent>
+            </Card>
         </form>
     );
 }
