@@ -282,6 +282,7 @@ class LiveSessionController extends Controller
                 'started_at' => $liveSession->started_at?->toISOString(),
                 'ended_at' => $liveSession->ended_at?->toISOString(),
                 'error_message' => $liveSession->error_message,
+                'last_audio_cues' => $liveSession->last_audio_cues,
                 'products' => $liveSession->products->map(fn ($p) => [
                     'id' => $p->id,
                     'name' => $p->name,
@@ -594,6 +595,7 @@ class LiveSessionController extends Controller
                 'topKeywords' => $topKeywords,
                 'ai_insights' => $liveSession->ai_insights,
                 'ai_alerts' => $liveSession->ai_alerts,
+                'last_audio_cues' => $liveSession->last_audio_cues,
             ]);
         }
 
@@ -653,6 +655,7 @@ class LiveSessionController extends Controller
                             'statsHistory' => $this->getFormattedStatsHistory($liveSession),
                             'potentialCustomersCount' => $this->getPotentialCustomersCount($liveSession),
                             'topKeywords' => $this->getTopKeywords($liveSession),
+                            'last_audio_cues' => $liveSession->last_audio_cues,
                         ]);
                     }
                 } catch (\Exception $restartException) {
@@ -722,6 +725,7 @@ class LiveSessionController extends Controller
             'topKeywords' => $topKeywords,
             'ai_insights' => $liveSession->ai_insights,
             'ai_alerts' => $liveSession->ai_alerts,
+            'last_audio_cues' => $liveSession->last_audio_cues,
         ]);
     }
 

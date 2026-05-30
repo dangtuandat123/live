@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -76,6 +76,7 @@ import {
     HelpCircleIcon,
     LightbulbIcon,
     LoaderIcon,
+    Lock,
     MessageSquareIcon,
     PackageIcon,
     PhoneIcon,
@@ -1601,6 +1602,9 @@ function CustomersPanel() {
                             className="h-7 gap-1.5 text-xs"
                             onClick={handleCopyAll}
                         >
+                            {!canExportLeads && (
+                                <Lock className="text-muted-foreground size-3" />
+                            )}
                             {copiedAll ? (
                                 <CheckIcon className="size-3 text-emerald-500" />
                             ) : (
@@ -1620,6 +1624,9 @@ function CustomersPanel() {
                                 }
                             }}
                         >
+                            {!canExportLeads && (
+                                <Lock className="text-muted-foreground size-3" />
+                            )}
                             <DownloadIcon className="size-3" />
                             Xuất CSV
                         </Button>
@@ -2007,14 +2014,18 @@ interface AiInsightsData {
     recommendations?: string;
 }
 
-function parseAiInsights(insights: string | null | undefined): AiInsightsData | null {
+function parseAiInsights(
+    insights: string | null | undefined,
+): AiInsightsData | null {
     if (!insights) return null;
     try {
         const parsed = JSON.parse(insights);
         if (
             parsed &&
             typeof parsed === 'object' &&
-            ('overview' in parsed || 'trends' in parsed || 'recommendations' in parsed)
+            ('overview' in parsed ||
+                'trends' in parsed ||
+                'recommendations' in parsed)
         ) {
             return parsed as AiInsightsData;
         }
@@ -2177,7 +2188,8 @@ function AIInsightsPanel() {
             icon: AlertTriangleIcon,
             variant: 'destructive',
             alertClass: 'border-destructive/20 bg-destructive/5',
-            actionClass: 'mt-2 rounded p-2 text-xs font-medium bg-destructive/10 text-destructive dark:text-red-300 border border-destructive/20',
+            actionClass:
+                'mt-2 rounded p-2 text-xs font-medium bg-destructive/10 text-destructive dark:text-red-300 border border-destructive/20',
         },
         warning: {
             icon: AlertTriangleIcon,
@@ -2246,7 +2258,9 @@ function AIInsightsPanel() {
                     <div className="text-muted-foreground space-y-3 px-4 text-sm">
                         {session.ai_insights ? (
                             (() => {
-                                const parsed = parseAiInsights(session.ai_insights);
+                                const parsed = parseAiInsights(
+                                    session.ai_insights,
+                                );
                                 if (parsed) {
                                     return (
                                         <div className="space-y-3">
@@ -2254,7 +2268,9 @@ function AIInsightsPanel() {
                                                 <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3 shadow-sm transition-all hover:shadow-md">
                                                     <div className="mb-1.5 flex items-center gap-2 font-semibold text-indigo-600 dark:text-indigo-400">
                                                         <SparklesIcon className="size-4" />
-                                                        <span>Tổng quan diễn biến</span>
+                                                        <span>
+                                                            Tổng quan diễn biến
+                                                        </span>
                                                     </div>
                                                     <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
                                                         {parsed.overview}
@@ -2265,7 +2281,10 @@ function AIInsightsPanel() {
                                                 <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 shadow-sm transition-all hover:shadow-md">
                                                     <div className="mb-1.5 flex items-center gap-2 font-semibold text-amber-600 dark:text-amber-400">
                                                         <FlameIcon className="size-4" />
-                                                        <span>Xu hướng mua hàng & sản phẩm</span>
+                                                        <span>
+                                                            Xu hướng mua hàng &
+                                                            sản phẩm
+                                                        </span>
                                                     </div>
                                                     <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
                                                         {parsed.trends}
@@ -2276,7 +2295,10 @@ function AIInsightsPanel() {
                                                 <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 shadow-sm transition-all hover:shadow-md">
                                                     <div className="mb-1.5 flex items-center gap-2 font-semibold text-emerald-600 dark:text-emerald-400">
                                                         <LightbulbIcon className="size-4" />
-                                                        <span>Khuyến nghị cho streamer</span>
+                                                        <span>
+                                                            Khuyến nghị cho
+                                                            streamer
+                                                        </span>
                                                     </div>
                                                     <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
                                                         {parsed.recommendations}
@@ -2391,7 +2413,11 @@ function AIInsightsPanel() {
                                       {
                                           variant: 'default' | 'destructive';
                                           alertClass: string;
-                                          badgeVariant: 'default' | 'destructive' | 'secondary' | 'outline';
+                                          badgeVariant:
+                                              | 'default'
+                                              | 'destructive'
+                                              | 'secondary'
+                                              | 'outline';
                                       }
                                   > = {
                                       amber: {
@@ -2929,6 +2955,36 @@ function StatsPanel() {
     );
 }
 
+interface SubscriptionFeature {
+    max_duration_hours: number;
+    ai_credits: number;
+    export_leads: boolean;
+    audio_analysis: boolean;
+    limit_streams?: number;
+}
+
+interface SubscriptionData {
+    package_name: string;
+    used_ai_credits: number;
+    features?: SubscriptionFeature;
+}
+
+interface UserData {
+    id: number;
+    name: string;
+    email: string;
+}
+
+interface AuthData {
+    user: UserData;
+    subscription: SubscriptionData | null;
+}
+
+interface InertiaPageProps {
+    auth: AuthData;
+    errors: Record<string, string>;
+}
+
 // --- Main Page ---
 export default function LivesShow({
     session: initialSession,
@@ -2944,6 +3000,12 @@ export default function LivesShow({
     const [soundEnabled, setSoundEnabled] = React.useState(true);
     const [isOffline, setIsOffline] = React.useState(false);
     const [isStopping, setIsStopping] = React.useState(false);
+
+    const [showDurationDialog, setShowDurationDialog] = React.useState(false);
+    const [showCreditsDialog, setShowCreditsDialog] = React.useState(false);
+
+    const { auth } = usePage().props as unknown as InertiaPageProps;
+    const subscription = auth?.subscription;
 
     // Live state — updated via polling
     const [session, setSession] = React.useState(initialSession);
@@ -2982,6 +3044,52 @@ export default function LivesShow({
     const [topKeywords, setTopKeywords] = React.useState<TopKeyword[]>(
         initialTopKeywords ?? [],
     );
+
+    React.useEffect(() => {
+        if (!session.id) return;
+
+        // Check for duration limit dialog
+        if (session.status === 'ended' && session.error_message) {
+            const lowerMsg = session.error_message.toLowerCase();
+            if (
+                lowerMsg.includes('thời lượng tối đa') ||
+                lowerMsg.includes('max duration')
+            ) {
+                const dismissed = sessionStorage.getItem(
+                    `dismiss_duration_dialog_${session.id}`,
+                );
+                if (!dismissed) {
+                    setShowDurationDialog(true);
+                }
+            }
+        }
+
+        // Check for credits limit dialog
+        if (session.status === 'error' && session.error_message) {
+            const lowerMsg = session.error_message.toLowerCase();
+            if (
+                lowerMsg.includes('tín dụng ai') ||
+                lowerMsg.includes('ai credits')
+            ) {
+                const dismissed = sessionStorage.getItem(
+                    `dismiss_credits_dialog_${session.id}`,
+                );
+                if (!dismissed) {
+                    setShowCreditsDialog(true);
+                }
+            }
+        }
+    }, [session.status, session.error_message, session.id]);
+
+    const handleCloseDurationDialog = () => {
+        sessionStorage.setItem(`dismiss_duration_dialog_${session.id}`, 'true');
+        setShowDurationDialog(false);
+    };
+
+    const handleCloseCreditsDialog = () => {
+        sessionStorage.setItem(`dismiss_credits_dialog_${session.id}`, 'true');
+        setShowCreditsDialog(false);
+    };
 
     // Order alerts — detect real "Chốt đơn" từ AI data
     const { alerts, dismiss } = useOrderAlerts(soundEnabled, comments);
@@ -3028,7 +3136,8 @@ export default function LivesShow({
                             ...prev,
                             status: data.status,
                             error_message:
-                                data.status === 'error'
+                                data.status === 'error' ||
+                                data.status === 'ended'
                                     ? (data.error_message ?? prev.error_message)
                                     : prev.error_message,
                             duration: data.duration ?? prev.duration,
@@ -3177,14 +3286,13 @@ export default function LivesShow({
                                 </div>
                             </div>
                         )}
-
                         {/* Session Header */}
                         <div className="flex items-center justify-between">
                             <div className="shrink-0">
                                 <h1 className="text-lg font-bold tracking-tight">
                                     {session.name}
                                 </h1>
-                                <div className="mt-1 flex items-center gap-2">
+                                <div className="mt-1 flex flex-wrap items-center gap-2">
                                     <Badge variant="default">TikTok</Badge>
                                     {session.status === 'live' ? (
                                         <Badge className="bg-destructive text-destructive-foreground gap-1.5 px-2.5 py-0.5 text-xs font-semibold shadow-xs">
@@ -3223,6 +3331,12 @@ export default function LivesShow({
                                         <ClockIcon className="size-3.5" />
                                         {session.duration}
                                     </span>
+                                    {session.status === 'ended' && session.error_message && (
+                                        <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md animate-pulse">
+                                            <AlertTriangleIcon className="size-3 text-amber-500 shrink-0" />
+                                            {session.error_message}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 
@@ -3513,14 +3627,14 @@ export default function LivesShow({
                                                     <Badge
                                                         key={`k-${item.keyword}`}
                                                         variant="secondary"
-                                                        className="flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium border border-primary/10 text-foreground"
+                                                        className="border-primary/10 text-foreground flex items-center gap-1.5 border px-2 py-0.5 text-xs font-medium"
                                                     >
                                                         <span>
                                                             {item.keyword}
                                                         </span>
                                                         <Badge
                                                             variant="outline"
-                                                            className="h-4 min-w-4 p-0 px-1 text-[10px] font-bold tabular-nums flex items-center justify-center bg-background/50 border-primary/20 text-muted-foreground"
+                                                            className="bg-background/50 border-primary/20 text-muted-foreground flex h-4 min-w-4 items-center justify-center p-0 px-1 text-[10px] font-bold tabular-nums"
                                                         >
                                                             {item.count}
                                                         </Badge>
@@ -3622,6 +3736,153 @@ export default function LivesShow({
                         </div>
                     </div>
                 </div>
+
+                {/* Upgrade Duration Dialog */}
+                <Dialog
+                    open={showDurationDialog}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            handleCloseDurationDialog();
+                        } else {
+                            setShowDurationDialog(true);
+                        }
+                    }}
+                >
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2 text-amber-600">
+                                <ClockIcon className="size-5" /> Giới hạn thời
+                                lượng đạt tới
+                            </DialogTitle>
+                            <DialogDescription className="space-y-3 pt-2">
+                                <p>
+                                    Phiên livestream này đã tự động dừng phân
+                                    tích vì vượt quá thời lượng tối đa cho phép
+                                    của gói dịch vụ hiện tại.
+                                </p>
+                                <div className="bg-muted/50 border-border/40 space-y-1.5 rounded-lg border p-3 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">
+                                            Gói hiện tại:
+                                        </span>
+                                        <span className="font-semibold">
+                                            {subscription?.package_name ||
+                                                'Free'}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">
+                                            Thời lượng tối đa:
+                                        </span>
+                                        <span className="font-semibold">
+                                            {subscription?.features
+                                                ?.max_duration_hours === -1
+                                                ? 'Vô hạn'
+                                                : `${subscription?.features?.max_duration_hours} giờ`}
+                                        </span>
+                                    </div>
+                                </div>
+                                <p className="text-muted-foreground text-xs">
+                                    Vui lòng nâng cấp tài khoản lên gói cao hơn
+                                    để tăng hoặc không giới hạn thời lượng phân
+                                    tích.
+                                </p>
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter className="flex-col gap-2 sm:flex-row">
+                            <Button
+                                variant="outline"
+                                onClick={handleCloseDurationDialog}
+                            >
+                                Bỏ qua
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    handleCloseDurationDialog();
+                                    router.visit('/subscription');
+                                }}
+                                className="bg-primary text-primary-foreground"
+                            >
+                                Nâng cấp gói dịch vụ
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Upgrade Credits Dialog */}
+                <Dialog
+                    open={showCreditsDialog}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            handleCloseCreditsDialog();
+                        } else {
+                            setShowCreditsDialog(true);
+                        }
+                    }}
+                >
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="text-destructive flex items-center gap-2">
+                                <ZapIcon className="size-5" /> Hết tín dụng phân
+                                tích AI
+                            </DialogTitle>
+                            <DialogDescription className="space-y-3 pt-2">
+                                <p>
+                                    Quá trình phân tích bình luận bằng AI của
+                                    phiên livestream đã bị tạm dừng vì tài khoản
+                                    của bạn đã hết (hoặc vượt quá) giới hạn tín
+                                    dụng AI.
+                                </p>
+                                <div className="bg-muted/50 border-border/40 space-y-1.5 rounded-lg border p-3 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">
+                                            Gói hiện tại:
+                                        </span>
+                                        <span className="font-semibold">
+                                            {subscription?.package_name ||
+                                                'Free'}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">
+                                            Tín dụng AI đã dùng:
+                                        </span>
+                                        <span className="font-semibold">
+                                            {subscription?.used_ai_credits?.toLocaleString()}{' '}
+                                            /{' '}
+                                            {subscription?.features
+                                                ?.ai_credits === -1
+                                                ? 'Vô hạn'
+                                                : subscription?.features?.ai_credits?.toLocaleString()}
+                                        </span>
+                                    </div>
+                                </div>
+                                <p className="text-muted-foreground text-xs">
+                                    Vui lòng mua thêm tín dụng hoặc nâng cấp gói
+                                    dịch vụ để tiếp tục phân tích bình luận trực
+                                    tiếp bằng trí tuệ nhân tạo.
+                                </p>
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter className="flex-col gap-2 sm:flex-row">
+                            <Button
+                                variant="outline"
+                                onClick={handleCloseCreditsDialog}
+                            >
+                                Bỏ qua
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    handleCloseCreditsDialog();
+                                    router.visit('/subscription');
+                                }}
+                                className="bg-primary text-primary-foreground"
+                            >
+                                Mua thêm / Nâng cấp
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </LiveContext.Provider>
         </AuthenticatedLayout>
     );
