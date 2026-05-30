@@ -126,6 +126,32 @@ class AnalyzeCommentsJobTest extends TestCase
         $this->assertStringContainsString('Đang bán áo thun, nhiều người hỏi size M.', $withMemory);
     }
 
+    public function test_agents_resolve_model_and_thinking_mode_from_config(): void
+    {
+        config([
+            'ai.providers.deepseek.models.text.default' => 'deepseek-v4-flash',
+            'ai.providers.deepseek.thinking_mode.comment_analyzer' => 'non-thinking',
+            'ai.providers.deepseek.thinking_mode.session_analyzer' => 'thinking',
+        ]);
+
+        $comment = new CommentAnalyzer;
+        $this->assertEquals('deepseek-v4-flash', $comment->model());
+        $this->assertEquals(
+            ['thinking_mode' => 'non-thinking'],
+            $comment->providerOptions(\Laravel\Ai\Enums\Lab::DeepSeek)
+        );
+
+        $insights = new LiveSessionAnalyzer;
+        $this->assertEquals('deepseek-v4-flash', $insights->model());
+        $this->assertEquals(
+            ['thinking_mode' => 'thinking'],
+            $insights->providerOptions(\Laravel\Ai\Enums\Lab::DeepSeek)
+        );
+
+        // Non-DeepSeek providers must not receive DeepSeek-specific options.
+        $this->assertEquals([], $comment->providerOptions(\Laravel\Ai\Enums\Lab::OpenAI));
+    }
+
     public function test_memory_is_saved_and_loaded(): void
     {
         $user = User::factory()->create();
@@ -743,6 +769,117 @@ class AnalyzeCommentsJobTest extends TestCase
             'intent_tag' => 'Hỏi thông tin',
             'question_tag' => 'Hỏi tồn kho',
             'ai_processed' => true,
+        ]);
+    }
+
+    public function test_it_discards_hallucinated_product_tag_not_in_catalog(): void
+    {
+        $user = User::factory()->create();
+        $session = LiveSession::create([
+            'user_id' => $user->id,
+            'name' => 'Hallucination Test',
+            'status' => 'live',
+            'tiktok_username' => 'testuser',
+        ]);
+
+        // Register a product so productNames is non-empty.
+        $product = $session->products()->getRelated()->create([
+            'user_id' => $user->id,
+            'name' => 'Áo thun đen',
+            'sku' => 'ATD-01',
+            'price' => 199000,
+        ]);
+        $session->products()->attach($product->id);
+
+        $comment = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now(),
+            'tiktok_user_id' => 'user_1',
+            'data' => ['comment' => 'cái nồi chiên này giá bao nhiêu'],
+            'ai_processed' => false,
+        ]);
+
+        CommentAnalyzer::fake([
+            [
+                'results' => [
+                    [
+                        'id' => $comment->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => 'Hỏi thông tin',
+                        'question_tag' => 'Hỏi giá',
+                        // AI hallucinates a product that is NOT in the catalog.
+                        'product_tag' => 'Nồi chiên không dầu',
+                        'has_phone' => false,
+                    ],
+                ],
+                'session_note' => 'Khách hỏi sản phẩm lạ.',
+            ],
+        ]);
+        $this->fakeInsights();
+
+        $job = new AnalyzeCommentsJob($session->id);
+        app()->call([$job, 'handle']);
+
+        // The hallucinated product_tag must be discarded (null), not persisted.
+        $this->assertDatabaseHas('live_events', [
+            'id' => $comment->id,
+            'ai_processed' => true,
+            'product_tag' => null,
+        ]);
+    }
+
+    public function test_it_maps_product_tag_to_registered_product(): void
+    {
+        $user = User::factory()->create();
+        $session = LiveSession::create([
+            'user_id' => $user->id,
+            'name' => 'Product Match Test',
+            'status' => 'live',
+            'tiktok_username' => 'testuser',
+        ]);
+
+        $product = $session->products()->getRelated()->create([
+            'user_id' => $user->id,
+            'name' => 'Áo thun đen',
+            'sku' => 'ATD-01',
+            'price' => 199000,
+        ]);
+        $session->products()->attach($product->id);
+
+        $comment = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now(),
+            'tiktok_user_id' => 'user_1',
+            'data' => ['comment' => 'áo thun đen còn size L không'],
+            'ai_processed' => false,
+        ]);
+
+        CommentAnalyzer::fake([
+            [
+                'results' => [
+                    [
+                        'id' => $comment->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => 'Hỏi thông tin',
+                        'question_tag' => 'Hỏi size',
+                        'product_tag' => 'Áo thun đen',
+                        'has_phone' => false,
+                    ],
+                ],
+                'session_note' => 'Khách hỏi size áo thun đen.',
+            ],
+        ]);
+        $this->fakeInsights();
+
+        $job = new AnalyzeCommentsJob($session->id);
+        app()->call([$job, 'handle']);
+
+        $this->assertDatabaseHas('live_events', [
+            'id' => $comment->id,
+            'ai_processed' => true,
+            'product_tag' => 'Áo thun đen',
         ]);
     }
 }

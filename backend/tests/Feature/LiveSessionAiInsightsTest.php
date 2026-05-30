@@ -224,6 +224,85 @@ class LiveSessionAiInsightsTest extends TestCase
     }
 
     /**
+     * Test auto insights inside the job charges a fixed credit cost consistent with manual refresh.
+     */
+    public function test_auto_insights_in_job_charges_fixed_credit_cost()
+    {
+        $user = User::factory()->create();
+
+        $package = SubscriptionPackage::create([
+            'name' => 'Test Package',
+            'price' => 0,
+            'duration_days' => 30,
+            'features' => [
+                'limit_streams' => 1,
+                'max_duration_hours' => 1,
+                'ai_credits' => 1000,
+                'audio_analysis' => false,
+                'export_leads' => false,
+            ],
+        ]);
+
+        $sub = $user->subscriptions()->create([
+            'subscription_package_id' => $package->id,
+            'starts_at' => now(),
+            'expires_at' => now()->addDays(30),
+            'status' => 'active',
+            'used_ai_credits' => 0,
+        ]);
+
+        $session = LiveSession::create([
+            'user_id' => $user->id,
+            'name' => 'Auto Insights Credit Test',
+            'status' => 'live',
+            'tiktok_username' => 'testuser',
+        ]);
+
+        $comment = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now(),
+            'tiktok_user_id' => 'user_1',
+            'data' => ['comment' => 'Mã 1'],
+            'ai_processed' => false,
+        ]);
+
+        CommentAnalyzer::fake([
+            [
+                'results' => [
+                    [
+                        'id' => $comment->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => null,
+                        'question_tag' => null,
+                        'product_tag' => null,
+                        'has_phone' => false,
+                    ],
+                ],
+                'session_note' => 'Processed batch.',
+            ],
+        ]);
+
+        LiveSessionAnalyzer::fake([
+            ['summary' => 'Auto summary.', 'alerts' => []],
+        ]);
+
+        // Ensure throttle is not set so auto-insights runs.
+        $cacheKey = "live_session_{$session->id}_last_insight_time";
+        Cache::forget($cacheKey);
+
+        $job = new AnalyzeCommentsJob($session->id);
+        app()->call([$job, 'handle']);
+
+        $sub->refresh();
+        // 1 comment batch (1 credit) + 1 insights call (INSIGHTS_CREDIT_COST).
+        $this->assertEquals(
+            1 + LiveSessionAnalyzer::INSIGHTS_CREDIT_COST,
+            $sub->used_ai_credits
+        );
+    }
+
+    /**
      * Test auto insights trigger throttles within 30 seconds.
      */
     public function test_auto_insights_trigger_throttles_within_30_seconds()
@@ -473,7 +552,10 @@ class LiveSessionAiInsightsTest extends TestCase
         $response->assertStatus(200);
 
         $sub->refresh();
-        // Since there were 3 comments, credits should increment by 3: 5 + 3 = 8
-        $this->assertEquals(8, $sub->used_ai_credits);
+        // Insights now cost a fixed INSIGHTS_CREDIT_COST per call: 5 + 10 = 15
+        $this->assertEquals(
+            5 + \App\Ai\Agents\LiveSessionAnalyzer::INSIGHTS_CREDIT_COST,
+            $sub->used_ai_credits
+        );
     }
 }

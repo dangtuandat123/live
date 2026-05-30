@@ -424,6 +424,11 @@ class AnalyzeCommentsJob implements ShouldQueue
                                 'ai_insights' => $insightResponse['summary'] ?? $session->ai_insights,
                                 'ai_alerts' => $insightResponse['alerts'] ?? $session->ai_alerts,
                             ]);
+
+                            // Tính credit nhất quán cho lần gọi insights tổng hợp.
+                            if ($activeSub) {
+                                $activeSub->increment('used_ai_credits', LiveSessionAnalyzer::INSIGHTS_CREDIT_COST);
+                            }
                         }
 
                         cache()->put($insightCacheKey, now()->timestamp);
@@ -554,7 +559,7 @@ class AnalyzeCommentsJob implements ShouldQueue
 
     /**
      * Fuzzy match product_tag against danh sách sản phẩm đã đăng ký.
-     * Trả null nếu không match — tránh hallucination.
+     * Trả null nếu không match — tránh hallucination đẩy sản phẩm "ma" vào thống kê Top sản phẩm.
      */
     private function matchProductTag(string $aiTag, array $productNames): ?string
     {
@@ -575,16 +580,15 @@ class AnalyzeCommentsJob implements ShouldQueue
             }
         }
 
-        // Nếu không match → giữ nguyên tag (có thể là sản phẩm user chưa đăng ký)
-        // nhưng log warning nếu debug mode
+        // Không khớp sản phẩm nào đã đăng ký → trả null để tránh hallucination.
         if (config('app.debug')) {
-            Log::debug('AI product_tag not in product list', [
+            Log::debug('AI product_tag not in product list, discarded', [
                 'ai_tag' => $aiTag,
                 'registered_products' => $productNames,
             ]);
         }
 
-        return $aiTag;
+        return null;
     }
 
     /**

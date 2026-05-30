@@ -4,18 +4,18 @@ namespace App\Ai\Agents;
 
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Attributes\MaxTokens;
-use Laravel\Ai\Attributes\Model;
 use Laravel\Ai\Attributes\Provider;
 use Laravel\Ai\Attributes\Temperature;
 use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\HasProviderOptions;
 use Laravel\Ai\Contracts\HasStructuredOutput;
+use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Promptable;
 
 #[Provider('deepseek')]
-#[Model('deepseek-v4-flash')]
 #[Temperature(0)]
 #[MaxTokens(4096)]
-class CommentAnalyzer implements Agent, HasStructuredOutput
+class CommentAnalyzer implements Agent, HasProviderOptions, HasStructuredOutput
 {
     use Promptable;
 
@@ -32,6 +32,33 @@ class CommentAnalyzer implements Agent, HasStructuredOutput
     private int $viewerCount = 0;
 
     private string $memoryContext = '';
+
+    /**
+     * Model được lấy từ config (đọc env) thay vì hardcode, để dễ đổi khi DeepSeek
+     * thay đổi tên model (vd: deepseek-v4-flash).
+     */
+    public function model(): ?string
+    {
+        return config('ai.providers.deepseek.models.text.default');
+    }
+
+    /**
+     * Tham số riêng của DeepSeek: thinking_mode điều khiển reasoning.
+     * Phân loại comment chạy rất thường xuyên nên mặc định dùng non-thinking (nhanh, rẻ, deterministic).
+     */
+    public function providerOptions(Lab|string $provider): array
+    {
+        $isDeepSeek = $provider === Lab::DeepSeek
+            || (is_string($provider) && $provider === 'deepseek');
+
+        if (! $isDeepSeek) {
+            return [];
+        }
+
+        return [
+            'thinking_mode' => config('ai.providers.deepseek.thinking_mode.comment_analyzer', 'non-thinking'),
+        ];
+    }
 
     public function withProducts(array $products): static
     {

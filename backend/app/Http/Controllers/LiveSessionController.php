@@ -483,8 +483,7 @@ class LiveSessionController extends Controller
             ]);
 
             if ($activeSub !== null) {
-                $activeSub->used_ai_credits += count($comments);
-                $activeSub->save();
+                $activeSub->increment('used_ai_credits', LiveSessionAnalyzer::INSIGHTS_CREDIT_COST);
             }
         }
 

@@ -4,20 +4,53 @@ namespace App\Ai\Agents;
 
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Attributes\MaxTokens;
-use Laravel\Ai\Attributes\Model;
 use Laravel\Ai\Attributes\Provider;
-use Laravel\Ai\Attributes\Temperature;
 use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\HasProviderOptions;
 use Laravel\Ai\Contracts\HasStructuredOutput;
+use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Promptable;
 
 #[Provider('deepseek')]
-#[Model('deepseek-v4-flash')]
-#[Temperature(0)]
 #[MaxTokens(4096)]
-class LiveSessionAnalyzer implements Agent, HasStructuredOutput
+class LiveSessionAnalyzer implements Agent, HasProviderOptions, HasStructuredOutput
 {
     use Promptable;
+
+    /**
+     * Chi phí tín dụng AI cho một lần phân tích tổng hợp phiên live (insights + alerts).
+     * Vì mỗi lần gọi đọc tối đa 150 bình luận + stats nên tốn hơn 1 batch comment thường;
+     * dùng hằng số cố định để tính credit nhất quán giữa auto-insights (trong Job) và
+     * manual refresh (Controller).
+     */
+    public const INSIGHTS_CREDIT_COST = 10;
+
+    /**
+     * Model lấy từ config (đọc env) thay vì hardcode.
+     */
+    public function model(): ?string
+    {
+        return config('ai.providers.deepseek.models.text.default');
+    }
+
+    /**
+     * Tham số riêng của DeepSeek: thinking_mode.
+     * Phân tích insights cần suy luận đa chiều nên mặc định dùng `thinking`.
+     * Lưu ý: thinking mode bỏ qua temperature/top_p (DeepSeek tự xử lý).
+     */
+    public function providerOptions(Lab|string $provider): array
+    {
+        $isDeepSeek = $provider === Lab::DeepSeek
+            || (is_string($provider) && $provider === 'deepseek');
+
+        if (! $isDeepSeek) {
+            return [];
+        }
+
+        return [
+            'thinking_mode' => config('ai.providers.deepseek.thinking_mode.session_analyzer', 'thinking'),
+        ];
+    }
 
     private array $comments = [];
 

@@ -84,7 +84,19 @@ return [
         'deepseek' => [
             'driver' => 'deepseek',
             'key' => env('DEEPSEEK_API_KEY'),
-            'model' => env('DEEPSEEK_MODEL', 'deepseek-chat'),
+            'models' => [
+                'text' => [
+                    'default' => env('DEEPSEEK_MODEL', 'deepseek-v4-flash'),
+                    'cheapest' => env('DEEPSEEK_MODEL', 'deepseek-v4-flash'),
+                    'smartest' => env('DEEPSEEK_PRO_MODEL', 'deepseek-v4-pro'),
+                ],
+            ],
+            // DeepSeek V4 reasoning được điều khiển bằng `thinking_mode`
+            // (non-thinking | thinking | thinking_max), KHÔNG phải `reasoning_effort`.
+            'thinking_mode' => [
+                'comment_analyzer' => env('DEEPSEEK_COMMENT_THINKING_MODE', 'non-thinking'),
+                'session_analyzer' => env('DEEPSEEK_INSIGHTS_THINKING_MODE', 'thinking'),
+            ],
         ],
 
         'eleven' => [

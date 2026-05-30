@@ -2008,33 +2008,6 @@ function CustomersPanel() {
     );
 }
 
-interface AiInsightsData {
-    overview?: string;
-    trends?: string;
-    recommendations?: string;
-}
-
-function parseAiInsights(
-    insights: string | null | undefined,
-): AiInsightsData | null {
-    if (!insights) return null;
-    try {
-        const parsed = JSON.parse(insights);
-        if (
-            parsed &&
-            typeof parsed === 'object' &&
-            ('overview' in parsed ||
-                'trends' in parsed ||
-                'recommendations' in parsed)
-        ) {
-            return parsed as AiInsightsData;
-        }
-    } catch (e) {
-        // Not a JSON string
-    }
-    return null;
-}
-
 function AIInsightsPanel() {
     const {
         session,
@@ -2257,63 +2230,15 @@ function AIInsightsPanel() {
                 <FadeScrollArea>
                     <div className="text-muted-foreground space-y-3 px-4 text-sm">
                         {session.ai_insights ? (
-                            (() => {
-                                const parsed = parseAiInsights(
-                                    session.ai_insights,
-                                );
-                                if (parsed) {
-                                    return (
-                                        <div className="space-y-3">
-                                            {parsed.overview && (
-                                                <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3 shadow-sm transition-all hover:shadow-md">
-                                                    <div className="mb-1.5 flex items-center gap-2 font-semibold text-indigo-600 dark:text-indigo-400">
-                                                        <SparklesIcon className="size-4" />
-                                                        <span>
-                                                            Tổng quan diễn biến
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
-                                                        {parsed.overview}
-                                                    </p>
-                                                </div>
-                                            )}
-                                            {parsed.trends && (
-                                                <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 shadow-sm transition-all hover:shadow-md">
-                                                    <div className="mb-1.5 flex items-center gap-2 font-semibold text-amber-600 dark:text-amber-400">
-                                                        <FlameIcon className="size-4" />
-                                                        <span>
-                                                            Xu hướng mua hàng &
-                                                            sản phẩm
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
-                                                        {parsed.trends}
-                                                    </p>
-                                                </div>
-                                            )}
-                                            {parsed.recommendations && (
-                                                <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 shadow-sm transition-all hover:shadow-md">
-                                                    <div className="mb-1.5 flex items-center gap-2 font-semibold text-emerald-600 dark:text-emerald-400">
-                                                        <LightbulbIcon className="size-4" />
-                                                        <span>
-                                                            Khuyến nghị cho
-                                                            streamer
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
-                                                        {parsed.recommendations}
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                }
-                                return (
-                                    <p className="text-sm whitespace-pre-line">
-                                        {session.ai_insights}
-                                    </p>
-                                );
-                            })()
+                            <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3 shadow-sm transition-all hover:shadow-md">
+                                <div className="mb-1.5 flex items-center gap-2 font-semibold text-indigo-600 dark:text-indigo-400">
+                                    <SparklesIcon className="size-4" />
+                                    <span>Tổng quan diễn biến</span>
+                                </div>
+                                <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
+                                    {session.ai_insights}
+                                </p>
+                            </div>
                         ) : sentimentTotal > 0 ? (
                             <>
                                 <p>
