@@ -542,7 +542,9 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
             ->with('analyze-comments-lock-'.$session->id, 120)
             ->andReturn($mockLock);
         Cache::shouldReceive('forget')->zeroOrMoreTimes();
-        Cache::shouldReceive('get')->zeroOrMoreTimes()->andReturn(null);
+        // Return a very recent insight timestamp so the insights job dispatch is throttled/skipped,
+        // keeping this test focused purely on the comment-job lock lifecycle.
+        Cache::shouldReceive('get')->zeroOrMoreTimes()->andReturn(now()->timestamp);
         Cache::shouldReceive('put')->zeroOrMoreTimes();
 
         $job = new AnalyzeCommentsJob($session->id);

@@ -216,7 +216,7 @@ PROMPT;
             'alerts' => $schema->array()
                 ->items(
                     $schema->object(fn ($s) => [
-                        'type' => $s->string()->required(),
+                        'type' => $s->string()->enum(['danger', 'warning', 'info', 'success'])->required(),
                         'title' => $s->string()->required(),
                         'desc' => $s->string()->required(),
                         'action' => $s->string()->required(),

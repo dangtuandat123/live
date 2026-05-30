@@ -3,11 +3,9 @@
 namespace App\Jobs;
 
 use App\Ai\Agents\CommentAnalyzer;
-use App\Ai\Agents\LiveSessionAnalyzer;
 use App\Models\LiveEvent;
 use App\Models\LiveSession;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Bus\Queueable;use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -359,86 +357,13 @@ class AnalyzeCommentsJob implements ShouldQueue
                     $session->update(['ai_context_summary' => mb_substr($sessionNote, 0, 500)]);
                 }
 
-                // === Auto-Insights: Tự động chạy phân tích insight/alert nếu vượt qua throttle 30s ===
-                $insightCacheKey = "live_session_{$this->liveSessionId}_last_insight_time";
+                // === Auto-Insights: Dispatch job riêng (bất đồng bộ) để không giữ lock
+                // và không ăn chung timeout budget với phân tích comment. ===
+                // Pre-check throttle (best-effort) để tránh churn queue; throttle thật nằm trong job.
+                $insightCacheKey = AnalyzeLiveInsightsJob::cacheKey($this->liveSessionId);
                 $lastInsightTime = cache()->get($insightCacheKey);
-                if (! $lastInsightTime || (now()->timestamp - $lastInsightTime) >= 30) {
-                    $session->load('stats');
-
-                    // Fetch recent 150 comments
-                    $insightComments = LiveEvent::where('live_session_id', $this->liveSessionId)
-                        ->where('event_type', 'comment')
-                        ->orderByDesc('event_at')
-                        ->limit(150)
-                        ->get()
-                        ->map(fn ($e) => [
-                            'user' => $e->tiktok_nickname ?? 'Unknown',
-                            'text' => $e->data['comment'] ?? '',
-                            'time' => $e->event_at?->toISOString() ?? '',
-                        ])
-                        ->toArray();
-
-                    $insightStats = $session->stats ? [
-                        'total_views' => $session->stats->total_views,
-                        'total_comments' => $session->stats->total_comments,
-                        'total_likes' => $session->stats->total_likes,
-                        'total_gifts' => $session->stats->total_gifts,
-                        'total_follows' => $session->stats->total_follows,
-                        'total_shares' => $session->stats->total_shares,
-                        'viewer_count' => $session->stats->viewer_count,
-                        'leads_count' => $session->stats->leads_count,
-                    ] : [];
-
-                    $insightProducts = $session->products->map(fn ($p) => [
-                        'name' => $p->name,
-                        'sku' => $p->sku,
-                        'price' => $p->price,
-                        'keywords' => $p->keywords ?? [],
-                    ])->toArray();
-
-                    $insightKeywords = $session->keywords->pluck('keyword')->toArray();
-                    $insightOldMemory = $session->ai_context_summary ?? '';
-
-                    $insightInput = [
-                        'comments' => $insightComments,
-                        'stats' => $insightStats,
-                        'products' => $insightProducts,
-                        'keywords' => $insightKeywords,
-                        'old_memory' => $insightOldMemory,
-                    ];
-
-                    $insightUserMessage = json_encode($insightInput, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-
-                    try {
-                        $insightResponse = (new LiveSessionAnalyzer)
-                            ->withComments($insightComments)
-                            ->withStats($insightStats)
-                            ->withProducts($insightProducts)
-                            ->withKeywords($insightKeywords)
-                            ->withOldMemory($insightOldMemory)
-                            ->prompt($insightUserMessage)
-                            ->toArray();
-
-                        if ($insightResponse) {
-                            $session->update([
-                                'ai_insights' => $insightResponse['summary'] ?? $session->ai_insights,
-                                'ai_alerts' => $insightResponse['alerts'] ?? $session->ai_alerts,
-                            ]);
-
-                            // Tính credit nhất quán cho lần gọi insights tổng hợp.
-                            if ($activeSub) {
-                                $activeSub->increment('used_ai_credits', LiveSessionAnalyzer::INSIGHTS_CREDIT_COST);
-                            }
-                        }
-
-                        cache()->put($insightCacheKey, now()->timestamp);
-                        $this->clearSessionCache();
-                    } catch (\Throwable $insightEx) {
-                        Log::warning('Automatic AI insights analysis failed in job', [
-                            'session_id' => $this->liveSessionId,
-                            'error' => $insightEx->getMessage(),
-                        ]);
-                    }
+                if (! $lastInsightTime || (now()->timestamp - $lastInsightTime) >= AnalyzeLiveInsightsJob::THROTTLE_SECONDS) {
+                    AnalyzeLiveInsightsJob::dispatch($this->liveSessionId);
                 }
 
                 // Vét sạch comments chưa được xử lý AI của session này

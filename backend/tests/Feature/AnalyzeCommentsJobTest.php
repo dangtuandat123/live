@@ -5,10 +5,12 @@ namespace Tests\Feature;
 use App\Ai\Agents\CommentAnalyzer;
 use App\Ai\Agents\LiveSessionAnalyzer;
 use App\Jobs\AnalyzeCommentsJob;
+use App\Jobs\AnalyzeLiveInsightsJob;
 use App\Models\LiveEvent;
 use App\Models\LiveSession;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -881,5 +883,98 @@ class AnalyzeCommentsJobTest extends TestCase
             'ai_processed' => true,
             'product_tag' => 'Áo thun đen',
         ]);
+    }
+
+    public function test_it_dispatches_insights_job_when_throttle_expired(): void
+    {
+        Queue::fake([AnalyzeLiveInsightsJob::class]);
+
+        $user = User::factory()->create();
+        $session = LiveSession::create([
+            'user_id' => $user->id,
+            'name' => 'Dispatch Insights Test',
+            'status' => 'live',
+            'tiktok_username' => 'testuser',
+        ]);
+
+        $comment = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now(),
+            'tiktok_user_id' => 'user_1',
+            'data' => ['comment' => 'Mã 1'],
+            'ai_processed' => false,
+        ]);
+
+        CommentAnalyzer::fake([
+            [
+                'results' => [
+                    [
+                        'id' => $comment->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => null,
+                        'question_tag' => null,
+                        'product_tag' => null,
+                        'has_phone' => false,
+                    ],
+                ],
+                'session_note' => 'Batch.',
+            ],
+        ]);
+
+        Cache::forget(AnalyzeLiveInsightsJob::cacheKey($session->id));
+
+        $job = new AnalyzeCommentsJob($session->id);
+        app()->call([$job, 'handle']);
+
+        Queue::assertPushed(AnalyzeLiveInsightsJob::class, function ($queued) use ($session) {
+            return $queued->uniqueId() === 'analyze-insights-'.$session->id;
+        });
+    }
+
+    public function test_it_does_not_dispatch_insights_job_when_throttled(): void
+    {
+        Queue::fake([AnalyzeLiveInsightsJob::class]);
+
+        $user = User::factory()->create();
+        $session = LiveSession::create([
+            'user_id' => $user->id,
+            'name' => 'Throttled Dispatch Test',
+            'status' => 'live',
+            'tiktok_username' => 'testuser',
+        ]);
+
+        $comment = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now(),
+            'tiktok_user_id' => 'user_1',
+            'data' => ['comment' => 'Mã 1'],
+            'ai_processed' => false,
+        ]);
+
+        CommentAnalyzer::fake([
+            [
+                'results' => [
+                    [
+                        'id' => $comment->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => null,
+                        'question_tag' => null,
+                        'product_tag' => null,
+                        'has_phone' => false,
+                    ],
+                ],
+                'session_note' => 'Batch.',
+            ],
+        ]);
+
+        // Recent insight timestamp → comment job must skip dispatching the insights job.
+        Cache::put(AnalyzeLiveInsightsJob::cacheKey($session->id), now()->timestamp - 5);
+
+        $job = new AnalyzeCommentsJob($session->id);
+        app()->call([$job, 'handle']);
+
+        Queue::assertNotPushed(AnalyzeLiveInsightsJob::class);
     }
 }

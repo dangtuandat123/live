@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Ai\Agents\LiveSessionAnalyzer;
 use App\Exceptions\TikTokSessionNotFoundException;
 use App\Jobs\AnalyzeCommentsJob;
+use App\Jobs\AnalyzeLiveInsightsJob;
 use App\Jobs\CaptureThumbnailJob;
 use App\Models\LiveEvent;
 use App\Models\LiveSession;
 use App\Models\LiveSessionStatsHistory;
 use App\Models\LiveStat;
 use App\Models\Product;
+use App\Services\LiveInsightsService;
 use App\Services\TikTokService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
@@ -382,19 +384,19 @@ class LiveSessionController extends Controller
     /**
      * Refresh AI insights manually.
      */
-    public function refreshInsights(Request $request, LiveSession $liveSession)
+    public function refreshInsights(Request $request, LiveSession $liveSession, LiveInsightsService $insights)
     {
         if ($liveSession->user_id !== $request->user()->id) {
             abort(403);
         }
 
         // Cache Throttle Check
-        $cacheKey = "live_session_{$liveSession->id}_last_insight_time";
+        $cacheKey = AnalyzeLiveInsightsJob::cacheKey($liveSession->id);
         $lastInsightTime = Cache::get($cacheKey);
         if ($lastInsightTime !== null) {
             $elapsed = now()->timestamp - $lastInsightTime;
-            if ($elapsed < 30) {
-                $secondsRemaining = 30 - $elapsed;
+            if ($elapsed < AnalyzeLiveInsightsJob::THROTTLE_SECONDS) {
+                $secondsRemaining = AnalyzeLiveInsightsJob::THROTTLE_SECONDS - $elapsed;
 
                 return response()->json(['error' => "Vui lòng đợi {$secondsRemaining} giây trước khi yêu cầu làm mới tiếp theo."], 429);
             }
@@ -411,65 +413,8 @@ class LiveSessionController extends Controller
             }
         }
 
-        // Fetch recent 150 comments
-        $comments = $liveSession->events()
-            ->where('event_type', 'comment')
-            ->orderByDesc('event_at')
-            ->limit(150)
-            ->get()
-            ->map(fn ($e) => [
-                'user' => $e->tiktok_nickname ?? 'Unknown',
-                'text' => $e->data['comment'] ?? '',
-                'time' => $e->event_at?->toISOString() ?? '',
-            ])
-            ->toArray();
-
-        // Stats
-        $liveSession->load('stats');
-        $stats = $liveSession->stats ? [
-            'total_views' => $liveSession->stats->total_views,
-            'total_comments' => $liveSession->stats->total_comments,
-            'total_likes' => $liveSession->stats->total_likes,
-            'total_gifts' => $liveSession->stats->total_gifts,
-            'total_follows' => $liveSession->stats->total_follows,
-            'total_shares' => $liveSession->stats->total_shares,
-            'viewer_count' => $liveSession->stats->viewer_count,
-            'leads_count' => $liveSession->stats->leads_count,
-        ] : [];
-
-        // Products
-        $products = $liveSession->products->map(fn ($p) => [
-            'name' => $p->name,
-            'sku' => $p->sku,
-            'price' => $p->price,
-            'keywords' => $p->keywords ?? [],
-        ])->toArray();
-
-        // Keywords
-        $keywords = $liveSession->keywords->pluck('keyword')->toArray();
-
-        // Memory
-        $oldMemory = $liveSession->ai_context_summary ?? '';
-
-        $inputData = [
-            'comments' => $comments,
-            'stats' => $stats,
-            'products' => $products,
-            'keywords' => $keywords,
-            'old_memory' => $oldMemory,
-        ];
-
-        $userMessage = json_encode($inputData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-
         try {
-            $response = (new LiveSessionAnalyzer)
-                ->withComments($comments)
-                ->withStats($stats)
-                ->withProducts($products)
-                ->withKeywords($keywords)
-                ->withOldMemory($oldMemory)
-                ->prompt($userMessage)
-                ->toArray();
+            $response = $insights->analyze($liveSession);
         } catch (\Throwable $e) {
             Log::error('Failed to refresh AI insights: '.$e->getMessage());
 
