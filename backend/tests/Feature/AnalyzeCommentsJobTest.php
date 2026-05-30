@@ -990,4 +990,95 @@ class AnalyzeCommentsJobTest extends TestCase
 
         Queue::assertNotPushed(AnalyzeLiveInsightsJob::class);
     }
+
+    public function test_it_extracts_and_persists_order_details(): void
+    {
+        $user = User::factory()->create();
+        $session = LiveSession::create([
+            'user_id' => $user->id,
+            'name' => 'Order Details Test',
+            'status' => 'live',
+            'tiktok_username' => 'testuser',
+        ]);
+
+        $product = $session->products()->getRelated()->create([
+            'user_id' => $user->id,
+            'name' => 'Áo thun đen',
+            'sku' => 'ATD-01',
+            'price' => 199000,
+        ]);
+        $session->products()->attach($product->id);
+
+        $orderComment = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now(),
+            'tiktok_user_id' => 'user_1',
+            'data' => ['comment' => 'chốt 2 áo thun đen size L màu đỏ, ship 12 Lê Lợi Q1 0912000111'],
+            'ai_processed' => false,
+        ]);
+
+        // A non-order comment that still returns order_details must be ignored.
+        $infoComment = LiveEvent::create([
+            'live_session_id' => $session->id,
+            'event_type' => 'comment',
+            'event_at' => now()->addSecond(),
+            'tiktok_user_id' => 'user_2',
+            'data' => ['comment' => 'áo này size L còn không shop'],
+            'ai_processed' => false,
+        ]);
+
+        CommentAnalyzer::fake([
+            [
+                'results' => [
+                    [
+                        'id' => $orderComment->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => 'Chốt đơn',
+                        'question_tag' => null,
+                        'product_tag' => 'Áo thun đen',
+                        'has_phone' => true,
+                        'order_details' => [
+                            'quantity' => 2,
+                            'size' => 'L',
+                            'color' => 'đỏ',
+                            'address' => '12 Lê Lợi Q1',
+                        ],
+                    ],
+                    [
+                        'id' => $infoComment->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => 'Hỏi thông tin',
+                        'question_tag' => 'Hỏi size',
+                        'product_tag' => 'Áo thun đen',
+                        'has_phone' => false,
+                        // AI hallucinates order_details on a non-order comment → must be discarded.
+                        'order_details' => [
+                            'quantity' => 1,
+                            'size' => 'L',
+                            'color' => null,
+                            'address' => null,
+                        ],
+                    ],
+                ],
+                'session_note' => 'Có 1 chốt đơn áo thun đen.',
+            ],
+        ]);
+        $this->fakeInsights();
+
+        $job = new AnalyzeCommentsJob($session->id);
+        app()->call([$job, 'handle']);
+
+        // Order comment: details persisted into data->order + qty.
+        $orderComment->refresh();
+        $this->assertEquals('L', $orderComment->data['order']['size']);
+        $this->assertEquals('đỏ', $orderComment->data['order']['color']);
+        $this->assertEquals('12 Lê Lợi Q1', $orderComment->data['order']['address']);
+        $this->assertEquals(2, $orderComment->data['qty']);
+
+        // Info comment: no order details should be stored.
+        $infoComment->refresh();
+        $this->assertArrayNotHasKey('order', $infoComment->data ?? []);
+        $this->assertArrayNotHasKey('qty', $infoComment->data ?? []);
+    }
 }

@@ -915,12 +915,6 @@ class LiveSessionController extends Controller
             return;
         }
 
-        $currentComments = $session->events()
-            ->where('event_type', 'comment')
-            ->count();
-
-        $totalCommentsStats = $currentStats->total_comments ?: $currentComments;
-
         for ($time = $startTime; $time->lessThanOrEqualTo($endTime); $time->addSeconds($interval)) {
             // Kiểm tra xem đã có bản ghi lịch sử nào gần mốc thời gian này chưa (trong khoảng +- 2 phút)
             $exists = $session->statsHistory()
@@ -931,45 +925,32 @@ class LiveSessionController extends Controller
                 ->exists();
 
             if (! $exists) {
-                // Đếm số lượng comment tại mốc $time
+                // total_comments: đếm THẬT số bình luận tính đến mốc $time (suy ra chính xác từ event_at).
                 $commentsAtTime = $session->events()
                     ->where('event_type', 'comment')
                     ->where('event_at', '<=', $time)
                     ->count();
 
-                $r = 0;
-                if ($totalCommentsStats > 0) {
-                    $r = $commentsAtTime / $totalCommentsStats;
-                    if ($r > 1) {
-                        $r = 1;
-                    }
-                }
-
-                // Nội suy các giá trị stats dựa trên tỷ lệ tăng trưởng comment
-                $views = (int) ($currentStats->total_views * $r);
-                $likes = (int) ($currentStats->total_likes * $r);
-                $gifts = (int) ($currentStats->total_gifts * $r);
-                $follows = (int) ($currentStats->total_follows * $r);
-                $shares = (int) ($currentStats->total_shares * $r);
-
-                // Người xem đồng thời biến động nhẹ quanh mức hiện tại dựa trên tỷ lệ r
-                $viewerCount = (int) ($currentStats->viewer_count * ($r > 0 ? (0.7 + 0.3 * $r) : 0));
-                if ($viewerCount < 0) {
-                    $viewerCount = 0;
-                }
+                // Các chỉ số khác KHÔNG thể tái dựng chính xác cho quá khứ (views/viewers/likes...
+                // chỉ biết tổng hiện tại). Dùng LOCF: lấy giá trị từ bản ghi THẬT gần nhất TRƯỚC mốc này,
+                // tránh bịa số bằng công thức nội suy. Nếu chưa có bản ghi nào trước đó → 0 (chưa đo được).
+                $prev = $session->statsHistory()
+                    ->where('created_at', '<', $time)
+                    ->orderByDesc('created_at')
+                    ->first();
 
                 $history = new LiveSessionStatsHistory([
-                    'total_views' => $views,
+                    'total_views' => $prev->total_views ?? 0,
                     'total_comments' => $commentsAtTime,
-                    'total_likes' => $likes,
-                    'total_gifts' => $gifts,
-                    'total_follows' => $follows,
-                    'total_shares' => $shares,
-                    'viewer_count' => $viewerCount,
-                    'sentiment_positive' => (int) ($currentStats->sentiment_positive * $r),
-                    'sentiment_neutral' => (int) ($currentStats->sentiment_neutral * $r),
-                    'sentiment_negative' => (int) ($currentStats->sentiment_negative * $r),
-                    'leads_count' => (int) ($currentStats->leads_count * $r),
+                    'total_likes' => $prev->total_likes ?? 0,
+                    'total_gifts' => $prev->total_gifts ?? 0,
+                    'total_follows' => $prev->total_follows ?? 0,
+                    'total_shares' => $prev->total_shares ?? 0,
+                    'viewer_count' => $prev->viewer_count ?? 0,
+                    'sentiment_positive' => $prev->sentiment_positive ?? 0,
+                    'sentiment_neutral' => $prev->sentiment_neutral ?? 0,
+                    'sentiment_negative' => $prev->sentiment_negative ?? 0,
+                    'leads_count' => $prev->leads_count ?? 0,
                 ]);
                 $history->live_session_id = $session->id;
                 $history->timestamps = false; // Tắt tự động timestamps của Eloquent để ghi đè thời gian quá khứ
@@ -1053,6 +1034,10 @@ class LiveSessionController extends Controller
                 'qty' => $e->data['qty'] ?? 1,
                 'note' => $e->data['note'] ?? '',
                 'status' => $e->data['status'] ?? 'pending',
+                // Order details AI bóc tách từ bình luận chốt đơn (size/màu/địa chỉ).
+                'size' => $e->data['order']['size'] ?? '',
+                'color' => $e->data['order']['color'] ?? '',
+                'address' => $e->data['order']['address'] ?? '',
             ])
             ->toArray();
     }

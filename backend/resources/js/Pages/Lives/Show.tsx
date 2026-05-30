@@ -252,6 +252,9 @@ interface PotentialCustomer {
     qty?: number;
     note?: string;
     status?: string;
+    size?: string;
+    color?: string;
+    address?: string;
 }
 
 interface TopQuestion {
@@ -437,10 +440,19 @@ function useOrderAlerts(soundEnabled: boolean, comments: CommentData[]) {
 
 // --- Export Utilities ---
 function exportLeadsCSV(customers: PotentialCustomer[]) {
-    const header = 'Tên,SĐT,Sản phẩm,Nội dung';
+    const header = 'Tên,SĐT,Sản phẩm,Size,Màu,Số lượng,Địa chỉ,Nội dung';
     const rows = customers.map((c) =>
-        [c.name, c.phone || '', c.product, c.comment]
-            .map((v) => `"${v.replace(/"/g, '""')}"`)
+        [
+            c.name,
+            c.phone || '',
+            c.product,
+            c.size || '',
+            c.color || '',
+            c.qty ? String(c.qty) : '',
+            c.address || '',
+            c.comment,
+        ]
+            .map((v) => `"${String(v).replace(/"/g, '""')}"`)
             .join(','),
     );
     const csv = [header, ...rows].join('\n');
@@ -457,10 +469,19 @@ function exportLeadsCSV(customers: PotentialCustomer[]) {
 
 function copyLeadsToClipboard(customers: PotentialCustomer[]): string {
     const text = customers
-        .map(
-            (c, i) =>
-                `${i + 1}. ${c.name} | ${c.phone || '—'} | ${c.product} | ${c.comment}`,
-        )
+        .map((c, i) => {
+            const parts = [
+                c.name,
+                c.phone || '—',
+                c.product,
+                [c.size && `size ${c.size}`, c.color, c.qty && c.qty > 1 && `x${c.qty}`]
+                    .filter(Boolean)
+                    .join(' '),
+                c.address || '',
+                c.comment,
+            ].filter((p) => p !== '' && p !== undefined);
+            return `${i + 1}. ${parts.join(' | ')}`;
+        })
         .join('\n');
     navigator.clipboard.writeText(text);
     return text;
@@ -1780,12 +1801,40 @@ function CustomersPanel() {
                                                         —
                                                     </span>
                                                 )}
+                                                {(c.size || c.color || (c.qty && c.qty > 1)) && (
+                                                    <div className="mt-1 flex flex-wrap gap-1">
+                                                        {c.size && (
+                                                            <span className="inline-flex items-center rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                                                                Size {c.size}
+                                                            </span>
+                                                        )}
+                                                        {c.color && (
+                                                            <span className="inline-flex items-center rounded bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600 dark:text-purple-400">
+                                                                {c.color}
+                                                            </span>
+                                                        )}
+                                                        {c.qty && c.qty > 1 && (
+                                                            <span className="inline-flex items-center rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                                                                x{c.qty}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td
                                                 className="text-muted-foreground truncate p-2 text-sm"
                                                 title={c.comment}
                                             >
                                                 {renderCommentText(c.comment)}
+                                                {c.address && (
+                                                    <div
+                                                        className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-emerald-600 dark:text-emerald-400"
+                                                        title={c.address}
+                                                    >
+                                                        <span>📍</span>
+                                                        {c.address}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="p-2 text-center">
                                                 {c.status && c.status !== '' ? (

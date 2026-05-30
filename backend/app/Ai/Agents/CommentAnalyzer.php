@@ -157,10 +157,18 @@ Analyze each comment individually and map to the following schema properties:
 5. **has_phone**:
    - true if the comment contains a continuous sequence of 9-11 digits (Vietnamese phone number format). Otherwise, false.
 
-6. **session_note**:
+6. **order_details**:
+   - ONLY when intent_tag is "Chốt đơn", extract the concrete order entities the buyer stated. Output an object with these keys (each null if not stated):
+     * "quantity": integer number of items (e.g., "lấy 2 cái" → 2). Default null if not stated.
+     * "size": the size/variant as written (e.g., "L", "XL", "39", "freesize"). null if not stated.
+     * "color": the color as written (e.g., "đen", "đỏ", "trắng"). null if not stated.
+     * "address": the Vietnamese shipping address if present in the comment (street/ward/district/province). null if not stated.
+   - If intent_tag is NOT "Chốt đơn", output null for the whole object.
+
+7. **session_note**:
    - Write a short summary note (maximum 300 characters) in Vietnamese about the current livestream's status to help the next batch analyzer maintain context. E.g., "Đang bán Áo thun đen, nhiều người hỏi size. Có minigame đoán số đang chạy. Streamer vừa chuyển sang giới thiệu Váy đỏ."
 
-7. **extracted_keywords**:
+8. **extracted_keywords**:
    - Extract a list of up to 5 prominent keywords from this batch of comments. Keywords must be in lowercase, short (1-3 words), and relate to products, pricing, quality, or common user queries.
 </rules>
 
@@ -182,8 +190,8 @@ Example COMMENTS TO CLASSIFY:
   103|34
   104|shop lừa đảo giao thiếu hàng, nhắn k rep bực quá
 - Reasoning:
-  * comment 101: Intent "Chốt đơn" (buy + size + phone). Sentiment "neutral". has_phone true. product_tag "Áo thun đen".
-  * comment 102: Intent "Hỏi thông tin" (asking material). Sentiment "neutral". question_tag "Hỏi chất liệu". product_tag "Áo thun đen".
+  * comment 101: Intent "Chốt đơn" (buy + size + phone). Sentiment "neutral". has_phone true. product_tag "Áo thun đen". order_details: size "L", quantity null, color null, address null.
+  * comment 102: Intent "Hỏi thông tin" (asking material). Sentiment "neutral". question_tag "Hỏi chất liệu". product_tag "Áo thun đen". order_details null.
   * comment 103: Intent null (minigame number guess). Sentiment "neutral".
   * comment 104: Intent "Yêu cầu hỗ trợ" (missing item complaint). Sentiment "negative" (angry, insulting words).
   * session_note: "Đang bán áo thun đen. Có khách chốt đơn và hỏi chất liệu. Có chơi đoán số. 1 khiếu nại giao thiếu hàng."
@@ -191,10 +199,10 @@ Example COMMENTS TO CLASSIFY:
 - Output JSON:
   {
     "results": [
-      {"id": 101, "sentiment": "neutral", "intent_tag": "Chốt đơn", "question_tag": null, "product_tag": "Áo thun đen", "has_phone": true},
-      {"id": 102, "sentiment": "neutral", "intent_tag": "Hỏi thông tin", "question_tag": "Hỏi chất liệu", "product_tag": "Áo thun đen", "has_phone": false},
-      {"id": 103, "sentiment": "neutral", "intent_tag": null, "question_tag": null, "product_tag": null, "has_phone": false},
-      {"id": 104, "sentiment": "negative", "intent_tag": "Yêu cầu hỗ trợ", "question_tag": null, "product_tag": null, "has_phone": false}
+      {"id": 101, "sentiment": "neutral", "intent_tag": "Chốt đơn", "question_tag": null, "product_tag": "Áo thun đen", "has_phone": true, "order_details": {"quantity": null, "size": "L", "color": null, "address": null}},
+      {"id": 102, "sentiment": "neutral", "intent_tag": "Hỏi thông tin", "question_tag": "Hỏi chất liệu", "product_tag": "Áo thun đen", "has_phone": false, "order_details": null},
+      {"id": 103, "sentiment": "neutral", "intent_tag": null, "question_tag": null, "product_tag": null, "has_phone": false, "order_details": null},
+      {"id": 104, "sentiment": "negative", "intent_tag": "Yêu cầu hỗ trợ", "question_tag": null, "product_tag": null, "has_phone": false, "order_details": null}
     ],
     "session_note": "Đang bán áo thun đen. Có khách chốt đơn và hỏi chất liệu. Có chơi đoán số. 1 khiếu nại giao thiếu hàng.",
     "extracted_keywords": ["áo thun đen", "chất liệu", "đoán số", "giao thiếu"]
@@ -212,7 +220,8 @@ JSON Structure:
       "intent_tag": "Chốt đơn" | "Hỏi thông tin" | "Phản hồi SP" | "Yêu cầu hỗ trợ" | null,
       "question_tag": "Hỏi giá" | "Hỏi size" | "Hỏi ship" | "Hỏi chất liệu" | "Hỏi màu" | "Hỏi tồn kho" | "Hỏi giảm giá" | "Hỏi bảo hành" | "Hỏi thanh toán" | "Hỏi mùi hương" | "Hỏi công dụng" | "Hỏi cấu hình" | "Hỏi trả góp" | "Hỏi xuất xứ" | "Hỏi phụ kiện" | "Hỏi tình trạng" | "Hỏi quà tặng" | null,
       "product_tag": string | null,
-      "has_phone": boolean
+      "has_phone": boolean,
+      "order_details": { "quantity": integer | null, "size": string | null, "color": string | null, "address": string | null } | null
     }
   ],
   "session_note": "string",
@@ -240,6 +249,12 @@ PROMPT;
                         ])->nullable(),
                         'product_tag' => $s->string()->nullable(),
                         'has_phone' => $s->boolean()->required(),
+                        'order_details' => $s->object(fn ($o) => [
+                            'quantity' => $o->integer()->nullable(),
+                            'size' => $o->string()->nullable(),
+                            'color' => $o->string()->nullable(),
+                            'address' => $o->string()->nullable(),
+                        ])->nullable(),
                     ])
                 )
                 ->required(),

@@ -202,6 +202,7 @@ class AnalyzeCommentsJob implements ShouldQueue
                     $negative = 0;
                     $chotDonUsers = [];
                     $updatesGrouped = [];
+                    $orderDetailsByEvent = [];
 
                     foreach ($results as $result) {
                         $eventId = $result['id'] ?? null;
@@ -234,6 +235,11 @@ class AnalyzeCommentsJob implements ShouldQueue
 
                         if ($validated['intent_tag'] === 'Chốt đơn' && $tiktokUserId) {
                             $chotDonUsers[] = $tiktokUserId;
+                        }
+
+                        // Order details (size/màu/SL/địa chỉ) lưu vào data JSON, xử lý riêng từng event.
+                        if (! empty($validated['order_details'])) {
+                            $orderDetailsByEvent[$eventId] = $validated['order_details'];
                         }
 
                         // Group updates by target attributes serialization to perform bulk updates
@@ -273,6 +279,36 @@ class AnalyzeCommentsJob implements ShouldQueue
                         LiveEvent::whereIn('id', $ids)
                             ->where('live_session_id', $this->liveSessionId)
                             ->update($attributes);
+                    }
+
+                    // Lưu order_details (size/màu/SL/địa chỉ) AI bóc tách vào data JSON của từng event.
+                    // Chỉ điền field AI có giá trị và chưa bị streamer chỉnh tay (giữ nguyên qty/note/status thủ công).
+                    foreach ($orderDetailsByEvent as $eventId => $details) {
+                        $event = $unprocessed->firstWhere('id', $eventId);
+                        if (! $event) {
+                            continue;
+                        }
+
+                        $data = $event->data ?? [];
+                        $aiOrder = array_filter([
+                            'size' => $details['size'],
+                            'color' => $details['color'],
+                            'address' => $details['address'],
+                        ], fn ($v) => $v !== null);
+
+                        // Số lượng: chỉ set nếu streamer chưa nhập qty thủ công.
+                        if ($details['quantity'] !== null && empty($data['qty'])) {
+                            $data['qty'] = $details['quantity'];
+                        }
+
+                        if (! empty($aiOrder)) {
+                            // Gộp vào data['order'] để tách biệt khỏi field nhập tay.
+                            $data['order'] = array_merge($data['order'] ?? [], $aiOrder);
+                        }
+
+                        LiveEvent::where('id', $eventId)
+                            ->where('live_session_id', $this->liveSessionId)
+                            ->update(['data' => $data]);
                     }
 
                     // Đánh dấu comments không có trong results (AI bỏ sót)
@@ -471,7 +507,48 @@ class AnalyzeCommentsJob implements ShouldQueue
             'question_tag' => $questionTag,
             'product_tag' => $productTag,
             'has_phone' => (bool) ($result['has_phone'] ?? false),
+            'order_details' => $this->validateOrderDetails($result['order_details'] ?? null, $intentTag),
         ];
+    }
+
+    /**
+     * Chuẩn hóa order_details từ AI. Chỉ giữ khi intent là "Chốt đơn".
+     * Trả về mảng đã làm sạch hoặc null.
+     */
+    private function validateOrderDetails(mixed $raw, ?string $intentTag): ?array
+    {
+        if ($intentTag !== 'Chốt đơn' || ! is_array($raw)) {
+            return null;
+        }
+
+        $quantity = $raw['quantity'] ?? null;
+        if ($quantity !== null) {
+            $quantity = is_numeric($quantity) ? max(1, (int) $quantity) : null;
+        }
+
+        $clean = static function ($v): ?string {
+            if (! is_string($v)) {
+                return null;
+            }
+            $v = trim($v);
+
+            return $v !== '' ? mb_substr($v, 0, 255) : null;
+        };
+
+        $details = [
+            'quantity' => $quantity,
+            'size' => $clean($raw['size'] ?? null),
+            'color' => $clean($raw['color'] ?? null),
+            'address' => $clean($raw['address'] ?? null),
+        ];
+
+        // Nếu tất cả đều rỗng thì coi như không có order_details.
+        $hasAny = $details['quantity'] !== null
+            || $details['size'] !== null
+            || $details['color'] !== null
+            || $details['address'] !== null;
+
+        return $hasAny ? $details : null;
     }
 
     /**
