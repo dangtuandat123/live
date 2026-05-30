@@ -119,13 +119,20 @@ class AnalyzeCommentsJobTest extends TestCase
         $this->assertStringContainsString('session_note', $instructions);
         $this->assertStringContainsString('extracted_keywords', $instructions);
 
-        // Memory context must be embedded into the instructions when provided.
-        $withMemory = (new CommentAnalyzer)
-            ->withMemory('Đang bán áo thun, nhiều người hỏi size M.')
-            ->instructions();
+        // Memory context is now carried in the USER message (cache-friendly), not the static system prompt.
+        $analyzerWithMemory = (new CommentAnalyzer)
+            ->withMemory('Đang bán áo thun, nhiều người hỏi size M.');
+        $userMessage = $analyzerWithMemory->buildUserMessage('1|test comment');
 
-        $this->assertStringContainsString('SESSION MEMORY', $withMemory);
-        $this->assertStringContainsString('Đang bán áo thun, nhiều người hỏi size M.', $withMemory);
+        $this->assertStringContainsString('Session Memory', $userMessage);
+        $this->assertStringContainsString('Đang bán áo thun, nhiều người hỏi size M.', $userMessage);
+        $this->assertStringContainsString('1|test comment', $userMessage);
+
+        // The system prompt must remain static (no dynamic memory injected) to maximize cache hits.
+        $this->assertStringNotContainsString(
+            'Đang bán áo thun, nhiều người hỏi size M.',
+            $analyzerWithMemory->instructions()
+        );
     }
 
     public function test_agents_resolve_model_and_thinking_mode_from_config(): void
@@ -199,7 +206,7 @@ class AnalyzeCommentsJobTest extends TestCase
         $session->refresh();
         $this->assertEquals('Đang bán áo thun, nhiều người hỏi size M.', $session->ai_context_summary);
 
-        // --- Batch 2: AI receives memory from batch 1 (embedded in instructions) ---
+        // --- Batch 2: AI receives memory from batch 1 (carried in the USER message) ---
         $comment2 = LiveEvent::create([
             'live_session_id' => $session->id,
             'event_type' => 'comment',
@@ -209,8 +216,14 @@ class AnalyzeCommentsJobTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        CommentAnalyzer::fake([
-            [
+        CommentAnalyzer::fake(function ($prompt) use ($comment2) {
+            // The previous batch's session_note must be carried into this batch's user message.
+            \PHPUnit\Framework\Assert::assertStringContainsString(
+                'Đang bán áo thun, nhiều người hỏi size M.',
+                $prompt
+            );
+
+            return [
                 'results' => [
                     [
                         'id' => $comment2->id,
@@ -222,8 +235,8 @@ class AnalyzeCommentsJobTest extends TestCase
                     ],
                 ],
                 'session_note' => 'Tiếp tục bán áo thun, có thêm 1 chốt đơn Mã 3.',
-            ],
-        ]);
+            ];
+        });
 
         $job2 = new AnalyzeCommentsJob($session->id);
         app()->call([$job2, 'handle']);

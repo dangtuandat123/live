@@ -68,7 +68,7 @@ class LiveInsightsService
             'products' => $products,
             'keywords' => $keywords,
             'old_memory' => $oldMemory,
-        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        ], JSON_UNESCAPED_UNICODE);
 
         return (new LiveSessionAnalyzer)
             ->withComments($comments)

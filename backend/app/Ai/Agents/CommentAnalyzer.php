@@ -12,6 +12,16 @@ use Laravel\Ai\Contracts\HasStructuredOutput;
 use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Promptable;
 
+/**
+ * Phân loại bình luận livestream.
+ *
+ * TỐI ƯU CACHE (DeepSeek context caching):
+ * - `instructions()` được giữ TĨNH 100% (không nội suy dữ liệu động) → cùng với JSON schema
+ *   do SDK gắn vào, toàn bộ system prompt trở thành prefix giống hệt nhau qua mọi batch / mọi phiên.
+ *   DeepSeek sẽ cache prefix này (rẻ ~90%, TTFT nhanh hơn).
+ * - Toàn bộ dữ liệu động (sản phẩm, từ khóa, memory, bình luận) được đẩy vào USER message
+ *   qua buildUserMessage(), KHÔNG nhét vào system prompt.
+ */
 #[Provider('deepseek')]
 #[Temperature(0)]
 #[MaxTokens(4096)]
@@ -25,17 +35,31 @@ class CommentAnalyzer implements Agent, HasProviderOptions, HasStructuredOutput
     /** @var list<string> */
     private array $trackingKeywords = [];
 
-    private string $liveTitle = '';
-
-    private string $streamerName = '';
-
-    private int $viewerCount = 0;
-
     private string $memoryContext = '';
 
+    public function withProducts(array $products): static
+    {
+        $this->products = $products;
+
+        return $this;
+    }
+
+    public function withKeywords(array $keywords): static
+    {
+        $this->trackingKeywords = $keywords;
+
+        return $this;
+    }
+
+    public function withMemory(string $memoryContext): static
+    {
+        $this->memoryContext = $memoryContext;
+
+        return $this;
+    }
+
     /**
-     * Model được lấy từ config (đọc env) thay vì hardcode, để dễ đổi khi DeepSeek
-     * thay đổi tên model (vd: deepseek-v4-flash).
+     * Model lấy từ config (đọc env) thay vì hardcode.
      */
     public function model(): ?string
     {
@@ -43,7 +67,7 @@ class CommentAnalyzer implements Agent, HasProviderOptions, HasStructuredOutput
     }
 
     /**
-     * Tham số riêng của DeepSeek: thinking_mode điều khiển reasoning.
+     * Tham số riêng của DeepSeek: thinking_mode.
      * Phân loại comment chạy rất thường xuyên nên mặc định dùng non-thinking (nhanh, rẻ, deterministic).
      */
     public function providerOptions(Lab|string $provider): array
@@ -60,37 +84,13 @@ class CommentAnalyzer implements Agent, HasProviderOptions, HasStructuredOutput
         ];
     }
 
-    public function withProducts(array $products): static
-    {
-        $this->products = $products;
-
-        return $this;
-    }
-
-    public function withKeywords(array $keywords): static
-    {
-        $this->trackingKeywords = $keywords;
-
-        return $this;
-    }
-
-    public function withLiveContext(string $liveTitle = '', string $streamerName = '', int $viewerCount = 0): static
-    {
-        $this->liveTitle = $liveTitle;
-        $this->streamerName = $streamerName;
-        $this->viewerCount = $viewerCount;
-
-        return $this;
-    }
-
-    public function withMemory(string $memoryContext): static
-    {
-        $this->memoryContext = $memoryContext;
-
-        return $this;
-    }
-
-    public function instructions(): string
+    /**
+     * Dựng USER message: phần CONTEXT động (sản phẩm, từ khóa, memory) + danh sách bình luận.
+     * Tách khỏi system prompt để giữ system prompt tĩnh 100% cho cache.
+     *
+     * @param  string  $commentLines  Mỗi dòng dạng "ID|text"
+     */
+    public function buildUserMessage(string $commentLines): string
     {
         $productContext = collect($this->products)
             ->map(function ($p) {
@@ -99,32 +99,35 @@ class CommentAnalyzer implements Agent, HasProviderOptions, HasStructuredOutput
                 return $p['name'].$kws;
             })
             ->join('; ');
+        $productContext = $productContext !== '' ? $productContext : '(chưa đăng ký sản phẩm)';
 
-        $keywordList = implode(', ', $this->trackingKeywords);
+        $keywordList = ! empty($this->trackingKeywords) ? implode(', ', $this->trackingKeywords) : '(chưa có)';
 
-        $liveContext = '';
-        if ($this->liveTitle || $this->streamerName) {
-            $liveContext = "\n- Livestream info: Title = \"{$this->liveTitle}\", Host = \"{$this->streamerName}\", Current active viewers = {$this->viewerCount}";
-        }
+        $memorySection = ! empty($this->memoryContext)
+            ? $this->memoryContext
+            : '(chưa có ngữ cảnh trước đó)';
 
-        // Memory section — ngữ cảnh từ batch phân tích trước
-        $memorySection = '';
-        if (! empty($this->memoryContext)) {
-            $memorySection = <<<MEM
+        return <<<MSG
+=== LIVE CONTEXT ===
+Registered Products: {$productContext}
+Tracked Keywords: {$keywordList}
+Session Memory (from previous batch): {$memorySection}
 
-=== SESSION MEMORY (CONTEXT FROM PREVIOUS BATCH) ===
-{$this->memoryContext}
-MEM;
-        }
+=== COMMENTS TO CLASSIFY (format per line: ID|text) ===
+{$commentLines}
+MSG;
+    }
 
-        return <<<PROMPT
-You are a senior analyst specializing in customer behavior on Vietnamese e-commerce livestreams. Your task is to read a batch of comments from a TikTok live chat, look at the history, and classify each comment while extracting keywords and session notes.
+    public function instructions(): string
+    {
+        return <<<'PROMPT'
+You are a senior analyst specializing in customer behavior on Vietnamese e-commerce livestreams. Your task is to read a batch of comments from a TikTok live chat and classify each comment while extracting keywords and a session note.
 
-<context>
-This is a live shopping session on TikTok in Vietnam. Viewers interact, play minigames, ask questions, and buy products.
-- Registered Products: {$productContext}
-- Tracked Keywords: {$keywordList}{$liveContext}{$memorySection}
-</context>
+<input_format>
+The user message contains two sections:
+1. "LIVE CONTEXT": registered products (with optional keywords), tracked keywords, and a session memory note carried over from the previous batch. Use this only as background to interpret comments and to map product_tag.
+2. "COMMENTS TO CLASSIFY": one comment per line in the format `ID|text`. Classify EVERY line and return its result keyed by that ID.
+</input_format>
 
 <rules>
 Analyze each comment individually and map to the following schema properties:
@@ -149,7 +152,7 @@ Analyze each comment individually and map to the following schema properties:
    - If not a question, output null.
 
 4. **product_tag**:
-   - If a product is mentioned in a buying/inquiry context, map it to the exact registered product name from the list. If not matching or ambiguous, output null.
+   - If a product is mentioned in a buying/inquiry context, map it to the exact registered product name from the LIVE CONTEXT list. If not matching or ambiguous, output null.
 
 5. **has_phone**:
    - true if the comment contains a continuous sequence of 9-11 digits (Vietnamese phone number format). Otherwise, false.
@@ -167,53 +170,34 @@ For each comment:
 2. Determine if it is a purchase request ("Chốt đơn"), a question/consultation request ("Hỏi thông tin"), usage feedback ("Phản hồi SP"), post-purchase issue ("Yêu cầu hỗ trợ"), or general chat/minigame guess (null).
 3. Evaluate the sentiment (positive, neutral, negative) strictly applying the CRITICAL RULE for questions.
 4. Extract phone numbers and map products if present.
-5. Compile the session note and extract lowercase keywords based on the entire comment batch and session memory context.
+5. Compile the session note and extract lowercase keywords based on the entire comment batch and the session memory context.
 6. Format the output as JSON.
 </reasoning_process>
 
 <few_shot_examples>
-Example 1:
-- Input comments batch:
+Example LIVE CONTEXT: Registered Products: Áo thun đen (từ khóa: áo thun, cotton). Tracked Keywords: size, ship.
+Example COMMENTS TO CLASSIFY:
   101|chốt đơn áo thun đen size L 0912000111
   102|áo thun đen vải gì vậy shop
   103|34
+  104|shop lừa đảo giao thiếu hàng, nhắn k rep bực quá
 - Reasoning:
-  * comment 101: Intent is "Chốt đơn" (buying intent + size + phone number). Sentiment is "neutral". has_phone is true.
-  * comment 102: Intent is "Hỏi thông tin" (asking about material). Sentiment is "neutral". question_tag is "Hỏi chất liệu". product_tag matches "Áo thun đen".
-  * comment 103: Intent is null (minigame number guess). Sentiment is "neutral".
-  * session_note: "Đang bán áo thun đen. Có khách chốt đơn và hỏi chất liệu. Có chơi đoán số."
-  * extracted_keywords: ["áo thun đen", "chất liệu", "đoán số"]
-
-- Output JSON structure:
+  * comment 101: Intent "Chốt đơn" (buy + size + phone). Sentiment "neutral". has_phone true. product_tag "Áo thun đen".
+  * comment 102: Intent "Hỏi thông tin" (asking material). Sentiment "neutral". question_tag "Hỏi chất liệu". product_tag "Áo thun đen".
+  * comment 103: Intent null (minigame number guess). Sentiment "neutral".
+  * comment 104: Intent "Yêu cầu hỗ trợ" (missing item complaint). Sentiment "negative" (angry, insulting words).
+  * session_note: "Đang bán áo thun đen. Có khách chốt đơn và hỏi chất liệu. Có chơi đoán số. 1 khiếu nại giao thiếu hàng."
+  * extracted_keywords: ["áo thun đen", "chất liệu", "đoán số", "giao thiếu"]
+- Output JSON:
   {
     "results": [
-      {
-        "id": 101,
-        "sentiment": "neutral",
-        "intent_tag": "Chốt đơn",
-        "question_tag": null,
-        "product_tag": "Áo thun đen",
-        "has_phone": true
-      },
-      {
-        "id": 102,
-        "sentiment": "neutral",
-        "intent_tag": "Hỏi thông tin",
-        "question_tag": "Hỏi chất liệu",
-        "product_tag": "Áo thun đen",
-        "has_phone": false
-      },
-      {
-        "id": 103,
-        "sentiment": "neutral",
-        "intent_tag": null,
-        "question_tag": null,
-        "product_tag": null,
-        "has_phone": false
-      }
+      {"id": 101, "sentiment": "neutral", "intent_tag": "Chốt đơn", "question_tag": null, "product_tag": "Áo thun đen", "has_phone": true},
+      {"id": 102, "sentiment": "neutral", "intent_tag": "Hỏi thông tin", "question_tag": "Hỏi chất liệu", "product_tag": "Áo thun đen", "has_phone": false},
+      {"id": 103, "sentiment": "neutral", "intent_tag": null, "question_tag": null, "product_tag": null, "has_phone": false},
+      {"id": 104, "sentiment": "negative", "intent_tag": "Yêu cầu hỗ trợ", "question_tag": null, "product_tag": null, "has_phone": false}
     ],
-    "session_note": "Đang bán áo thun đen. Có khách chốt đơn và hỏi chất liệu. Có chơi đoán số.",
-    "extracted_keywords": ["áo thun đen", "chất liệu", "đoán số"]
+    "session_note": "Đang bán áo thun đen. Có khách chốt đơn và hỏi chất liệu. Có chơi đoán số. 1 khiếu nại giao thiếu hàng.",
+    "extracted_keywords": ["áo thun đen", "chất liệu", "đoán số", "giao thiếu"]
   }
 </few_shot_examples>
 

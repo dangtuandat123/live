@@ -136,20 +136,11 @@ class AnalyzeCommentsJob implements ShouldQueue
             $keywords = $session->keywords->pluck('keyword')->toArray();
 
             try {
-                // Live metadata
-                $liveTitle = $session->name ?? '';
-                $streamerName = $session->tiktok_username ?? '';
-                $viewerCount = 0;
-
-                if ($session->stats) {
-                    $viewerCount = $session->stats->viewer_count ?? 0;
-                }
-
                 // === Memory: Đọc context từ batch trước ===
                 $memoryContext = $session->ai_context_summary ?? '';
 
-                // Build user message: "ID|text" per line
-                $userMessage = $commentsText->map(fn ($c) => "{$c['id']}|{$c['text']}")->join("\n");
+                // Build comment lines: "ID|text" per line
+                $commentLines = $commentsText->map(fn ($c) => "{$c['id']}|{$c['text']}")->join("\n");
 
                 Log::info('AI comment analysis start', [
                     'session_id' => $this->liveSessionId,
@@ -157,12 +148,13 @@ class AnalyzeCommentsJob implements ShouldQueue
                     'has_memory' => ! empty($memoryContext),
                 ]);
 
-                $response = (new CommentAnalyzer)
+                $analyzer = (new CommentAnalyzer)
                     ->withProducts($products)
                     ->withKeywords($keywords)
-                    ->withLiveContext($liveTitle, $streamerName, $viewerCount)
-                    ->withMemory($memoryContext)
-                    ->prompt($userMessage);
+                    ->withMemory($memoryContext);
+
+                // System prompt tĩnh (cache-friendly); toàn bộ data động đẩy vào user message.
+                $response = $analyzer->prompt($analyzer->buildUserMessage($commentLines));
 
                 // StructuredAgentResponse → array (json_decode của AI output)
                 $responseArray = $response->toArray();

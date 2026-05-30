@@ -268,12 +268,17 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
         }
 
         // Fake the agent: assert exactly 50 comments are sent and return 50 results.
-        // In a fake closure, the first argument is the prompt string itself.
+        // In a fake closure, the first argument is the prompt (user message) string.
+        // The user message now has a LIVE CONTEXT header + a comment block; count only
+        // the lines in the format "ID|text" to verify the 50-comment batch limit.
         CommentAnalyzer::fake(function ($prompt) use ($comments) {
-            $lines = explode("\n", trim($prompt));
+            $commentLines = array_filter(
+                explode("\n", $prompt),
+                fn ($line) => preg_match('/^\d+\|/', trim($line)) === 1,
+            );
 
-            // Exactly 50 lines (comments) should be sent to the AI.
-            \PHPUnit\Framework\Assert::assertCount(50, $lines);
+            // Exactly 50 comment lines should be sent to the AI.
+            \PHPUnit\Framework\Assert::assertCount(50, $commentLines);
 
             return [
                 'results' => array_map(function ($i) use ($comments) {
