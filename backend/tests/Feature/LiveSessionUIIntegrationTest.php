@@ -22,6 +22,10 @@ class LiveSessionUIIntegrationTest extends TestCase
             'name' => 'Integration Session',
             'tiktok_username' => 'test_user_show',
             'status' => 'live',
+            'ai_insights' => 'Tóm tắt AI cho phiên live.',
+            'ai_alerts' => [
+                ['type' => 'info', 'title' => 'Test', 'desc' => 'Desc', 'action' => 'Action'],
+            ],
         ]);
         $session->keywords()->create(['keyword' => 'kem']);
         $session->keywords()->create(['keyword' => 'son']);
@@ -82,7 +86,11 @@ class LiveSessionUIIntegrationTest extends TestCase
             $page->component('Lives/Show')
                 ->has('potentialCustomersCount')
                 ->has('topKeywords')
-                ->where('potentialCustomersCount', 2);
+                ->where('potentialCustomersCount', 2)
+                // AI insights/alerts must be present on the initial load so the panel
+                // doesn't flip between the AI view and the fallback view.
+                ->where('session.ai_insights', 'Tóm tắt AI cho phiên live.')
+                ->where('session.ai_alerts.0.type', 'info');
         });
 
         // Assert that potentialCustomersCount is cached

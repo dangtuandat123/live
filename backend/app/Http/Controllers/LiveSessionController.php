@@ -283,6 +283,8 @@ class LiveSessionController extends Controller
                 'started_at' => $liveSession->started_at?->toISOString(),
                 'ended_at' => $liveSession->ended_at?->toISOString(),
                 'error_message' => $liveSession->error_message,
+                'ai_insights' => $liveSession->ai_insights,
+                'ai_alerts' => $liveSession->ai_alerts,
                 'products' => $liveSession->products->map(fn ($p) => [
                     'id' => $p->id,
                     'name' => $p->name,

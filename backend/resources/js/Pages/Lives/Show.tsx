@@ -3105,6 +3105,26 @@ export default function LivesShow({
                             data.potentialCustomersCount,
                         );
                     if (data.topKeywords) setTopKeywords(data.topKeywords);
+
+                    // AI insights/alerts cập nhật độc lập với status để tránh desync
+                    // (panel AI không bị nhảy giữa bản fallback và bản AI thật).
+                    if (
+                        data.ai_insights !== undefined ||
+                        data.ai_alerts !== undefined
+                    ) {
+                        setSession((prev) => ({
+                            ...prev,
+                            ai_insights:
+                                data.ai_insights !== undefined
+                                    ? data.ai_insights
+                                    : prev.ai_insights,
+                            ai_alerts:
+                                data.ai_alerts !== undefined
+                                    ? data.ai_alerts
+                                    : prev.ai_alerts,
+                        }));
+                    }
+
                     if (data.status) {
                         setSession((prev) => ({
                             ...prev,
@@ -3115,14 +3135,6 @@ export default function LivesShow({
                                     ? (data.error_message ?? prev.error_message)
                                     : prev.error_message,
                             duration: data.duration ?? prev.duration,
-                            ai_insights:
-                                data.ai_insights !== undefined
-                                    ? data.ai_insights
-                                    : prev.ai_insights,
-                            ai_alerts:
-                                data.ai_alerts !== undefined
-                                    ? data.ai_alerts
-                                    : prev.ai_alerts,
                         }));
                     }
                 } else {
