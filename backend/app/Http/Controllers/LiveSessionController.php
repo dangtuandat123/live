@@ -11,7 +11,6 @@ use App\Models\LiveSession;
 use App\Models\LiveSessionStatsHistory;
 use App\Models\LiveStat;
 use App\Models\Product;
-use App\Services\RunwareAiService;
 use App\Services\TikTokService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
@@ -282,7 +281,6 @@ class LiveSessionController extends Controller
                 'started_at' => $liveSession->started_at?->toISOString(),
                 'ended_at' => $liveSession->ended_at?->toISOString(),
                 'error_message' => $liveSession->error_message,
-                'last_audio_cues' => $liveSession->last_audio_cues,
                 'products' => $liveSession->products->map(fn ($p) => [
                     'id' => $p->id,
                     'name' => $p->name,
@@ -384,7 +382,7 @@ class LiveSessionController extends Controller
     /**
      * Refresh AI insights manually.
      */
-    public function refreshInsights(Request $request, LiveSession $liveSession, RunwareAiService $runware)
+    public function refreshInsights(Request $request, LiveSession $liveSession)
     {
         if ($liveSession->user_id !== $request->user()->id) {
             abort(403);
@@ -463,20 +461,15 @@ class LiveSessionController extends Controller
 
         $userMessage = json_encode($inputData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
-        $analyzer = (new LiveSessionAnalyzer)
-            ->withComments($comments)
-            ->withStats($stats)
-            ->withProducts($products)
-            ->withKeywords($keywords)
-            ->withOldMemory($oldMemory);
-
         try {
-            $response = $runware->chatJson(
-                systemPrompt: $analyzer->instructions(),
-                userMessage: $userMessage,
-                temperature: 0,
-                maxTokens: 4096,
-            );
+            $response = (new LiveSessionAnalyzer)
+                ->withComments($comments)
+                ->withStats($stats)
+                ->withProducts($products)
+                ->withKeywords($keywords)
+                ->withOldMemory($oldMemory)
+                ->prompt($userMessage)
+                ->toArray();
         } catch (\Throwable $e) {
             Log::error('Failed to refresh AI insights: '.$e->getMessage());
 
@@ -595,7 +588,6 @@ class LiveSessionController extends Controller
                 'topKeywords' => $topKeywords,
                 'ai_insights' => $liveSession->ai_insights,
                 'ai_alerts' => $liveSession->ai_alerts,
-                'last_audio_cues' => $liveSession->last_audio_cues,
             ]);
         }
 
@@ -655,7 +647,6 @@ class LiveSessionController extends Controller
                             'statsHistory' => $this->getFormattedStatsHistory($liveSession),
                             'potentialCustomersCount' => $this->getPotentialCustomersCount($liveSession),
                             'topKeywords' => $this->getTopKeywords($liveSession),
-                            'last_audio_cues' => $liveSession->last_audio_cues,
                         ]);
                     }
                 } catch (\Exception $restartException) {
@@ -725,7 +716,6 @@ class LiveSessionController extends Controller
             'topKeywords' => $topKeywords,
             'ai_insights' => $liveSession->ai_insights,
             'ai_alerts' => $liveSession->ai_alerts,
-            'last_audio_cues' => $liveSession->last_audio_cues,
         ]);
     }
 

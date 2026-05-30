@@ -3,13 +3,11 @@
 namespace Tests\Feature;
 
 use App\Ai\Agents\CommentAnalyzer;
+use App\Ai\Agents\LiveSessionAnalyzer;
 use App\Jobs\AnalyzeCommentsJob;
 use App\Models\LiveEvent;
 use App\Models\LiveSession;
-use App\Models\SubscriptionPackage;
 use App\Models\User;
-use App\Services\RunwareAiService;
-use App\Services\TikTokService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -17,6 +15,16 @@ use Tests\TestCase;
 class AnalyzeCommentsJobTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * Fake the LiveSessionAnalyzer so the job's auto-insights step never hits the network.
+     */
+    private function fakeInsights(): void
+    {
+        LiveSessionAnalyzer::fake([
+            ['summary' => 'Auto insight summary.', 'alerts' => []],
+        ]);
+    }
 
     public function test_it_analyzes_comments_and_saves_ai_tags(): void
     {
@@ -48,41 +56,31 @@ class AnalyzeCommentsJobTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        // 2. Mock RunwareAiService — now uses chatMultimodal instead of chatJson
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment1, $comment2) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->andReturn([
-                    'results' => [
-                        [
-                            'id' => $comment1->id,
-                            'sentiment' => 'neutral',
-                            'intent_tag' => 'Chốt đơn',
-                            'question_tag' => null,
-                            'product_tag' => null,
-                            'has_phone' => false,
-                        ],
-                        [
-                            'id' => $comment2->id,
-                            'sentiment' => 'neutral',
-                            'intent_tag' => 'Chốt đơn',
-                            'question_tag' => null,
-                            'product_tag' => null,
-                            'has_phone' => false,
-                        ],
+        // 2. Fake the CommentAnalyzer agent (Laravel AI SDK)
+        CommentAnalyzer::fake([
+            [
+                'results' => [
+                    [
+                        'id' => $comment1->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => 'Chốt đơn',
+                        'question_tag' => null,
+                        'product_tag' => null,
+                        'has_phone' => false,
                     ],
-                    'session_note' => 'Đang bán sản phẩm, có 2 khách chốt đơn.',
-                ]);
-        });
-
-        // Mock TikTokService — getSnapshot returns no audio (graceful fallback)
-        $this->mock(TikTokService::class, function ($mock) {
-            $mock->shouldReceive('getSnapshot')->andReturn([
-                'audio_b64' => null,
-                'image_b64' => null,
-                'title' => 'Test',
-            ]);
-        });
+                    [
+                        'id' => $comment2->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => 'Chốt đơn',
+                        'question_tag' => null,
+                        'product_tag' => null,
+                        'has_phone' => false,
+                    ],
+                ],
+                'session_note' => 'Đang bán sản phẩm, có 2 khách chốt đơn.',
+            ],
+        ]);
+        $this->fakeInsights();
 
         // 3. Run job
         $job = new AnalyzeCommentsJob($session->id);
@@ -102,154 +100,30 @@ class AnalyzeCommentsJobTest extends TestCase
             'sentiment' => 'neutral',
             'ai_processed' => true,
         ]);
+
+        CommentAnalyzer::assertPrompted(fn ($prompt) => $prompt->contains((string) $comment1->id));
     }
 
     public function test_system_prompts_contain_key_instructions(): void
     {
-        // 1. Check CommentAnalyzer agent instructions (unchanged — used by Laravel AI SDK agent)
-        $analyzer = new CommentAnalyzer;
+        // CommentAnalyzer agent instructions must carry the core classification rules.
+        $analyzer = (new CommentAnalyzer)
+            ->withProducts([])
+            ->withKeywords([]);
         $instructions = $analyzer->instructions();
 
         $this->assertStringContainsString('Chốt đơn', $instructions);
         $this->assertStringContainsString('cú pháp đặt hàng', $instructions);
+        $this->assertStringContainsString('session_note', $instructions);
+        $this->assertStringContainsString('extracted_keywords', $instructions);
 
-        // 2. Check AnalyzeCommentsJob system prompt includes session_note + audio section
-        $user = User::factory()->create();
-        $session = LiveSession::create([
-            'user_id' => $user->id,
-            'name' => 'Test Session',
-            'status' => 'live',
-            'tiktok_username' => 'testuser',
-        ]);
+        // Memory context must be embedded into the instructions when provided.
+        $withMemory = (new CommentAnalyzer)
+            ->withMemory('Đang bán áo thun, nhiều người hỏi size M.')
+            ->instructions();
 
-        $comment = LiveEvent::create([
-            'live_session_id' => $session->id,
-            'event_type' => 'comment',
-            'event_at' => now(),
-            'tiktok_user_id' => 'user_1',
-            'data' => ['comment' => 'Mã 2'],
-            'ai_processed' => false,
-        ]);
-
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->withArgs(function ($systemPrompt, $parts) {
-                    $hasChotDon = str_contains($systemPrompt, 'Chốt đơn');
-                    $hasCuPhap = str_contains($systemPrompt, 'cú pháp đặt hàng');
-                    $hasSessionNote = str_contains($systemPrompt, 'session_note');
-
-                    return $hasChotDon && $hasCuPhap && $hasSessionNote;
-                })
-                ->andReturn([
-                    'results' => [
-                        [
-                            'id' => $comment->id,
-                            'sentiment' => 'neutral',
-                            'intent_tag' => 'Chốt đơn',
-                            'question_tag' => null,
-                            'product_tag' => null,
-                            'has_phone' => false,
-                        ],
-                    ],
-                    'session_note' => 'Batch đầu tiên, có 1 chốt đơn.',
-                ]);
-        });
-
-        $this->mock(TikTokService::class, function ($mock) {
-            $mock->shouldReceive('getSnapshot')->andReturn([
-                'audio_b64' => null,
-                'image_b64' => null,
-                'title' => 'Test',
-            ]);
-        });
-
-        $job = new AnalyzeCommentsJob($session->id);
-        app()->call([$job, 'handle']);
-    }
-
-    public function test_audio_fallback_to_text_only(): void
-    {
-        // When TikTokService::getSnapshot throws exception, job should still work (text-only fallback)
-        $user = User::factory()->create();
-        $package = SubscriptionPackage::create([
-            'name' => 'Premium',
-            'price' => 299000,
-            'duration_days' => 30,
-            'features' => [
-                'audio_analysis' => true,
-                'limit_streams' => -1,
-                'max_duration_hours' => 24,
-                'ai_credits' => -1,
-            ],
-        ]);
-        $user->subscriptions()->create([
-            'subscription_package_id' => $package->id,
-            'starts_at' => now(),
-            'expires_at' => now()->addDays(30),
-            'status' => 'active',
-            'used_ai_credits' => 0,
-        ]);
-
-        $session = LiveSession::create([
-            'user_id' => $user->id,
-            'name' => 'Audio Fallback Test',
-            'status' => 'live',
-            'tiktok_username' => 'testuser',
-            'tiktok_session_id' => 'fake-session-id',
-        ]);
-
-        $comment = LiveEvent::create([
-            'live_session_id' => $session->id,
-            'event_type' => 'comment',
-            'event_at' => now(),
-            'tiktok_user_id' => 'user_1',
-            'data' => ['comment' => 'cho em hỏi giá'],
-            'ai_processed' => false,
-        ]);
-
-        $this->mock(TikTokService::class, function ($mock) {
-            // Simulate FFmpeg/network failure
-            $mock->shouldReceive('getSnapshot')
-                ->once()
-                ->andThrow(new \RuntimeException('FFmpeg timeout'));
-        });
-
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->withArgs(function ($systemPrompt, $parts) {
-                    // Should NOT have audio section in prompt since audio failed
-                    $hasAudioSection = str_contains($systemPrompt, 'AUDIO LIVESTREAM');
-                    // Parts should only contain text, no audio
-                    $hasOnlyTextPart = count($parts) === 1 && $parts[0]['type'] === 'text';
-
-                    return ! $hasAudioSection && $hasOnlyTextPart;
-                })
-                ->andReturn([
-                    'results' => [
-                        [
-                            'id' => $comment->id,
-                            'sentiment' => 'neutral',
-                            'intent_tag' => 'Hỏi thông tin',
-                            'question_tag' => 'Hỏi giá',
-                            'product_tag' => null,
-                            'has_phone' => false,
-                        ],
-                    ],
-                    'session_note' => 'Có khách hỏi giá.',
-                ]);
-        });
-
-        $job = new AnalyzeCommentsJob($session->id);
-        app()->call([$job, 'handle']);
-
-        $this->assertDatabaseHas('live_events', [
-            'id' => $comment->id,
-            'intent_tag' => 'Hỏi thông tin',
-            'question_tag' => 'Hỏi giá',
-            'ai_processed' => true,
-        ]);
+        $this->assertStringContainsString('SESSION MEMORY', $withMemory);
+        $this->assertStringContainsString('Đang bán áo thun, nhiều người hỏi size M.', $withMemory);
     }
 
     public function test_memory_is_saved_and_loaded(): void
@@ -273,25 +147,22 @@ class AnalyzeCommentsJobTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        $this->mock(TikTokService::class);
-
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment1) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->andReturn([
-                    'results' => [
-                        [
-                            'id' => $comment1->id,
-                            'sentiment' => 'neutral',
-                            'intent_tag' => 'Hỏi thông tin',
-                            'question_tag' => 'Hỏi size',
-                            'product_tag' => null,
-                            'has_phone' => false,
-                        ],
+        CommentAnalyzer::fake([
+            [
+                'results' => [
+                    [
+                        'id' => $comment1->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => 'Hỏi thông tin',
+                        'question_tag' => 'Hỏi size',
+                        'product_tag' => null,
+                        'has_phone' => false,
                     ],
-                    'session_note' => 'Đang bán áo thun, nhiều người hỏi size M.',
-                ]);
-        });
+                ],
+                'session_note' => 'Đang bán áo thun, nhiều người hỏi size M.',
+            ],
+        ]);
+        $this->fakeInsights();
 
         $job1 = new AnalyzeCommentsJob($session->id);
         app()->call([$job1, 'handle']);
@@ -300,7 +171,7 @@ class AnalyzeCommentsJobTest extends TestCase
         $session->refresh();
         $this->assertEquals('Đang bán áo thun, nhiều người hỏi size M.', $session->ai_context_summary);
 
-        // --- Batch 2: AI receives memory from batch 1 ---
+        // --- Batch 2: AI receives memory from batch 1 (embedded in instructions) ---
         $comment2 = LiveEvent::create([
             'live_session_id' => $session->id,
             'event_type' => 'comment',
@@ -310,31 +181,21 @@ class AnalyzeCommentsJobTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        // Re-mock services for batch 2
-        $this->mock(TikTokService::class);
-
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment2) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->withArgs(function ($systemPrompt, $parts) {
-                    // Prompt should contain memory from batch 1
-                    return str_contains($systemPrompt, 'Đang bán áo thun, nhiều người hỏi size M.')
-                        && str_contains($systemPrompt, 'SESSION MEMORY');
-                })
-                ->andReturn([
-                    'results' => [
-                        [
-                            'id' => $comment2->id,
-                            'sentiment' => 'neutral',
-                            'intent_tag' => 'Chốt đơn',
-                            'question_tag' => null,
-                            'product_tag' => null,
-                            'has_phone' => false,
-                        ],
+        CommentAnalyzer::fake([
+            [
+                'results' => [
+                    [
+                        'id' => $comment2->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => 'Chốt đơn',
+                        'question_tag' => null,
+                        'product_tag' => null,
+                        'has_phone' => false,
                     ],
-                    'session_note' => 'Tiếp tục bán áo thun, có thêm 1 chốt đơn Mã 3.',
-                ]);
-        });
+                ],
+                'session_note' => 'Tiếp tục bán áo thun, có thêm 1 chốt đơn Mã 3.',
+            ],
+        ]);
 
         $job2 = new AnalyzeCommentsJob($session->id);
         app()->call([$job2, 'handle']);
@@ -348,93 +209,6 @@ class AnalyzeCommentsJobTest extends TestCase
             'id' => $comment2->id,
             'intent_tag' => 'Chốt đơn',
             'ai_processed' => true,
-        ]);
-    }
-
-    public function test_audio_present_adds_audio_section_and_part(): void
-    {
-        $user = User::factory()->create();
-        $package = SubscriptionPackage::create([
-            'name' => 'Premium',
-            'price' => 299000,
-            'duration_days' => 30,
-            'features' => [
-                'audio_analysis' => true,
-                'limit_streams' => -1,
-                'max_duration_hours' => 24,
-                'ai_credits' => -1,
-            ],
-        ]);
-        $user->subscriptions()->create([
-            'subscription_package_id' => $package->id,
-            'starts_at' => now(),
-            'expires_at' => now()->addDays(30),
-            'status' => 'active',
-            'used_ai_credits' => 0,
-        ]);
-
-        $session = LiveSession::create([
-            'user_id' => $user->id,
-            'name' => 'Audio Present Test',
-            'status' => 'live',
-            'tiktok_username' => 'testuser',
-            'tiktok_session_id' => 'real-session-id',
-        ]);
-
-        $comment = LiveEvent::create([
-            'live_session_id' => $session->id,
-            'event_type' => 'comment',
-            'event_at' => now(),
-            'tiktok_user_id' => 'user_1',
-            'data' => ['comment' => 'cái này bao nhiêu'],
-            'ai_processed' => false,
-        ]);
-
-        // Mock TikTokService returns actual audio
-        $this->mock(TikTokService::class, function ($mock) {
-            $mock->shouldReceive('getSnapshot')
-                ->once()
-                ->andReturn([
-                    'audio_b64' => base64_encode('fake-audio-data'),
-                    'image_b64' => null,
-                    'title' => 'Test Live',
-                ]);
-        });
-
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->withArgs(function ($systemPrompt, $parts) {
-                    // Prompt MUST have audio section
-                    $hasAudioSection = str_contains($systemPrompt, 'AUDIO LIVESTREAM');
-                    // Parts MUST have 2 elements: text + audio
-                    $hasTwoParts = count($parts) === 2;
-                    $hasAudioPart = $parts[1]['type'] === 'input_audio';
-
-                    return $hasAudioSection && $hasTwoParts && $hasAudioPart;
-                })
-                ->andReturn([
-                    'results' => [
-                        [
-                            'id' => $comment->id,
-                            'sentiment' => 'neutral',
-                            'intent_tag' => 'Hỏi thông tin',
-                            'question_tag' => 'Hỏi giá',
-                            'product_tag' => null,
-                            'has_phone' => false,
-                        ],
-                    ],
-                    'session_note' => 'Streamer đang giới thiệu sản phẩm.',
-                ]);
-        });
-
-        $job = new AnalyzeCommentsJob($session->id);
-        app()->call([$job, 'handle']);
-
-        $this->assertDatabaseHas('live_events', [
-            'id' => $comment->id,
-            'ai_processed' => true,
-            'intent_tag' => 'Hỏi thông tin',
         ]);
     }
 
@@ -460,25 +234,22 @@ class AnalyzeCommentsJobTest extends TestCase
 
         $longNote = str_repeat('A', 1000); // 1000 chars
 
-        $this->mock(TikTokService::class);
-
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment, $longNote) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->andReturn([
-                    'results' => [
-                        [
-                            'id' => $comment->id,
-                            'sentiment' => 'neutral',
-                            'intent_tag' => null,
-                            'question_tag' => null,
-                            'product_tag' => null,
-                            'has_phone' => false,
-                        ],
+        CommentAnalyzer::fake([
+            [
+                'results' => [
+                    [
+                        'id' => $comment->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => null,
+                        'question_tag' => null,
+                        'product_tag' => null,
+                        'has_phone' => false,
                     ],
-                    'session_note' => $longNote,
-                ]);
-        });
+                ],
+                'session_note' => $longNote,
+            ],
+        ]);
+        $this->fakeInsights();
 
         $job = new AnalyzeCommentsJob($session->id);
         app()->call([$job, 'handle']);
@@ -507,30 +278,28 @@ class AnalyzeCommentsJobTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        $this->mock(TikTokService::class);
-
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->andReturn([
-                    'results' => [
-                        [
-                            'id' => $comment->id,
-                            'sentiment' => 'neutral',
-                            'intent_tag' => null,
-                            'question_tag' => null,
-                            'product_tag' => null,
-                            'has_phone' => false,
-                        ],
+        CommentAnalyzer::fake([
+            [
+                'results' => [
+                    [
+                        'id' => $comment->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => null,
+                        'question_tag' => null,
+                        'product_tag' => null,
+                        'has_phone' => false,
                     ],
-                    // AI hallucinate: session_note is array instead of string
-                    'session_note' => ['key' => 'value'],
-                ]);
-        });
+                ],
+                // AI hallucinate: session_note is array instead of string
+                'session_note' => ['key' => 'value'],
+            ],
+        ]);
+        $this->fakeInsights();
 
         $job = new AnalyzeCommentsJob($session->id);
         app()->call([$job, 'handle']);
 
+        $session->refresh();
         $this->assertNull($session->ai_context_summary);
     }
 
@@ -569,11 +338,8 @@ class AnalyzeCommentsJobTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        // Mock services
-        $this->mock(TikTokService::class);
-        $this->mock(RunwareAiService::class, function ($mock) {
-            $mock->shouldNotReceive('chatMultimodal');
-        });
+        // The agent must never be prompted for an all-empty batch.
+        CommentAnalyzer::fake();
 
         $job = new AnalyzeCommentsJob($session->id);
         app()->call([$job, 'handle']);
@@ -588,6 +354,8 @@ class AnalyzeCommentsJobTest extends TestCase
         // Assert the valid comment is still unprocessed
         $validComment->refresh();
         $this->assertFalse((bool) $validComment->ai_processed);
+
+        CommentAnalyzer::assertNeverPrompted();
 
         // Assert next job was dispatched to continue pipeline
         Queue::assertPushed(AnalyzeCommentsJob::class, function ($job) use ($session) {
@@ -633,9 +401,8 @@ class AnalyzeCommentsJobTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        $this->mock(TikTokService::class);
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment1, $comment2, $comment3) {
-            $mock->shouldReceive('chatMultimodal')->andReturn([
+        CommentAnalyzer::fake([
+            [
                 'results' => [
                     [
                         'id' => $comment1->id,
@@ -663,8 +430,9 @@ class AnalyzeCommentsJobTest extends TestCase
                     ],
                 ],
                 'session_note' => 'Stats batch summary.',
-            ]);
-        });
+            ],
+        ]);
+        $this->fakeInsights();
 
         $job = new AnalyzeCommentsJob($session->id);
         app()->call([$job, 'handle']);
@@ -697,9 +465,8 @@ class AnalyzeCommentsJobTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        $this->mock(TikTokService::class);
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment4, $comment5) {
-            $mock->shouldReceive('chatMultimodal')->andReturn([
+        CommentAnalyzer::fake([
+            [
                 'results' => [
                     [
                         'id' => $comment4->id,
@@ -719,8 +486,8 @@ class AnalyzeCommentsJobTest extends TestCase
                     ],
                 ],
                 'session_note' => 'Second batch summary.',
-            ]);
-        });
+            ],
+        ]);
 
         $job2 = new AnalyzeCommentsJob($session->id);
         app()->call([$job2, 'handle']);
@@ -767,11 +534,9 @@ class AnalyzeCommentsJobTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        $this->mock(TikTokService::class);
-        $this->mock(RunwareAiService::class, function ($mock) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->andThrow(new \RuntimeException('AI Response has invalid structure'));
+        // Fake the agent to throw an unrecoverable exception
+        CommentAnalyzer::fake(function () {
+            throw new \RuntimeException('AI Response has invalid structure');
         });
 
         $job = new AnalyzeCommentsJob($session->id);
@@ -822,25 +587,23 @@ class AnalyzeCommentsJobTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        $this->mock(TikTokService::class);
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->andReturn([
-                    'results' => [
-                        [
-                            'id' => $comment->id,
-                            'sentiment' => 'neutral',
-                            'intent_tag' => null,
-                            'question_tag' => null,
-                            'product_tag' => null,
-                            'has_phone' => false,
-                        ],
+        CommentAnalyzer::fake([
+            [
+                'results' => [
+                    [
+                        'id' => $comment->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => null,
+                        'question_tag' => null,
+                        'product_tag' => null,
+                        'has_phone' => false,
                     ],
-                    'session_note' => 'Notes',
-                    'extracted_keywords' => ['áo thun', 'giá rẻ', 'size l'],
-                ]);
-        });
+                ],
+                'session_note' => 'Notes',
+                'extracted_keywords' => ['áo thun', 'giá rẻ', 'size l'],
+            ],
+        ]);
+        $this->fakeInsights();
 
         $job = new AnalyzeCommentsJob($session->id);
         app()->call([$job, 'handle']);
@@ -873,32 +636,30 @@ class AnalyzeCommentsJobTest extends TestCase
             $session->keywords()->create(['keyword' => "existing{$i}"]);
         }
 
-        $this->mock(TikTokService::class);
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->andReturn([
-                    'results' => [
-                        [
-                            'id' => $comment->id,
-                            'sentiment' => 'neutral',
-                            'intent_tag' => null,
-                            'question_tag' => null,
-                            'product_tag' => null,
-                            'has_phone' => false,
-                        ],
+        CommentAnalyzer::fake([
+            [
+                'results' => [
+                    [
+                        'id' => $comment->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => null,
+                        'question_tag' => null,
+                        'product_tag' => null,
+                        'has_phone' => false,
                     ],
-                    'session_note' => 'Notes',
-                    'extracted_keywords' => [
-                        'EXISTING1', // existing, should be ignored (case insensitive)
-                        '  new1  ',   // new, should be trimmed and lowercased
-                        'new2',       // new, should be lowercased
-                        'new3',       // new, but should exceed limit (since 28 + 2 = 30)
-                        '',           // empty, should be ignored
-                        'new2',       // duplicate in the same batch, should be ignored
-                    ],
-                ]);
-        });
+                ],
+                'session_note' => 'Notes',
+                'extracted_keywords' => [
+                    'EXISTING1', // existing, should be ignored (case insensitive)
+                    '  new1  ',   // new, should be trimmed and lowercased
+                    'new2',       // new, should be lowercased
+                    'new3',       // new, but should exceed limit (since 28 + 2 = 30)
+                    '',           // empty, should be ignored
+                    'new2',       // duplicate in the same batch, should be ignored
+                ],
+            ],
+        ]);
+        $this->fakeInsights();
 
         $job = new AnalyzeCommentsJob($session->id);
         app()->call([$job, 'handle']);
@@ -940,32 +701,30 @@ class AnalyzeCommentsJobTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        $this->mock(TikTokService::class);
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment1, $comment2) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->andReturn([
-                    'results' => [
-                        [
-                            'id' => $comment1->id,
-                            'sentiment' => 'neutral',
-                            'intent_tag' => 'Hỏi thông tin',
-                            'question_tag' => 'Hỏi công dụng',
-                            'product_tag' => null,
-                            'has_phone' => false,
-                        ],
-                        [
-                            'id' => $comment2->id,
-                            'sentiment' => 'neutral',
-                            'intent_tag' => 'Hỏi thông tin',
-                            'question_tag' => 'Hỏi tồn kho',
-                            'product_tag' => null,
-                            'has_phone' => false,
-                        ],
+        CommentAnalyzer::fake([
+            [
+                'results' => [
+                    [
+                        'id' => $comment1->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => 'Hỏi thông tin',
+                        'question_tag' => 'Hỏi công dụng',
+                        'product_tag' => null,
+                        'has_phone' => false,
                     ],
-                    'session_note' => 'Khách hỏi thăm sản phẩm và tồn kho giỏ hàng.',
-                ]);
-        });
+                    [
+                        'id' => $comment2->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => 'Hỏi thông tin',
+                        'question_tag' => 'Hỏi tồn kho',
+                        'product_tag' => null,
+                        'has_phone' => false,
+                    ],
+                ],
+                'session_note' => 'Khách hỏi thăm sản phẩm và tồn kho giỏ hàng.',
+            ],
+        ]);
+        $this->fakeInsights();
 
         $job = new AnalyzeCommentsJob($session->id);
         app()->call([$job, 'handle']);

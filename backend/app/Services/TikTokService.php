@@ -88,7 +88,7 @@ class TikTokService
     }
 
     /**
-     * Capture snapshot (ảnh + audio) từ live stream cho AI phân tích.
+     * Capture snapshot (ảnh) từ live stream để dùng làm thumbnail.
      *
      * @return array{image_b64: ?string, audio_b64: ?string, title: ?string}|null
      */

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Ai\Agents\CommentAnalyzer;
 use App\Jobs\AnalyzeCommentsJob;
 use App\Models\LiveEvent;
 use App\Models\LiveSession;
@@ -9,7 +10,6 @@ use App\Models\PaymentConfig;
 use App\Models\SubscriptionPackage;
 use App\Models\Transaction;
 use App\Models\User;
-use App\Services\RunwareAiService;
 use App\Services\TikTokService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -155,11 +155,8 @@ class SubscriptionGatingTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        // Mock TikTokService and RunwareAiService so they don't do real work
-        $this->mock(TikTokService::class);
-        $this->mock(RunwareAiService::class, function ($mock) {
-            $mock->shouldNotReceive('chatMultimodal');
-        });
+        // The agent must never be prompted when credits are exhausted.
+        CommentAnalyzer::fake();
 
         $job = new AnalyzeCommentsJob($session->id);
         app()->call([$job, 'handle']);
@@ -168,10 +165,14 @@ class SubscriptionGatingTest extends TestCase
 
         $this->assertEquals('error', $session->status);
         $this->assertEquals('Đã hết tín dụng AI của gói dịch vụ.', $session->error_message);
+
+        CommentAnalyzer::assertNeverPrompted();
     }
 
-    public function test_audio_analysis_gating()
+    public function test_text_only_analysis_runs_without_audio()
     {
+        // Audio analysis was removed; the job is now always text-only regardless of the
+        // audio_analysis feature flag. This verifies comments are still analyzed via the SDK.
         $user = User::factory()->create();
         $package = SubscriptionPackage::create([
             'name' => 'Trial Package',
@@ -181,7 +182,7 @@ class SubscriptionGatingTest extends TestCase
                 'limit_streams' => 1,
                 'max_duration_hours' => 1,
                 'ai_credits' => 1000,
-                'audio_analysis' => false, // Gated
+                'audio_analysis' => false,
                 'export_leads' => false,
             ],
         ]);
@@ -196,7 +197,7 @@ class SubscriptionGatingTest extends TestCase
 
         $session = LiveSession::create([
             'user_id' => $user->id,
-            'name' => 'Audio Gated Session',
+            'name' => 'Text Only Session',
             'tiktok_username' => 'user1',
             'status' => 'live',
             'tiktok_session_id' => 'dummy-tiktok-session',
@@ -211,31 +212,34 @@ class SubscriptionGatingTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        $this->mock(TikTokService::class, function ($mock) {
-            // Should NEVER be called because audio_analysis is false
-            $mock->shouldNotReceive('getSnapshot');
-        });
-
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->andReturn([
-                    'results' => [
-                        [
-                            'id' => $comment->id,
-                            'sentiment' => 'neutral',
-                            'intent_tag' => null,
-                            'question_tag' => null,
-                            'product_tag' => null,
-                            'has_phone' => false,
-                        ],
+        CommentAnalyzer::fake([
+            [
+                'results' => [
+                    [
+                        'id' => $comment->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => null,
+                        'question_tag' => null,
+                        'product_tag' => null,
+                        'has_phone' => false,
                     ],
-                    'session_note' => 'No audio used.',
-                ]);
-        });
+                ],
+                'session_note' => 'No audio used.',
+            ],
+        ]);
+        \App\Ai\Agents\LiveSessionAnalyzer::fake([
+            ['summary' => 'Auto insight summary.', 'alerts' => []],
+        ]);
 
         $job = new AnalyzeCommentsJob($session->id);
         app()->call([$job, 'handle']);
+
+        $this->assertDatabaseHas('live_events', [
+            'id' => $comment->id,
+            'ai_processed' => true,
+        ]);
+
+        CommentAnalyzer::assertPrompted(fn ($prompt) => $prompt->contains((string) $comment->id));
     }
 
     public function test_inertia_props_sharing()

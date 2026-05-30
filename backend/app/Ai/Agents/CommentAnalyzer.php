@@ -25,6 +25,14 @@ class CommentAnalyzer implements Agent, HasStructuredOutput
     /** @var list<string> */
     private array $trackingKeywords = [];
 
+    private string $liveTitle = '';
+
+    private string $streamerName = '';
+
+    private int $viewerCount = 0;
+
+    private string $memoryContext = '';
+
     public function withProducts(array $products): static
     {
         $this->products = $products;
@@ -35,6 +43,22 @@ class CommentAnalyzer implements Agent, HasStructuredOutput
     public function withKeywords(array $keywords): static
     {
         $this->trackingKeywords = $keywords;
+
+        return $this;
+    }
+
+    public function withLiveContext(string $liveTitle = '', string $streamerName = '', int $viewerCount = 0): static
+    {
+        $this->liveTitle = $liveTitle;
+        $this->streamerName = $streamerName;
+        $this->viewerCount = $viewerCount;
+
+        return $this;
+    }
+
+    public function withMemory(string $memoryContext): static
+    {
+        $this->memoryContext = $memoryContext;
 
         return $this;
     }
@@ -51,13 +75,28 @@ class CommentAnalyzer implements Agent, HasStructuredOutput
 
         $keywordList = implode(', ', $this->trackingKeywords);
 
+        $liveContext = '';
+        if ($this->liveTitle || $this->streamerName) {
+            $liveContext = "\n- Livestream info: Title = \"{$this->liveTitle}\", Host = \"{$this->streamerName}\", Current active viewers = {$this->viewerCount}";
+        }
+
+        // Memory section — ngữ cảnh từ batch phân tích trước
+        $memorySection = '';
+        if (! empty($this->memoryContext)) {
+            $memorySection = <<<MEM
+
+=== SESSION MEMORY (CONTEXT FROM PREVIOUS BATCH) ===
+{$this->memoryContext}
+MEM;
+        }
+
         return <<<PROMPT
-You are a senior analyst specializing in customer behavior on Vietnamese e-commerce livestreams. Your task is to read a batch of comments from a TikTok live chat and classify each comment.
+You are a senior analyst specializing in customer behavior on Vietnamese e-commerce livestreams. Your task is to read a batch of comments from a TikTok live chat, look at the history, and classify each comment while extracting keywords and session notes.
 
 <context>
 This is a live shopping session on TikTok in Vietnam. Viewers interact, play minigames, ask questions, and buy products.
 - Registered Products: {$productContext}
-- Tracked Keywords: {$keywordList}
+- Tracked Keywords: {$keywordList}{$liveContext}{$memorySection}
 </context>
 
 <rules>
@@ -87,6 +126,12 @@ Analyze each comment individually and map to the following schema properties:
 
 5. **has_phone**:
    - true if the comment contains a continuous sequence of 9-11 digits (Vietnamese phone number format). Otherwise, false.
+
+6. **session_note**:
+   - Write a short summary note (maximum 300 characters) in Vietnamese about the current livestream's status to help the next batch analyzer maintain context. E.g., "Đang bán Áo thun đen, nhiều người hỏi size. Có minigame đoán số đang chạy. Streamer vừa chuyển sang giới thiệu Váy đỏ."
+
+7. **extracted_keywords**:
+   - Extract a list of up to 5 prominent keywords from this batch of comments. Keywords must be in lowercase, short (1-3 words), and relate to products, pricing, quality, or common user queries.
 </rules>
 
 <reasoning_process>
@@ -95,50 +140,54 @@ For each comment:
 2. Determine if it is a purchase request ("Chốt đơn"), a question/consultation request ("Hỏi thông tin"), usage feedback ("Phản hồi SP"), post-purchase issue ("Yêu cầu hỗ trợ"), or general chat/minigame guess (null).
 3. Evaluate the sentiment (positive, neutral, negative) strictly applying the CRITICAL RULE for questions.
 4. Extract phone numbers and map products if present.
-5. Format the output as JSON.
+5. Compile the session note and extract lowercase keywords based on the entire comment batch and session memory context.
+6. Format the output as JSON.
 </reasoning_process>
 
 <few_shot_examples>
 Example 1:
-- Input comment: "Chốt em 2 cái size L màu đen 0987654321"
+- Input comments batch:
+  101|chốt đơn áo thun đen size L 0912000111
+  102|áo thun đen vải gì vậy shop
+  103|34
 - Reasoning:
-  * Intent: The phrase "Chốt em" followed by quantity, size, color, and phone number indicates a clear order request. Tag: "Chốt đơn".
-  * Sentiment: Informative order, no emotional expression. Tag: "neutral".
-  * Question: Not a question. Tag: null.
-  * Phone: Contains "0987654321" (10 digits). Tag: true.
-  * Product: Matches standard red/black clothes context if available, otherwise null.
+  * comment 101: Intent is "Chốt đơn" (buying intent + size + phone number). Sentiment is "neutral". has_phone is true.
+  * comment 102: Intent is "Hỏi thông tin" (asking about material). Sentiment is "neutral". question_tag is "Hỏi chất liệu". product_tag matches "Áo thun đen".
+  * comment 103: Intent is null (minigame number guess). Sentiment is "neutral".
+  * session_note: "Đang bán áo thun đen. Có khách chốt đơn và hỏi chất liệu. Có chơi đoán số."
+  * extracted_keywords: ["áo thun đen", "chất liệu", "đoán số"]
 
-Example 2:
-- Input comment: "hàng dùng sướng lắm shop ơi, mịn da cực kì"
-- Reasoning:
-  * Intent: Feedback on product usage. Tag: "Phản hồi SP".
-  * Sentiment: Highly positive praise ("dùng sướng lắm", "mịn da"). Tag: "positive".
-  * Question: Not a question. Tag: null.
-  * Phone: None. Tag: false.
-
-Example 3:
-- Input comment: "sao mình dùng mặt bị mẩn đỏ ngứa thế shop? bôi cái này như nào ạ"
-- Reasoning:
-  * Intent: Asking about product usage instructions and reaction. Tag: "Hỏi thông tin".
-  * Sentiment: Even though they mention skin irritation, they are asking for instructions politely ("như nào ạ"). Classified as "neutral".
-  * Question: Question about usage. Tag: "Hỏi công dụng".
-  * Phone: None. Tag: false.
-
-Example 4:
-- Input comment: "shop lừa đảo giao thiếu hàng của mình rồi, nhắn tin không rep bực mình quá"
-- Reasoning:
-  * Intent: Post-sale complaint about missing items. Tag: "Yêu cầu hỗ trợ".
-  * Sentiment: Expresses anger and severe complaint ("lừa đảo", "bực mình"). Tag: "negative".
-  * Question: Not a question. Tag: null.
-  * Phone: None. Tag: false.
-
-Example 5:
-- Input comment: "chào shop nha" or "99"
-- Reasoning:
-  * Intent: Social greeting or minigame number guessing. Tag: null.
-  * Sentiment: Neutral. Tag: "neutral".
-  * Question: Not a question. Tag: null.
-  * Phone: None. Tag: false.
+- Output JSON structure:
+  {
+    "results": [
+      {
+        "id": 101,
+        "sentiment": "neutral",
+        "intent_tag": "Chốt đơn",
+        "question_tag": null,
+        "product_tag": "Áo thun đen",
+        "has_phone": true
+      },
+      {
+        "id": 102,
+        "sentiment": "neutral",
+        "intent_tag": "Hỏi thông tin",
+        "question_tag": "Hỏi chất liệu",
+        "product_tag": "Áo thun đen",
+        "has_phone": false
+      },
+      {
+        "id": 103,
+        "sentiment": "neutral",
+        "intent_tag": null,
+        "question_tag": null,
+        "product_tag": null,
+        "has_phone": false
+      }
+    ],
+    "session_note": "Đang bán áo thun đen. Có khách chốt đơn và hỏi chất liệu. Có chơi đoán số.",
+    "extracted_keywords": ["áo thun đen", "chất liệu", "đoán số"]
+  }
 </few_shot_examples>
 
 <output_format>
@@ -154,7 +203,9 @@ JSON Structure:
       "product_tag": string | null,
       "has_phone": boolean
     }
-  ]
+  ],
+  "session_note": "string",
+  "extracted_keywords": ["string"]
 }
 </output_format>
 PROMPT;
@@ -181,6 +232,8 @@ PROMPT;
                     ])
                 )
                 ->required(),
+            'session_note' => $schema->string()->nullable(),
+            'extracted_keywords' => $schema->array()->items($schema->string())->nullable(),
         ];
     }
 }

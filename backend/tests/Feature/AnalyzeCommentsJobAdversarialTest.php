@@ -2,13 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Ai\Agents\CommentAnalyzer;
+use App\Ai\Agents\LiveSessionAnalyzer;
 use App\Jobs\AnalyzeCommentsJob;
 use App\Models\LiveEvent;
 use App\Models\LiveSession;
 use App\Models\LiveStat;
 use App\Models\User;
-use App\Services\RunwareAiService;
-use App\Services\TikTokService;
 use Illuminate\Cache\Lock;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -19,17 +19,14 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
+    /**
+     * Fake the LiveSessionAnalyzer so the job's auto-insights step never hits the network.
+     */
+    private function fakeInsights(): void
     {
-        parent::setUp();
-        // Mock TikTokService by default
-        $this->mock(TikTokService::class, function ($mock) {
-            $mock->shouldReceive('getSnapshot')->andReturn([
-                'audio_b64' => null,
-                'image_b64' => null,
-                'title' => 'Adversarial Test',
-            ]);
-        });
+        LiveSessionAnalyzer::fake([
+            ['summary' => 'Auto insight summary.', 'alerts' => []],
+        ]);
     }
 
     /**
@@ -91,11 +88,9 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        // Mock RunwareAiService to throw a retryable rate limit exception (lowercase 'rate limit')
-        $this->mock(RunwareAiService::class, function ($mock) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->andThrow(new \RuntimeException('rate limit exceeded.'));
+        // Fake the agent to throw a retryable rate limit exception (lowercase 'rate limit')
+        CommentAnalyzer::fake(function () {
+            throw new \RuntimeException('rate limit exceeded.');
         });
 
         $job = new AnalyzeCommentsJob($session->id);
@@ -143,11 +138,9 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        // Mock RunwareAiService to throw an exception containing capitalized 'Rate limit'
-        $this->mock(RunwareAiService::class, function ($mock) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->andThrow(new \RuntimeException('Rate limit exceeded.'));
+        // Fake the agent to throw an exception containing capitalized 'Rate limit'
+        CommentAnalyzer::fake(function () {
+            throw new \RuntimeException('Rate limit exceeded.');
         });
 
         $job = new AnalyzeCommentsJob($session->id);
@@ -202,11 +195,9 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        // Mock RunwareAiService to throw an unrecoverable exception
-        $this->mock(RunwareAiService::class, function ($mock) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->andThrow(new \RuntimeException('Invalid JSON syntax returned by LLM.'));
+        // Fake the agent to throw an unrecoverable exception
+        CommentAnalyzer::fake(function () {
+            throw new \RuntimeException('Invalid JSON syntax returned by LLM.');
         });
 
         $job = new AnalyzeCommentsJob($session->id);
@@ -215,7 +206,6 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
         $lock = cache()->lock($lockKey, 120);
 
         $a1 = $lock->get();
-        dump('Lock acquired initially: '.($a1 ? 'true' : 'false'));
         $this->assertTrue($a1);
         $lock->release(); // Release so handle() can acquire it
 
@@ -229,7 +219,6 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
         $this->assertTrue($thrown);
 
         $a2 = $lock->get();
-        dump('Lock acquired after job run: '.($a2 ? 'true' : 'false'));
         $this->assertTrue($a2);
 
         // Assert first batch comments were marked processed & neutral (poison pill applied)
@@ -278,31 +267,29 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
             ]);
         }
 
-        // Mock RunwareAiService to receive only 50 comments in the input and return 50 results
-        $this->mock(RunwareAiService::class, function ($mock) use ($comments) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->withArgs(function ($systemPrompt, $parts) {
-                    $userMessage = $parts[0]['text'];
-                    $lines = explode("\n", trim($userMessage));
+        // Fake the agent: assert exactly 50 comments are sent and return 50 results.
+        // In a fake closure, the first argument is the prompt string itself.
+        CommentAnalyzer::fake(function ($prompt) use ($comments) {
+            $lines = explode("\n", trim($prompt));
 
-                    // Assert exactly 50 lines (comments) are sent to AI
-                    return count($lines) === 50;
-                })
-                ->andReturn([
-                    'results' => array_map(function ($i) use ($comments) {
-                        return [
-                            'id' => $comments[$i]->id,
-                            'sentiment' => 'positive',
-                            'intent_tag' => 'Hỏi thông tin',
-                            'question_tag' => 'Hỏi giá',
-                            'product_tag' => null,
-                            'has_phone' => false,
-                        ];
-                    }, range(0, 49)),
-                    'session_note' => 'Processed first 50.',
-                ]);
+            // Exactly 50 lines (comments) should be sent to the AI.
+            \PHPUnit\Framework\Assert::assertCount(50, $lines);
+
+            return [
+                'results' => array_map(function ($i) use ($comments) {
+                    return [
+                        'id' => $comments[$i]->id,
+                        'sentiment' => 'positive',
+                        'intent_tag' => 'Hỏi thông tin',
+                        'question_tag' => 'Hỏi giá',
+                        'product_tag' => null,
+                        'has_phone' => false,
+                    ];
+                }, range(0, 49)),
+                'session_note' => 'Processed first 50.',
+            ];
         });
+        $this->fakeInsights();
 
         $job = new AnalyzeCommentsJob($session->id);
         app()->call([$job, 'handle']);
@@ -384,8 +371,8 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment1, $comment2, $comment3) {
-            $mock->shouldReceive('chatMultimodal')->andReturn([
+        CommentAnalyzer::fake([
+            [
                 'results' => [
                     [
                         'id' => $comment1->id,
@@ -413,8 +400,9 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
                     ],
                 ],
                 'session_note' => 'Stats increment test.',
-            ]);
-        });
+            ],
+        ]);
+        $this->fakeInsights();
 
         $job = new AnalyzeCommentsJob($session->id);
         app()->call([$job, 'handle']);
@@ -455,8 +443,8 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment) {
-            $mock->shouldReceive('chatMultimodal')->andReturn([
+        CommentAnalyzer::fake([
+            [
                 'results' => [
                     [
                         'id' => $comment->id,
@@ -468,8 +456,8 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
                     ],
                 ],
                 'session_note' => 'Sync failure test.',
-            ]);
-        });
+            ],
+        ]);
 
         // Register a saving event listener on LiveStat that throws an exception
         // This will cause updateAggregateStats to throw an exception
@@ -527,9 +515,9 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
             ]);
         }
 
-        // Mock RunwareAiService to process first 50
-        $this->mock(RunwareAiService::class, function ($mock) use ($comments) {
-            $mock->shouldReceive('chatMultimodal')->andReturn([
+        // Fake the agent to process the first 50 comments
+        CommentAnalyzer::fake([
+            [
                 'results' => array_map(function ($i) use ($comments) {
                     return [
                         'id' => $comments[$i]->id,
@@ -541,8 +529,9 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
                     ];
                 }, range(0, 49)),
                 'session_note' => 'Lock release test batch.',
-            ]);
-        });
+            ],
+        ]);
+        $this->fakeInsights();
 
         // Mock the Cache lock to verify it is released exactly once
         $mockLock = \Mockery::mock(Lock::class);
@@ -606,8 +595,8 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
         ]);
 
         // Run Job 1 processing comment 1
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment1) {
-            $mock->shouldReceive('chatMultimodal')->andReturn([
+        CommentAnalyzer::fake([
+            [
                 'results' => [
                     [
                         'id' => $comment1->id,
@@ -619,16 +608,16 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
                     ],
                 ],
                 'session_note' => 'Job 1 summary.',
-            ]);
-        });
+            ],
+        ]);
+        $this->fakeInsights();
 
         $job1 = new AnalyzeCommentsJob($session->id);
         app()->call([$job1, 'handle']);
 
-        // Run Job 2 processing comment 2
-        // We need to re-mock RunwareAiService for the second job
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment2) {
-            $mock->shouldReceive('chatMultimodal')->andReturn([
+        // Run Job 2 processing comment 2 — re-fake for the second job
+        CommentAnalyzer::fake([
+            [
                 'results' => [
                     [
                         'id' => $comment2->id,
@@ -640,8 +629,8 @@ class AnalyzeCommentsJobAdversarialTest extends TestCase
                     ],
                 ],
                 'session_note' => 'Job 2 summary.',
-            ]);
-        });
+            ],
+        ]);
 
         $job2 = new AnalyzeCommentsJob($session->id);
         app()->call([$job2, 'handle']);

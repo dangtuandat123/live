@@ -2,13 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Ai\Agents\CommentAnalyzer;
 use App\Ai\Agents\LiveSessionAnalyzer;
 use App\Jobs\AnalyzeCommentsJob;
 use App\Models\LiveEvent;
 use App\Models\LiveSession;
 use App\Models\SubscriptionPackage;
 use App\Models\User;
-use App\Services\RunwareAiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\JsonSchema\JsonSchemaTypeFactory;
 use Illuminate\JsonSchema\Types\ArrayType;
@@ -121,14 +121,9 @@ class LiveSessionAiInsightsTest extends TestCase
             ],
         ];
 
-        $this->mock(RunwareAiService::class, function ($mock) use ($mockSummary, $mockAlerts) {
-            $mock->shouldReceive('chatJson')
-                ->once()
-                ->andReturn([
-                    'summary' => $mockSummary,
-                    'alerts' => $mockAlerts,
-                ]);
-        });
+        LiveSessionAnalyzer::fake([
+            ['summary' => $mockSummary, 'alerts' => $mockAlerts],
+        ]);
 
         $response = $this->actingAs($user)
             ->post(route('lives.refresh-insights', $session));
@@ -195,30 +190,25 @@ class LiveSessionAiInsightsTest extends TestCase
         $mockSummary = 'Auto summary.';
         $mockAlerts = [['type' => 'test', 'title' => 'Test', 'description' => 'Test desc', 'action' => 'Test action']];
 
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment, $mockSummary, $mockAlerts) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->andReturn([
-                    'results' => [
-                        [
-                            'id' => $comment->id,
-                            'sentiment' => 'neutral',
-                            'intent_tag' => null,
-                            'question_tag' => null,
-                            'product_tag' => null,
-                            'has_phone' => false,
-                        ],
+        CommentAnalyzer::fake([
+            [
+                'results' => [
+                    [
+                        'id' => $comment->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => null,
+                        'question_tag' => null,
+                        'product_tag' => null,
+                        'has_phone' => false,
                     ],
-                    'session_note' => 'Processed batch.',
-                ]);
+                ],
+                'session_note' => 'Processed batch.',
+            ],
+        ]);
 
-            $mock->shouldReceive('chatJson')
-                ->once()
-                ->andReturn([
-                    'summary' => $mockSummary,
-                    'alerts' => $mockAlerts,
-                ]);
-        });
+        LiveSessionAnalyzer::fake([
+            ['summary' => $mockSummary, 'alerts' => $mockAlerts],
+        ]);
 
         // Ensure throttle is not set
         $cacheKey = "live_session_{$session->id}_last_insight_time";
@@ -257,25 +247,26 @@ class LiveSessionAiInsightsTest extends TestCase
             'ai_processed' => false,
         ]);
 
-        $this->mock(RunwareAiService::class, function ($mock) use ($comment) {
-            $mock->shouldReceive('chatMultimodal')
-                ->once()
-                ->andReturn([
-                    'results' => [
-                        [
-                            'id' => $comment->id,
-                            'sentiment' => 'neutral',
-                            'intent_tag' => null,
-                            'question_tag' => null,
-                            'product_tag' => null,
-                            'has_phone' => false,
-                        ],
+        CommentAnalyzer::fake([
+            [
+                'results' => [
+                    [
+                        'id' => $comment->id,
+                        'sentiment' => 'neutral',
+                        'intent_tag' => null,
+                        'question_tag' => null,
+                        'product_tag' => null,
+                        'has_phone' => false,
                     ],
-                    'session_note' => 'Processed batch.',
-                ]);
+                ],
+                'session_note' => 'Processed batch.',
+            ],
+        ]);
 
-            $mock->shouldNotReceive('chatJson');
-        });
+        // Fake the analyzer too (so a stray call never hits the network) but assert it is never prompted.
+        LiveSessionAnalyzer::fake([
+            ['summary' => 'should not be used', 'alerts' => []],
+        ]);
 
         // Set last insight time to 10 seconds ago
         $cacheKey = "live_session_{$session->id}_last_insight_time";
@@ -287,6 +278,8 @@ class LiveSessionAiInsightsTest extends TestCase
         $session->refresh();
         $this->assertEquals('old insights', $session->ai_insights);
         $this->assertEquals([], $session->ai_alerts);
+
+        LiveSessionAnalyzer::assertNeverPrompted();
     }
 
     /**
@@ -386,7 +379,7 @@ class LiveSessionAiInsightsTest extends TestCase
     }
 
     /**
-     * Test manual refresh insights endpoint handles Runware AI service exceptions.
+     * Test manual refresh insights endpoint handles AI service exceptions.
      */
     public function test_manual_refresh_insights_endpoint_handles_exceptions()
     {
@@ -398,10 +391,8 @@ class LiveSessionAiInsightsTest extends TestCase
             'status' => 'live',
         ]);
 
-        $this->mock(RunwareAiService::class, function ($mock) {
-            $mock->shouldReceive('chatJson')
-                ->once()
-                ->andThrow(new \RuntimeException('AI service error'));
+        LiveSessionAnalyzer::fake(function () {
+            throw new \RuntimeException('AI service error');
         });
 
         // Ensure no throttle is set
@@ -468,14 +459,9 @@ class LiveSessionAiInsightsTest extends TestCase
         $mockSummary = 'Insights summary.';
         $mockAlerts = [];
 
-        $this->mock(RunwareAiService::class, function ($mock) use ($mockSummary, $mockAlerts) {
-            $mock->shouldReceive('chatJson')
-                ->once()
-                ->andReturn([
-                    'summary' => $mockSummary,
-                    'alerts' => $mockAlerts,
-                ]);
-        });
+        LiveSessionAnalyzer::fake([
+            ['summary' => $mockSummary, 'alerts' => $mockAlerts],
+        ]);
 
         // Ensure no throttle is set
         $cacheKey = "live_session_{$session->id}_last_insight_time";
